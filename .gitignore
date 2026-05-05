@@ -1,0 +1,157 @@
+# ----------------------------
+# Python
+# ----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+
+# ----------------------------
+# Manim outputs
+# ----------------------------
+media/
+videos/
+images/
+Tex/
+tex/
+text/
+partial_movie_files/
+*.mp4
+*.mov
+*.webm
+*.gif
+
+# Manim cache / generated files
+.manim/
+manim.cfg.backup
+*.log
+*.aux
+*.dvi
+*.xdv
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# ----------------------------
+# Render / export outputs
+# ----------------------------
+renders/
+exports/
+output/
+outputs/
+out/
+frames/
+thumbnails/
+screenshots/
+
+# Generated assets
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.pdf
+
+# Keep source/design assets if you store them intentionally
+!assets/**/*.png
+!assets/**/*.jpg
+!assets/**/*.jpeg
+!assets/**/*.svg
+!assets/**/*.pdf
+!docs/**/*.png
+!docs/**/*.jpg
+!docs/**/*.jpeg
+!docs/**/*.svg
+!docs/**/*.pdf
+
+# ----------------------------
+# Project-specific generated data
+# ----------------------------
+cache/
+caches/
+tmp/
+temp/
+.temp/
+.cache/
+
+# Scene render checkpoints / scratch
+scratch/
+drafts/
+sandbox/
+playground/
+
+# ----------------------------
+# Jupyter / notebooks
+# ----------------------------
+.ipynb_checkpoints/
+
+# ----------------------------
+# IDE / editor files
+# ----------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ----------------------------
+# Environment / secrets
+# ----------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ----------------------------
+# Logs
+# ----------------------------
+logs/
+*.log
+
+# ----------------------------
+# Dependency lock files
+# ----------------------------
+# Uncomment if you do NOT want to commit lock files.
+# Usually keep these committed for reproducible projects.
+# poetry.lock
+# uv.lock
+# Pipfile.lock
+# requirements.lock
+
+# ----------------------------
+# OS files
+# ----------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Trashes
+ehthumbs.db
+Desktop.ini
