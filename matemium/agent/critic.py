@@ -140,17 +140,23 @@ def _merge_ipc_results(*results: SidecarIpcResult) -> SidecarIpcResult:
     )
 
 
+def _ipc_failure_result(stderr: str, *, returncode: int = -1) -> SidecarIpcResult:
+    return SidecarIpcResult(responses=(), stderr=stderr, returncode=returncode)
+
+
 def run_sidecar_ipc(
     requests: list[tuple[str, str, dict]],
     *,
     timeout: float = DEFAULT_COMPILE_TIMEOUT,
 ) -> SidecarIpcResult:
     """Spawn the PyInstaller sidecar and exchange NDJSON requests on stdin."""
-    binary = sidecar_binary_path()
-    stdin_payload = "\n".join(_ipc_request(req_id, command, params) for req_id, command, params in requests)
-    stdin_payload = f"{stdin_payload}\n" if stdin_payload else ""
-
     try:
+        binary = sidecar_binary_path()
+        stdin_payload = "\n".join(
+            _ipc_request(req_id, command, params) for req_id, command, params in requests
+        )
+        stdin_payload = f"{stdin_payload}\n" if stdin_payload else ""
+
         proc = subprocess.run(
             [str(binary)],
             input=stdin_payload,
@@ -160,19 +166,19 @@ def run_sidecar_ipc(
             env=_sidecar_env(),
             cwd=str(discover_root()),
         )
+    except FileNotFoundError as exc:
+        return _ipc_failure_result(str(exc))
     except subprocess.TimeoutExpired as exc:
         stderr = _decode_subprocess_stream(exc.stderr)
         if stderr.strip():
             stderr = f"sidecar subprocess timed out after {timeout}s\n{stderr}"
         else:
             stderr = f"sidecar subprocess timed out after {timeout}s"
-        return SidecarIpcResult(responses=(), stderr=stderr, returncode=-1)
+        return _ipc_failure_result(stderr)
     except OSError as exc:
-        return SidecarIpcResult(
-            responses=(),
-            stderr=f"sidecar spawn failed: {exc}",
-            returncode=-1,
-        )
+        return _ipc_failure_result(f"sidecar spawn failed: {exc}")
+    except Exception as exc:
+        return _ipc_failure_result(f"sidecar IPC failed: {exc}")
 
     responses, _events = _parse_sidecar_stdout(proc.stdout)
     return SidecarIpcResult(
@@ -192,17 +198,23 @@ def contains_python_or_manim_error(text: str) -> bool:
     return bool(re.search(r"\bError\b", text))
 
 
-def format_compile_error(responses: tuple[dict, ...] | list[dict], stderr: str) -> str:
-    """Flatten sidecar responses and stderr into one error string for patch_fn."""
+def _collect_error_fragments(responses: tuple[dict, ...] | list[dict], stderr: str) -> list[str]:
+    """Gather every error fragment from stderr and IPC payloads."""
     lines: list[str] = []
     if stderr.strip():
         lines.append(stderr.strip())
     for resp in responses:
         if not resp.get("ok"):
             err = resp.get("error") or {}
-            message = err.get("message") if isinstance(err, dict) else str(err)
-            if message:
-                lines.append(str(message))
+            if isinstance(err, dict):
+                traceback = err.get("traceback")
+                message = err.get("message")
+                if traceback:
+                    lines.append(str(traceback))
+                if message:
+                    lines.append(str(message))
+            elif err:
+                lines.append(str(err))
         result = resp.get("result")
         if isinstance(result, dict) and result.get("ok") is False:
             for diag in result.get("errors") or []:
@@ -210,7 +222,32 @@ def format_compile_error(responses: tuple[dict, ...] | list[dict], stderr: str) 
                     lines.append(str(diag.get("message", diag)))
                 else:
                     lines.append(str(diag))
-    return "\n".join(lines) if lines else ""
+    return list(dict.fromkeys(line for line in lines if line.strip()))
+
+
+def _richest_error_text(fragments: list[str]) -> str:
+    """Pick the most informative compile error for patch_fn feeding."""
+    if not fragments:
+        return ""
+    for fragment in fragments:
+        if "SyntaxError" in fragment and "^" in fragment:
+            return fragment
+    for fragment in fragments:
+        if "SyntaxError" in fragment:
+            return fragment
+    for fragment in fragments:
+        if "Traceback" in fragment:
+            return fragment
+    return max(fragments, key=len)
+
+
+def format_compile_error(responses: tuple[dict, ...] | list[dict], stderr: str) -> str:
+    """Flatten sidecar responses and stderr into one error string for patch_fn."""
+    fragments = _collect_error_fragments(responses, stderr)
+    richest = _richest_error_text(fragments)
+    if richest:
+        return richest
+    return "\n".join(fragments) if fragments else ""
 
 
 def _ensure_error_text(error_text: str, result: SidecarIpcResult) -> str:
@@ -283,10 +320,6 @@ def compile_project_via_sidecar(
         ("list", "list_scenes", {"workspace": str(workspace)}),
     ]
     list_ipc = run_sidecar_ipc(requests, timeout=timeout)
-    list_ok, list_err = compile_outcome_from_sidecar(list_ipc)
-    if not list_ok:
-        return False, list_err
-
     scene_name = _resolve_scene_from_listing(list_ipc.responses, scene)
 
     compile_requests: list[tuple[str, str, dict]] = [

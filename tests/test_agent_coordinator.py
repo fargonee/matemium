@@ -579,6 +579,21 @@ def test_run_sidecar_ipc_timeout_returns_failure(monkeypatch):
     assert "timed out" in err
 
 
+def test_compile_project_via_sidecar_missing_binary_returns_tuple(monkeypatch, tmp_path: Path):
+    def raise_missing() -> Path:
+        raise FileNotFoundError("PyInstaller sidecar not found at /missing/matemium-sidecar")
+
+    monkeypatch.setattr("matemium.agent.critic.sidecar_binary_path", raise_missing)
+    ok, err = compile_project_via_sidecar(tmp_path / "ws")
+    assert ok is False
+    assert "PyInstaller sidecar not found" in err
+
+    compile_fn = make_sidecar_compile_fn(tmp_path / "ws")
+    ok_fn, err_fn = compile_fn()
+    assert ok_fn is False
+    assert "PyInstaller sidecar not found" in err_fn
+
+
 def test_format_compile_error_extracts_syntax_message():
     responses = (
         {
@@ -614,6 +629,9 @@ def test_sidecar_compile_syntax_error_workspace(tmp_path: Path):
     (ws / "scenes.py").write_text("def broken(\n", encoding="utf-8")
     ok, stderr = compile_project_via_sidecar(ws)
     assert ok is False
+    assert "SyntaxError" in stderr
+    assert "File" in stderr
+    assert "^" in stderr
     assert contains_python_or_manim_error(stderr)
 
 
