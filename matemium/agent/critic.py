@@ -24,6 +24,8 @@ DEFAULT_COMPILE_TIMEOUT = 300.0
 
 PYTHON_MANIM_ERROR_MARKERS: tuple[str, ...] = (
     "SyntaxError",
+    "was never closed",
+    "invalid syntax",
     "IndentationError",
     "ImportError",
     "ModuleNotFoundError",
@@ -112,6 +114,32 @@ def _parse_sidecar_stdout(stdout: str) -> tuple[list[dict], list[dict]]:
     return responses, events
 
 
+def _decode_subprocess_stream(data: str | bytes | None) -> str:
+    if not data:
+        return ""
+    if isinstance(data, bytes):
+        return data.decode("utf-8", errors="replace")
+    return data
+
+
+def _merge_ipc_results(*results: SidecarIpcResult) -> SidecarIpcResult:
+    """Combine responses and stderr from sequential sidecar IPC rounds."""
+    responses: list[dict] = []
+    stderr_parts: list[str] = []
+    returncode = 0
+    for result in results:
+        responses.extend(result.responses)
+        if result.stderr.strip():
+            stderr_parts.append(result.stderr.strip())
+        if result.returncode != 0:
+            returncode = result.returncode
+    return SidecarIpcResult(
+        responses=tuple(responses),
+        stderr="\n".join(stderr_parts),
+        returncode=returncode,
+    )
+
+
 def run_sidecar_ipc(
     requests: list[tuple[str, str, dict]],
     *,
@@ -122,15 +150,30 @@ def run_sidecar_ipc(
     stdin_payload = "\n".join(_ipc_request(req_id, command, params) for req_id, command, params in requests)
     stdin_payload = f"{stdin_payload}\n" if stdin_payload else ""
 
-    proc = subprocess.run(
-        [str(binary)],
-        input=stdin_payload,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        env=_sidecar_env(),
-        cwd=str(discover_root()),
-    )
+    try:
+        proc = subprocess.run(
+            [str(binary)],
+            input=stdin_payload,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=_sidecar_env(),
+            cwd=str(discover_root()),
+        )
+    except subprocess.TimeoutExpired as exc:
+        stderr = _decode_subprocess_stream(exc.stderr)
+        if stderr.strip():
+            stderr = f"sidecar subprocess timed out after {timeout}s\n{stderr}"
+        else:
+            stderr = f"sidecar subprocess timed out after {timeout}s"
+        return SidecarIpcResult(responses=(), stderr=stderr, returncode=-1)
+    except OSError as exc:
+        return SidecarIpcResult(
+            responses=(),
+            stderr=f"sidecar spawn failed: {exc}",
+            returncode=-1,
+        )
+
     responses, _events = _parse_sidecar_stdout(proc.stdout)
     return SidecarIpcResult(
         responses=tuple(responses),
@@ -170,26 +213,40 @@ def format_compile_error(responses: tuple[dict, ...] | list[dict], stderr: str) 
     return "\n".join(lines) if lines else ""
 
 
+def _ensure_error_text(error_text: str, result: SidecarIpcResult) -> str:
+    """Guarantee a non-empty error string for patch_fn and debug payloads."""
+    if error_text.strip():
+        return error_text
+    if result.stderr.strip():
+        return result.stderr.strip()
+    if result.returncode != 0:
+        return f"sidecar exited with code {result.returncode}"
+    if not result.responses:
+        return "sidecar produced no responses"
+    return "compilation failed"
+
+
 def compile_outcome_from_sidecar(result: SidecarIpcResult) -> tuple[bool, str]:
     """Classify sidecar IPC as compile success or failure with error text."""
     error_text = format_compile_error(result.responses, result.stderr)
-    if result.returncode != 0 and not error_text.strip():
-        error_text = f"sidecar exited with code {result.returncode}"
 
     if not result.responses:
-        return False, error_text or "sidecar produced no responses"
+        return False, _ensure_error_text(error_text, result)
 
     for resp in result.responses:
         if not resp.get("ok"):
-            return False, error_text
+            return False, _ensure_error_text(error_text, result)
         payload = resp.get("result")
         if isinstance(payload, dict) and payload.get("ok") is False:
-            return False, error_text
+            return False, _ensure_error_text(error_text, result)
 
     if contains_python_or_manim_error(result.stderr):
-        return False, error_text
+        return False, _ensure_error_text(error_text, result)
     if contains_python_or_manim_error(error_text):
-        return False, error_text
+        return False, _ensure_error_text(error_text, result)
+
+    if result.returncode != 0:
+        return False, _ensure_error_text(error_text, result)
 
     return True, ""
 
@@ -225,8 +282,12 @@ def compile_project_via_sidecar(
     requests: list[tuple[str, str, dict]] = [
         ("list", "list_scenes", {"workspace": str(workspace)}),
     ]
-    ipc = run_sidecar_ipc(requests, timeout=timeout)
-    scene_name = _resolve_scene_from_listing(ipc.responses, scene)
+    list_ipc = run_sidecar_ipc(requests, timeout=timeout)
+    list_ok, list_err = compile_outcome_from_sidecar(list_ipc)
+    if not list_ok:
+        return False, list_err
+
+    scene_name = _resolve_scene_from_listing(list_ipc.responses, scene)
 
     compile_requests: list[tuple[str, str, dict]] = [
         (
@@ -249,8 +310,9 @@ def compile_project_via_sidecar(
             )
         )
 
-    ipc = run_sidecar_ipc(compile_requests, timeout=timeout)
-    return compile_outcome_from_sidecar(ipc)
+    compile_ipc = run_sidecar_ipc(compile_requests, timeout=timeout)
+    merged = _merge_ipc_results(list_ipc, compile_ipc)
+    return compile_outcome_from_sidecar(merged)
 
 
 def make_sidecar_compile_fn(

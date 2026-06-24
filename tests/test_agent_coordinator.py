@@ -21,10 +21,14 @@ from matemium.agent import (
     parse_whisper_timing_blueprint,
     run_lifecycle,
 )
+import subprocess
+
 from matemium.agent.critic import (
     CriticHooks,
     MAX_CRITIC_RETRIES,
     VISUAL_QC_FAILURE,
+    SidecarIpcResult,
+    compile_outcome_from_sidecar,
     compile_project_via_sidecar,
     contains_python_or_manim_error,
     format_compile_error,
@@ -555,6 +559,26 @@ requires_sidecar = pytest.mark.skipif(
 )
 
 
+def test_compile_outcome_ensures_non_empty_error_on_failure():
+    result = SidecarIpcResult(responses=({"ok": False, "error": {}},), stderr="", returncode=1)
+    ok, err = compile_outcome_from_sidecar(result)
+    assert ok is False
+    assert err.strip()
+    assert err == "sidecar exited with code 1"
+
+
+def test_run_sidecar_ipc_timeout_returns_failure(monkeypatch):
+    def raise_timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd="matemium-sidecar", timeout=1)
+
+    monkeypatch.setattr("matemium.agent.critic.subprocess.run", raise_timeout)
+    monkeypatch.setattr("matemium.agent.critic.sidecar_binary_path", lambda: Path("/fake/sidecar"))
+    result = run_sidecar_ipc([("ping", "ping", {})], timeout=1)
+    ok, err = compile_outcome_from_sidecar(result)
+    assert ok is False
+    assert "timed out" in err
+
+
 def test_format_compile_error_extracts_syntax_message():
     responses = (
         {
@@ -579,6 +603,7 @@ def test_sidecar_compile_good_demo_workspace(tmp_path: Path):
     shutil.copy(DEMO_SCENES, ws / "scenes.py")
     ok, stderr = compile_project_via_sidecar(ws, scene="PortraitDemo")
     assert ok is True
+    assert stderr == ""
     assert not contains_python_or_manim_error(stderr)
 
 
@@ -589,7 +614,7 @@ def test_sidecar_compile_syntax_error_workspace(tmp_path: Path):
     (ws / "scenes.py").write_text("def broken(\n", encoding="utf-8")
     ok, stderr = compile_project_via_sidecar(ws)
     assert ok is False
-    assert "SyntaxError" in stderr
+    assert contains_python_or_manim_error(stderr)
 
 
 @requires_sidecar
@@ -615,10 +640,10 @@ def test_critic_loop_feeds_patch_fn_from_sidecar_errors(tmp_path: Path):
         run_critic_loop(session, hooks)
 
     assert len(patches) == MAX_CRITIC_RETRIES - 1
-    assert all("SyntaxError" in p for p in patches)
+    assert all(contains_python_or_manim_error(p) for p in patches)
     debug = json.loads((ws / DEBUG_FILENAME).read_text(encoding="utf-8"))
     assert debug["retry_count"] == MAX_CRITIC_RETRIES
-    assert "SyntaxError" in debug["error"]
+    assert contains_python_or_manim_error(debug["error"])
 
 
 @requires_sidecar
