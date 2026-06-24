@@ -25,8 +25,10 @@ from .critic import (
 from .debug import DEBUG_FILENAME
 from .guard import (
     WATERMARK_MARKER,
+    apply_guard_to_project,
     apply_guard_to_scenes_file,
     dsl_has_watermark,
+    should_apply_watermark,
     should_apply_watermark_for_session,
 )
 from .models import AccountTier, ModelTier, Phase, ProcessingMode, ProjectSession
@@ -200,6 +202,43 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _dir_listing(path: Path) -> list[str]:
+    if not path.is_dir():
+        return []
+    return sorted(p.name for p in path.iterdir())
+
+
+def _excerpt_builder_config(source: str, *, lines: int = 6) -> str:
+    """Return scenes.py lines around the main-scene builder / watermark block."""
+    split = source.splitlines()
+    anchor_idx = -1
+    for idx, line in enumerate(split):
+        if WATERMARK_MARKER in line or "super().__init__(dsl=builder.build()" in line:
+            anchor_idx = idx
+            break
+    if anchor_idx < 0:
+        return "(builder config excerpt not found)"
+    start = max(0, anchor_idx - lines)
+    end = min(len(split), anchor_idx + lines + 1)
+    return "\n".join(split[start:end])
+
+
+def _append_scratch_transcript(
+    path: Path,
+    text: str,
+    *,
+    append: bool = True,
+    separator: str = "\n---\n",
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if append and path.is_file() and path.stat().st_size > 0:
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(separator)
+            handle.write(text)
+    else:
+        path.write_text(text, encoding="utf-8")
+
+
 def _run_guard_consumer_scenarios(base: Path, log: io.StringIO) -> dict[str, str]:
     """Exercise guard tier decisions, writer emission, DSL inspection, and compile."""
     from matemium.workspace_project import instantiate_scene, workspace_context
@@ -225,7 +264,10 @@ def _run_guard_consumer_scenarios(base: Path, log: io.StringIO) -> dict[str, str
     )
     write_decoupled_project(writer_dir, basic_script, blueprint, session=writer_session)
     writer_scenes = (writer_dir / "scenes.py").read_text(encoding="utf-8")
+    writeln(f"writer listing: {_dir_listing(writer_dir)}")
     writeln(f"writer basic has watermark: {WATERMARK_MARKER in writer_scenes}")
+    writeln("writer scenes excerpt:")
+    writeln(_excerpt_builder_config(writer_scenes))
     assert WATERMARK_MARKER in writer_scenes
 
     basic_dir = base / "basic_unpaid"
@@ -239,8 +281,11 @@ def _run_guard_consumer_scenarios(base: Path, log: io.StringIO) -> dict[str, str
     )
     apply_guard_to_scenes_file(basic_dir / "scenes.py", basic_session)
     basic_scenes = (basic_dir / "scenes.py").read_text(encoding="utf-8")
+    writeln(f"basic listing: {_dir_listing(basic_dir)}")
     writeln(f"basic decision: {should_apply_watermark_for_session(basic_session)}")
     writeln(f"basic scenes has watermark: {WATERMARK_MARKER in basic_scenes}")
+    writeln("basic scenes excerpt:")
+    writeln(_excerpt_builder_config(basic_scenes))
     assert should_apply_watermark_for_session(basic_session)
     assert WATERMARK_MARKER in basic_scenes
 
@@ -255,8 +300,11 @@ def _run_guard_consumer_scenarios(base: Path, log: io.StringIO) -> dict[str, str
     )
     apply_guard_to_scenes_file(premium_dir / "scenes.py", premium_session)
     premium_scenes = (premium_dir / "scenes.py").read_text(encoding="utf-8")
+    writeln(f"premium listing: {_dir_listing(premium_dir)}")
     writeln(f"premium decision: {should_apply_watermark_for_session(premium_session)}")
     writeln(f"premium scenes has watermark: {WATERMARK_MARKER in premium_scenes}")
+    writeln("premium scenes excerpt:")
+    writeln(_excerpt_builder_config(premium_scenes))
     assert not should_apply_watermark_for_session(premium_session)
     assert WATERMARK_MARKER not in premium_scenes
 
@@ -297,45 +345,133 @@ def _run_guard_consumer_scenarios(base: Path, log: io.StringIO) -> dict[str, str
     else:
         writeln("SIDECAR_MISSING: compile skipped")
 
-    writeln("GUARD_CONSUMER_PASS")
-    return {
+    hashes = {
         "basic_scenes": _sha(basic_dir / "scenes.py"),
         "premium_scenes": _sha(premium_dir / "scenes.py"),
         "paid_scenes": _sha(paid_dir / "scenes.py"),
         "writer_scenes": _sha(writer_dir / "scenes.py"),
     }
+    writeln(f"hashes: {json.dumps(hashes, indent=2)}")
+    writeln("GUARD_CONSUMER_PASS")
+    return hashes
 
 
-def _run_guard_launch_capture(scratch: Path, log: io.StringIO) -> None:
-    project = scratch / "guard_launch_project"
-    project.mkdir(parents=True, exist_ok=True)
-    blueprint = build_mute_blueprint(stub_director_agent("launch", ProcessingMode.MUTE).script)
+def _run_guard_direct_launch(log: io.StringIO) -> None:
+    """Plan step 3 — guard + writer + apply_guard_to_project + make_sidecar_compile_fn."""
+    import tempfile
+
+    def writeln(msg: str = "") -> None:
+        log.write(msg + "\n")
+
+    writeln(f"=== guard direct launch pid={os.getpid()} ===")
+
     script = stub_director_agent("launch", ProcessingMode.MUTE).script
+    blueprint = build_mute_blueprint(script)
+
+    writer_basic = Path(tempfile.mkdtemp(prefix="guard_launch_writer_basic_"))
+    writer_premium = Path(tempfile.mkdtemp(prefix="guard_launch_writer_premium_"))
+    compile_basic = Path(tempfile.mkdtemp(prefix="guard_launch_compile_basic_"))
+    compile_premium = Path(tempfile.mkdtemp(prefix="guard_launch_compile_premium_"))
 
     basic_session = ProjectSession(
-        project_dir=project / "basic",
+        project_dir=writer_basic,
         user_prompt="launch basic",
         model_tier=ModelTier.STANDARD,
         account_tier=AccountTier.BASIC,
     )
-    (project / "basic").mkdir(parents=True, exist_ok=True)
-    write_decoupled_project(project / "basic", script, blueprint, session=basic_session)
-    apply_guard_to_scenes_file(project / "basic" / "scenes.py", basic_session)
-    basic_source = (project / "basic" / "scenes.py").read_text(encoding="utf-8")
-    log.write(f"launch basic watermark: {WATERMARK_MARKER in basic_source}\n")
-
     premium_session = ProjectSession(
-        project_dir=project / "premium",
+        project_dir=writer_premium,
         user_prompt="launch premium",
         model_tier=ModelTier.STANDARD,
         account_tier=AccountTier.PREMIUM,
     )
-    (project / "premium").mkdir(parents=True, exist_ok=True)
-    write_decoupled_project(project / "premium", script, blueprint, session=premium_session)
-    apply_guard_to_scenes_file(project / "premium" / "scenes.py", premium_session)
-    premium_source = (project / "premium" / "scenes.py").read_text(encoding="utf-8")
-    log.write(f"launch premium watermark: {WATERMARK_MARKER in premium_source}\n")
-    log.write("GUARD_LAUNCH_OK\n")
+
+    writeln(f"should_apply_watermark basic: {should_apply_watermark(AccountTier.BASIC)}")
+    writeln(f"should_apply_watermark premium: {should_apply_watermark(AccountTier.PREMIUM)}")
+
+    write_decoupled_project(writer_basic, script, blueprint, session=basic_session)
+    write_decoupled_project(writer_premium, script, blueprint, session=premium_session)
+    basic_writer_source = (writer_basic / "scenes.py").read_text(encoding="utf-8")
+    premium_writer_source = (writer_premium / "scenes.py").read_text(encoding="utf-8")
+    writeln(f"writer basic listing: {_dir_listing(writer_basic)}")
+    writeln(f"writer premium listing: {_dir_listing(writer_premium)}")
+    writeln(f"writer basic watermark: {WATERMARK_MARKER in basic_writer_source}")
+    writeln(f"writer premium watermark: {WATERMARK_MARKER in premium_writer_source}")
+    writeln("writer basic excerpt:")
+    writeln(_excerpt_builder_config(basic_writer_source))
+    writeln("writer premium excerpt:")
+    writeln(_excerpt_builder_config(premium_writer_source))
+
+    shutil.copy(DEMO_SCENES, compile_basic / "scenes.py")
+    shutil.copy(DEMO_SCENES, compile_premium / "scenes.py")
+    compile_basic_session = ProjectSession(
+        project_dir=compile_basic,
+        user_prompt="compile basic",
+        model_tier=ModelTier.STANDARD,
+        account_tier=AccountTier.BASIC,
+    )
+    compile_premium_session = ProjectSession(
+        project_dir=compile_premium,
+        user_prompt="compile premium",
+        model_tier=ModelTier.STANDARD,
+        account_tier=AccountTier.PREMIUM,
+    )
+    apply_guard_to_project(compile_basic_session)
+    apply_guard_to_project(compile_premium_session)
+    compile_basic_source = (compile_basic / "scenes.py").read_text(encoding="utf-8")
+    compile_premium_source = (compile_premium / "scenes.py").read_text(encoding="utf-8")
+    writeln(f"compile basic listing: {_dir_listing(compile_basic)}")
+    writeln(f"compile premium listing: {_dir_listing(compile_premium)}")
+    writeln(f"compile basic watermark: {WATERMARK_MARKER in compile_basic_source}")
+    writeln(f"compile premium watermark: {WATERMARK_MARKER in compile_premium_source}")
+    writeln("compile basic excerpt:")
+    writeln(_excerpt_builder_config(compile_basic_source))
+    writeln("compile premium excerpt:")
+    writeln(_excerpt_builder_config(compile_premium_source))
+
+    if sidecar_binary_available():
+        basic_compile_fn = make_sidecar_compile_fn(compile_basic, scene="PortraitDemo")
+        premium_compile_fn = make_sidecar_compile_fn(compile_premium, scene="PortraitDemo")
+        ok_basic, err_basic = basic_compile_fn()
+        ok_premium, err_premium = premium_compile_fn()
+        writeln(f"make_sidecar_compile_fn basic ok: {ok_basic}")
+        writeln(f"make_sidecar_compile_fn premium ok: {ok_premium}")
+        writeln(f"make_sidecar_compile_fn basic err: {repr(err_basic)}")
+        writeln(f"make_sidecar_compile_fn premium err: {repr(err_premium)}")
+        assert ok_basic and ok_premium
+    else:
+        writeln("SIDECAR_MISSING: make_sidecar_compile_fn compile skipped")
+
+    assert WATERMARK_MARKER in basic_writer_source
+    assert WATERMARK_MARKER not in premium_writer_source
+    assert WATERMARK_MARKER in compile_basic_source
+    assert WATERMARK_MARKER not in compile_premium_source
+    writeln("GUARD_LAUNCH_OK")
+
+
+def run_standalone_guard_consumer(*, append: bool = True) -> dict[str, str]:
+    """Standalone consumer entry point — full scenario transcript to guard_consumer.log."""
+    scratch = scratch_dir()
+    log = io.StringIO()
+    bundle = scratch / f"guard_bundle_{os.getpid()}"
+    hashes = _run_guard_consumer_scenarios(bundle, log)
+    transcript = log.getvalue()
+    _append_scratch_transcript(scratch / "guard_consumer.log", transcript, append=append)
+    hash_path = scratch / "guard_consumer_hashes.json"
+    existing: dict[str, str] = {}
+    if append and hash_path.is_file():
+        existing = json.loads(hash_path.read_text(encoding="utf-8"))
+    existing[f"run_{os.getpid()}"] = hashes
+    hash_path.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+    return hashes
+
+
+def run_standalone_guard_launch(*, append: bool = True) -> None:
+    """Standalone direct launch entry point — full transcript to guard_launch.log."""
+    scratch = scratch_dir()
+    log = io.StringIO()
+    _run_guard_direct_launch(log)
+    _append_scratch_transcript(scratch / "guard_launch.log", log.getvalue(), append=append)
 
 
 def _run_launch_capture(scratch: Path, log: io.StringIO) -> None:
@@ -397,22 +533,39 @@ def emit_guard_scratch_artifacts(target: Path | None = None) -> Path:
     """Run guard verification scenarios and write scratch capture files."""
     scratch = target or scratch_dir()
     scratch.mkdir(parents=True, exist_ok=True)
-
-    guard_consumer_log = io.StringIO()
-    guard_bundle = scratch / f"guard_bundle_{os.getpid()}"
-    guard_hashes = _run_guard_consumer_scenarios(guard_bundle, guard_consumer_log)
-    (scratch / "guard_consumer.log").write_text(guard_consumer_log.getvalue(), encoding="utf-8")
-
-    guard_launch_log = io.StringIO()
-    _run_guard_launch_capture(scratch, guard_launch_log)
-    (scratch / "guard_launch.log").write_text(guard_launch_log.getvalue(), encoding="utf-8")
-
-    (scratch / "guard_source_read.log").write_text(_capture_guard_source_read(), encoding="utf-8")
-
-    if guard_hashes:
-        (scratch / "guard_consumer_hashes.json").write_text(
-            json.dumps(guard_hashes, indent=2) + "\n",
-            encoding="utf-8",
-        )
-
+    prev = os.environ.get("MATEMIUM_SCRATCH")
+    os.environ["MATEMIUM_SCRATCH"] = str(scratch)
+    try:
+        run_standalone_guard_consumer(append=False)
+        run_standalone_guard_launch(append=False)
+        (scratch / "guard_source_read.log").write_text(_capture_guard_source_read(), encoding="utf-8")
+    finally:
+        if prev is None:
+            os.environ.pop("MATEMIUM_SCRATCH", None)
+        else:
+            os.environ["MATEMIUM_SCRATCH"] = prev
     return scratch
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry: guard-consumer | guard-launch | guard-all."""
+    args = list(argv if argv is not None else sys.argv[1:])
+    if not args:
+        print("usage: python -m matemium.agent.verification_scratch guard-consumer|guard-launch|guard-all")
+        return 2
+    command = args[0]
+    if command == "guard-consumer":
+        run_standalone_guard_consumer(append=True)
+        return 0
+    if command == "guard-launch":
+        run_standalone_guard_launch(append=True)
+        return 0
+    if command == "guard-all":
+        emit_guard_scratch_artifacts()
+        return 0
+    print(f"unknown command: {command}")
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
