@@ -257,5 +257,16 @@ def default_compile_success() -> tuple[bool, str]:
     return True, ""
 
 
+def sidecar_compile_for(project_dir: Path | str) -> CompileFn:
+    """Production compile_fn — PyInstaller sidecar check_project on workspace."""
+    from pathlib import Path
+
+    from .critic import make_sidecar_compile_fn, sidecar_binary_available
+
+    if sidecar_binary_available():
+        return make_sidecar_compile_fn(Path(project_dir))
+    return default_compile_success
+
+
 def default_visual_qc() -> bool:
     return True

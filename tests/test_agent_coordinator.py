@@ -21,8 +21,20 @@ from matemium.agent import (
     parse_whisper_timing_blueprint,
     run_lifecycle,
 )
-from matemium.agent.critic import MAX_CRITIC_RETRIES, VISUAL_QC_FAILURE
+from matemium.agent.critic import (
+    CriticHooks,
+    MAX_CRITIC_RETRIES,
+    VISUAL_QC_FAILURE,
+    compile_project_via_sidecar,
+    contains_python_or_manim_error,
+    format_compile_error,
+    make_sidecar_compile_fn,
+    run_critic_loop,
+    run_sidecar_ipc,
+    sidecar_binary_available,
+)
 from matemium.agent.debug import DEBUG_FILENAME
+from matemium.agent.models import ProjectSession
 from matemium.agent.script_parser import parse_narrative_blocks
 from matemium.agent.separation import build_decoupled_artifacts
 from matemium.agent.stubs import (
@@ -532,6 +544,89 @@ def test_token_ledger_applies_tier_multipliers(tmp_path: Path):
     phases_charged = {e.phase for e in ledger.entries}
     assert Phase.CRITIC in phases_charged
     assert Phase.POST_PRODUCTION in phases_charged
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEMO_SCENES = REPO_ROOT / "projects" / "demo" / "scenes.py"
+SIDECAR_AVAILABLE = sidecar_binary_available()
+requires_sidecar = pytest.mark.skipif(
+    not SIDECAR_AVAILABLE,
+    reason="dist/matemium-sidecar not built",
+)
+
+
+def test_format_compile_error_extracts_syntax_message():
+    responses = (
+        {
+            "ok": True,
+            "result": {
+                "ok": False,
+                "errors": [{"message": "SyntaxError: invalid syntax"}],
+            },
+        },
+    )
+    text = format_compile_error(responses, "")
+    assert "SyntaxError" in text
+    assert contains_python_or_manim_error(text)
+
+
+@requires_sidecar
+def test_sidecar_compile_good_demo_workspace(tmp_path: Path):
+    import shutil
+
+    ws = tmp_path / "good"
+    ws.mkdir()
+    shutil.copy(DEMO_SCENES, ws / "scenes.py")
+    ok, stderr = compile_project_via_sidecar(ws, scene="PortraitDemo")
+    assert ok is True
+    assert not contains_python_or_manim_error(stderr)
+
+
+@requires_sidecar
+def test_sidecar_compile_syntax_error_workspace(tmp_path: Path):
+    ws = tmp_path / "broken_py"
+    ws.mkdir()
+    (ws / "scenes.py").write_text("def broken(\n", encoding="utf-8")
+    ok, stderr = compile_project_via_sidecar(ws)
+    assert ok is False
+    assert "SyntaxError" in stderr
+
+
+@requires_sidecar
+def test_critic_loop_feeds_patch_fn_from_sidecar_errors(tmp_path: Path):
+    ws = tmp_path / "patch_feed"
+    ws.mkdir()
+    (ws / "scenes.py").write_text("def broken(\n", encoding="utf-8")
+    session = ProjectSession(project_dir=ws, user_prompt="broken", model_tier=ModelTier.STANDARD)
+    session.director_output = stub_director_agent("broken", ProcessingMode.MUTE)
+    session.blueprint = build_mute_blueprint(session.director_output.script)
+    session.record_transition(Phase.CRITIC, ("scenes_config",))
+
+    patches: list[str] = []
+
+    def track_patch(stderr: str) -> None:
+        patches.append(stderr)
+
+    hooks = CriticHooks(
+        compile_fn=make_sidecar_compile_fn(ws),
+        patch_fn=track_patch,
+    )
+    with pytest.raises(CoordinatorHaltError):
+        run_critic_loop(session, hooks)
+
+    assert len(patches) == MAX_CRITIC_RETRIES - 1
+    assert all("SyntaxError" in p for p in patches)
+    debug = json.loads((ws / DEBUG_FILENAME).read_text(encoding="utf-8"))
+    assert debug["retry_count"] == MAX_CRITIC_RETRIES
+    assert "SyntaxError" in debug["error"]
+
+
+@requires_sidecar
+def test_sidecar_ipc_spawns_binary():
+    result = run_sidecar_ipc([("ping", "ping", {})], timeout=30)
+    assert result.returncode == 0
+    assert result.responses
+    assert result.responses[-1]["ok"] is True
 
 
 def test_critic_failure_writes_debug_and_halts(tmp_path: Path):

@@ -1,7 +1,14 @@
 """Matemium multi-agent lifecycle engine."""
 
 from .coordinator import CoordinatorConfig, LifecycleCoordinator, run_lifecycle
-from .critic import CoordinatorHaltError, MAX_CRITIC_RETRIES
+from .critic import (
+    CoordinatorHaltError,
+    MAX_CRITIC_RETRIES,
+    compile_project_via_sidecar,
+    make_sidecar_compile_fn,
+    run_critic_loop,
+    sidecar_binary_available,
+)
 from .debug import DEBUG_FILENAME, build_debug_payload, write_debug_log
 from .models import (
     DecoupledArtifacts,
@@ -42,10 +49,12 @@ from .writer import (
 __all__ = [
     "CoordinatorConfig",
     "CoordinatorHaltError",
+    "compile_project_via_sidecar",
     "DEBUG_FILENAME",
     "DecoupledArtifacts",
     "LifecycleCoordinator",
     "LifecycleResult",
+    "make_sidecar_compile_fn",
     "MAX_CRITIC_RETRIES",
     "ModelTier",
     "PatchAmbiguousError",
@@ -74,7 +83,9 @@ __all__ = [
     "parse_patch_blocks",
     "parse_whisper_timing_blueprint",
     "round_ms",
+    "run_critic_loop",
     "run_lifecycle",
+    "sidecar_binary_available",
     "write_decoupled_project",
     "write_debug_log",
 ]
