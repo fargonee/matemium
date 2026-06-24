@@ -209,6 +209,9 @@ def _run_guard_consumer_scenarios(base: Path, log: io.StringIO) -> dict[str, str
 
     writeln(f"=== guard consumer pid={os.getpid()} ===")
 
+    if base.exists():
+        shutil.rmtree(base)
+
     blueprint = build_mute_blueprint(stub_director_agent("guard", ProcessingMode.MUTE).script)
     basic_script = stub_director_agent("guard", ProcessingMode.MUTE).script
 
@@ -396,7 +399,8 @@ def emit_guard_scratch_artifacts(target: Path | None = None) -> Path:
     scratch.mkdir(parents=True, exist_ok=True)
 
     guard_consumer_log = io.StringIO()
-    guard_hashes = _run_guard_consumer_scenarios(scratch / "guard_bundle", guard_consumer_log)
+    guard_bundle = scratch / f"guard_bundle_{os.getpid()}"
+    guard_hashes = _run_guard_consumer_scenarios(guard_bundle, guard_consumer_log)
     (scratch / "guard_consumer.log").write_text(guard_consumer_log.getvalue(), encoding="utf-8")
 
     guard_launch_log = io.StringIO()
