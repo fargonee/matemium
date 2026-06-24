@@ -27,16 +27,21 @@ from matemium.agent.critic import (
     CriticHooks,
     MAX_CRITIC_RETRIES,
     VISUAL_QC_FAILURE,
-    SidecarIpcResult,
-    compile_outcome_from_sidecar,
     compile_project_via_sidecar,
-    contains_python_or_manim_error,
-    format_compile_error,
     make_sidecar_compile_fn,
     run_critic_loop,
     run_sidecar_ipc,
     sidecar_binary_available,
 )
+from matemium.agent.sidecar_outcome import (
+    SidecarIpcResult,
+    compile_outcome_from_sidecar,
+    contains_python_or_manim_error,
+    format_compile_error,
+    ipc_failure_result,
+    merge_ipc_results,
+)
+from matemium.agent.verification_scratch import emit_scratch_artifacts
 from matemium.agent.debug import DEBUG_FILENAME
 from matemium.agent.models import ProjectSession
 from matemium.agent.script_parser import parse_narrative_blocks
@@ -579,19 +584,145 @@ def test_run_sidecar_ipc_timeout_returns_failure(monkeypatch):
     assert "timed out" in err
 
 
-def test_compile_project_via_sidecar_missing_binary_returns_tuple(monkeypatch, tmp_path: Path):
-    def raise_missing() -> Path:
-        raise FileNotFoundError("PyInstaller sidecar not found at /missing/matemium-sidecar")
+def test_compile_project_when_sidecar_binary_absent(tmp_path: Path, monkeypatch):
+    """Uses real sidecar_binary_path resolution against a root with no dist/ binary."""
+    fake_root = tmp_path / "no_sidecar_root"
+    fake_root.mkdir()
+    ws = fake_root / "ws"
+    ws.mkdir()
+    (ws / "scenes.py").write_text("pass\n", encoding="utf-8")
+    monkeypatch.setattr("matemium.agent.critic.discover_root", lambda: fake_root)
+    assert sidecar_binary_available() is False
 
-    monkeypatch.setattr("matemium.agent.critic.sidecar_binary_path", raise_missing)
-    ok, err = compile_project_via_sidecar(tmp_path / "ws")
+    ok, err = compile_project_via_sidecar(ws)
     assert ok is False
     assert "PyInstaller sidecar not found" in err
+    assert str(fake_root / "dist" / "matemium-sidecar") in err
 
-    compile_fn = make_sidecar_compile_fn(tmp_path / "ws")
-    ok_fn, err_fn = compile_fn()
+    ok_fn, err_fn = make_sidecar_compile_fn(ws)()
     assert ok_fn is False
     assert "PyInstaller sidecar not found" in err_fn
+
+
+LIST_SYNTAX_TRACEBACK = (
+    '  File "/tmp/ws/scenes.py", line 1\n'
+    "    def broken(\n"
+    "              ^\n"
+    "SyntaxError: '(' was never closed\n"
+)
+
+OUTCOME_TABLE = [
+    pytest.param(
+        ipc_failure_result("PyInstaller sidecar not found at /missing/matemium-sidecar"),
+        False,
+        ("PyInstaller sidecar not found",),
+        id="missing_binary",
+    ),
+    pytest.param(
+        ipc_failure_result("sidecar subprocess timed out after 30s"),
+        False,
+        ("timed out",),
+        id="timeout",
+    ),
+    pytest.param(
+        SidecarIpcResult(responses=(), stderr="", returncode=0),
+        False,
+        ("sidecar produced no responses",),
+        id="empty_responses",
+    ),
+    pytest.param(
+        SidecarIpcResult(
+            responses=(
+                {
+                    "ok": False,
+                    "error": {
+                        "message": "'(' was never closed",
+                        "traceback": LIST_SYNTAX_TRACEBACK,
+                    },
+                },
+            ),
+            stderr="",
+            returncode=0,
+        ),
+        False,
+        ("SyntaxError", "^"),
+        id="list_syntax_fail",
+    ),
+    pytest.param(
+        SidecarIpcResult(
+            responses=(
+                {
+                    "ok": True,
+                    "result": {
+                        "ok": False,
+                        "errors": [
+                            {
+                                "message": "'CanvasBuilder' object has no attribute 'wait'",
+                            }
+                        ],
+                    },
+                },
+            ),
+            stderr="",
+            returncode=0,
+        ),
+        False,
+        ("has no attribute",),
+        id="check_attr_fail",
+    ),
+    pytest.param(
+        merge_ipc_results(
+            SidecarIpcResult(
+                responses=(
+                    {
+                        "ok": False,
+                        "error": {"message": "short", "traceback": LIST_SYNTAX_TRACEBACK},
+                    },
+                ),
+                stderr="",
+                returncode=0,
+            ),
+            SidecarIpcResult(
+                responses=(
+                    {
+                        "ok": True,
+                        "result": {
+                            "ok": False,
+                            "errors": [{"message": LIST_SYNTAX_TRACEBACK}],
+                        },
+                    },
+                ),
+                stderr="",
+                returncode=0,
+            ),
+        ),
+        False,
+        ("SyntaxError", "^"),
+        id="merged_list_check",
+    ),
+    pytest.param(
+        SidecarIpcResult(
+            responses=({"ok": True, "result": {"ok": True, "scene": "PortraitDemo"}},),
+            stderr="",
+            returncode=0,
+        ),
+        True,
+        (),
+        id="success",
+    ),
+]
+
+
+@pytest.mark.parametrize("result,expected_ok,must_contain", OUTCOME_TABLE)
+def test_compile_outcome_table(result, expected_ok, must_contain):
+    ok, err = compile_outcome_from_sidecar(result)
+    assert ok is expected_ok
+    if expected_ok:
+        assert err == ""
+    else:
+        assert err.strip()
+        for token in must_contain:
+            assert token in err
 
 
 def test_format_compile_error_extracts_syntax_message():
@@ -670,6 +801,27 @@ def test_sidecar_ipc_spawns_binary():
     assert result.returncode == 0
     assert result.responses
     assert result.responses[-1]["ok"] is True
+
+
+@requires_sidecar
+def test_critic_verification_bundle(tmp_path: Path, monkeypatch):
+    """Atomic verification: scenarios + scratch artifact emission in one pytest run."""
+    scratch = tmp_path / "scratch_bundle"
+    monkeypatch.setenv("MATEMIUM_SCRATCH", str(scratch))
+    out = emit_scratch_artifacts(scratch)
+    assert (out / "critic_consumer.log").is_file()
+    assert (out / "critic_source_read.log").is_file()
+    assert (out / "critic_launch.log").is_file()
+    assert (out / "critic_exhaust.log").is_file()
+    consumer = (out / "critic_consumer.log").read_text(encoding="utf-8")
+    assert "CONSUMER_PASS" in consumer
+    assert "good stderr repr: ''" in consumer
+    source = (out / "critic_source_read.log").read_text(encoding="utf-8")
+    assert "merge_ipc_results" in source
+    assert "richest_error_text" in source or "compile_outcome_from_sidecar" in source
+    launch = (out / "critic_launch.log").read_text(encoding="utf-8")
+    assert "LAUNCH_OK" in launch
+    assert "launch listing:" in launch
 
 
 def test_critic_failure_writes_debug_and_halts(tmp_path: Path):

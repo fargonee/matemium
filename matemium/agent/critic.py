@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +13,15 @@ from matemium.paths import discover_root
 
 from .debug import build_debug_payload, write_debug_log
 from .models import CriticResult, Phase, ProjectSession
+from .sidecar_outcome import (
+    PYTHON_MANIM_ERROR_MARKERS,
+    SidecarIpcResult,
+    compile_outcome_from_sidecar,
+    contains_python_or_manim_error,
+    format_compile_error,
+    ipc_failure_result,
+    merge_ipc_results,
+)
 from .stubs import CompileFn, PatchFn, default_visual_qc
 
 MAX_CRITIC_RETRIES = 3
@@ -21,24 +29,6 @@ VISUAL_QC_FAILURE = "visual_qc_failed: layout/clipping/contrast issue detected"
 
 SIDECAR_REL_PATH = Path("dist") / "matemium-sidecar"
 DEFAULT_COMPILE_TIMEOUT = 300.0
-
-PYTHON_MANIM_ERROR_MARKERS: tuple[str, ...] = (
-    "SyntaxError",
-    "was never closed",
-    "invalid syntax",
-    "IndentationError",
-    "ImportError",
-    "ModuleNotFoundError",
-    "AttributeError",
-    "has no attribute",
-    "NameError",
-    "TypeError",
-    "Traceback",
-    "Manim",
-    "CHECK_FAILED",
-    "RENDER_FAILED",
-    "Exception",
-)
 
 
 class CoordinatorHaltError(RuntimeError):
@@ -54,15 +44,6 @@ class CriticHooks:
     compile_fn: CompileFn
     patch_fn: PatchFn
     visual_qc_fn: Callable[[], bool] = default_visual_qc
-
-
-@dataclass(frozen=True)
-class SidecarIpcResult:
-    """Captured sidecar subprocess IPC outcome."""
-
-    responses: tuple[dict, ...]
-    stderr: str
-    returncode: int
 
 
 def sidecar_binary_path() -> Path:
@@ -122,28 +103,6 @@ def _decode_subprocess_stream(data: str | bytes | None) -> str:
     return data
 
 
-def _merge_ipc_results(*results: SidecarIpcResult) -> SidecarIpcResult:
-    """Combine responses and stderr from sequential sidecar IPC rounds."""
-    responses: list[dict] = []
-    stderr_parts: list[str] = []
-    returncode = 0
-    for result in results:
-        responses.extend(result.responses)
-        if result.stderr.strip():
-            stderr_parts.append(result.stderr.strip())
-        if result.returncode != 0:
-            returncode = result.returncode
-    return SidecarIpcResult(
-        responses=tuple(responses),
-        stderr="\n".join(stderr_parts),
-        returncode=returncode,
-    )
-
-
-def _ipc_failure_result(stderr: str, *, returncode: int = -1) -> SidecarIpcResult:
-    return SidecarIpcResult(responses=(), stderr=stderr, returncode=returncode)
-
-
 def run_sidecar_ipc(
     requests: list[tuple[str, str, dict]],
     *,
@@ -152,11 +111,15 @@ def run_sidecar_ipc(
     """Spawn the PyInstaller sidecar and exchange NDJSON requests on stdin."""
     try:
         binary = sidecar_binary_path()
-        stdin_payload = "\n".join(
-            _ipc_request(req_id, command, params) for req_id, command, params in requests
-        )
-        stdin_payload = f"{stdin_payload}\n" if stdin_payload else ""
+    except FileNotFoundError as exc:
+        return ipc_failure_result(str(exc))
 
+    stdin_payload = "\n".join(
+        _ipc_request(req_id, command, params) for req_id, command, params in requests
+    )
+    stdin_payload = f"{stdin_payload}\n" if stdin_payload else ""
+
+    try:
         proc = subprocess.run(
             [str(binary)],
             input=stdin_payload,
@@ -166,19 +129,15 @@ def run_sidecar_ipc(
             env=_sidecar_env(),
             cwd=str(discover_root()),
         )
-    except FileNotFoundError as exc:
-        return _ipc_failure_result(str(exc))
     except subprocess.TimeoutExpired as exc:
         stderr = _decode_subprocess_stream(exc.stderr)
         if stderr.strip():
             stderr = f"sidecar subprocess timed out after {timeout}s\n{stderr}"
         else:
             stderr = f"sidecar subprocess timed out after {timeout}s"
-        return _ipc_failure_result(stderr)
+        return ipc_failure_result(stderr)
     except OSError as exc:
-        return _ipc_failure_result(f"sidecar spawn failed: {exc}")
-    except Exception as exc:
-        return _ipc_failure_result(f"sidecar IPC failed: {exc}")
+        return ipc_failure_result(f"sidecar spawn failed: {exc}")
 
     responses, _events = _parse_sidecar_stdout(proc.stdout)
     return SidecarIpcResult(
@@ -186,106 +145,6 @@ def run_sidecar_ipc(
         stderr=proc.stderr or "",
         returncode=proc.returncode,
     )
-
-
-def contains_python_or_manim_error(text: str) -> bool:
-    """Detect Python or Manim failure signatures in stderr or error payloads."""
-    if not text.strip():
-        return False
-    for marker in PYTHON_MANIM_ERROR_MARKERS:
-        if marker in text:
-            return True
-    return bool(re.search(r"\bError\b", text))
-
-
-def _collect_error_fragments(responses: tuple[dict, ...] | list[dict], stderr: str) -> list[str]:
-    """Gather every error fragment from stderr and IPC payloads."""
-    lines: list[str] = []
-    if stderr.strip():
-        lines.append(stderr.strip())
-    for resp in responses:
-        if not resp.get("ok"):
-            err = resp.get("error") or {}
-            if isinstance(err, dict):
-                traceback = err.get("traceback")
-                message = err.get("message")
-                if traceback:
-                    lines.append(str(traceback))
-                if message:
-                    lines.append(str(message))
-            elif err:
-                lines.append(str(err))
-        result = resp.get("result")
-        if isinstance(result, dict) and result.get("ok") is False:
-            for diag in result.get("errors") or []:
-                if isinstance(diag, dict):
-                    lines.append(str(diag.get("message", diag)))
-                else:
-                    lines.append(str(diag))
-    return list(dict.fromkeys(line for line in lines if line.strip()))
-
-
-def _richest_error_text(fragments: list[str]) -> str:
-    """Pick the most informative compile error for patch_fn feeding."""
-    if not fragments:
-        return ""
-    for fragment in fragments:
-        if "SyntaxError" in fragment and "^" in fragment:
-            return fragment
-    for fragment in fragments:
-        if "SyntaxError" in fragment:
-            return fragment
-    for fragment in fragments:
-        if "Traceback" in fragment:
-            return fragment
-    return max(fragments, key=len)
-
-
-def format_compile_error(responses: tuple[dict, ...] | list[dict], stderr: str) -> str:
-    """Flatten sidecar responses and stderr into one error string for patch_fn."""
-    fragments = _collect_error_fragments(responses, stderr)
-    richest = _richest_error_text(fragments)
-    if richest:
-        return richest
-    return "\n".join(fragments) if fragments else ""
-
-
-def _ensure_error_text(error_text: str, result: SidecarIpcResult) -> str:
-    """Guarantee a non-empty error string for patch_fn and debug payloads."""
-    if error_text.strip():
-        return error_text
-    if result.stderr.strip():
-        return result.stderr.strip()
-    if result.returncode != 0:
-        return f"sidecar exited with code {result.returncode}"
-    if not result.responses:
-        return "sidecar produced no responses"
-    return "compilation failed"
-
-
-def compile_outcome_from_sidecar(result: SidecarIpcResult) -> tuple[bool, str]:
-    """Classify sidecar IPC as compile success or failure with error text."""
-    error_text = format_compile_error(result.responses, result.stderr)
-
-    if not result.responses:
-        return False, _ensure_error_text(error_text, result)
-
-    for resp in result.responses:
-        if not resp.get("ok"):
-            return False, _ensure_error_text(error_text, result)
-        payload = resp.get("result")
-        if isinstance(payload, dict) and payload.get("ok") is False:
-            return False, _ensure_error_text(error_text, result)
-
-    if contains_python_or_manim_error(result.stderr):
-        return False, _ensure_error_text(error_text, result)
-    if contains_python_or_manim_error(error_text):
-        return False, _ensure_error_text(error_text, result)
-
-    if result.returncode != 0:
-        return False, _ensure_error_text(error_text, result)
-
-    return True, ""
 
 
 def _resolve_scene_from_listing(
@@ -316,10 +175,10 @@ def compile_project_via_sidecar(
 ) -> tuple[bool, str]:
     """Compile a workspace scenes.py via the PyInstaller sidecar subprocess."""
     workspace = Path(workspace).resolve()
-    requests: list[tuple[str, str, dict]] = [
-        ("list", "list_scenes", {"workspace": str(workspace)}),
-    ]
-    list_ipc = run_sidecar_ipc(requests, timeout=timeout)
+    list_ipc = run_sidecar_ipc(
+        [("list", "list_scenes", {"workspace": str(workspace)})],
+        timeout=timeout,
+    )
     scene_name = _resolve_scene_from_listing(list_ipc.responses, scene)
 
     compile_requests: list[tuple[str, str, dict]] = [
@@ -344,7 +203,7 @@ def compile_project_via_sidecar(
         )
 
     compile_ipc = run_sidecar_ipc(compile_requests, timeout=timeout)
-    merged = _merge_ipc_results(list_ipc, compile_ipc)
+    merged = merge_ipc_results(list_ipc, compile_ipc)
     return compile_outcome_from_sidecar(merged)
 
 
