@@ -236,13 +236,17 @@ def stub_director_agent(user_prompt: str, mode: ProcessingMode) -> DirectorOutpu
 
 
 def stub_engineer_agent(session: ProjectSession) -> DecoupledArtifacts:
-    """Phase 3 stub — produces strictly decoupled scenes/assets configs."""
+    """Phase 3 stub — decoupled configs + on-disk scenes.py/assets.py via patch engine."""
     assert session.director_output is not None
     assert session.blueprint is not None
-    return build_decoupled_artifacts(
+    from .writer import write_decoupled_project
+
+    result = write_decoupled_project(
+        session.project_dir,
         session.director_output.script,
         session.blueprint,
     )
+    return result.artifacts
 
 
 CompileFn = Callable[[], tuple[bool, str]]

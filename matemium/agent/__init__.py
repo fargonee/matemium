@@ -24,6 +24,16 @@ from .timing import (
     parse_whisper_timing_blueprint,
     round_ms,
 )
+from .writer import (
+    PatchAmbiguousError,
+    PatchBlock,
+    PatchNotFoundError,
+    WriterResult,
+    apply_patch,
+    apply_patches,
+    parse_patch_blocks,
+    write_decoupled_project,
+)
 
 __all__ = [
     "CoordinatorConfig",
@@ -34,6 +44,9 @@ __all__ = [
     "LifecycleResult",
     "MAX_CRITIC_RETRIES",
     "ModelTier",
+    "PatchAmbiguousError",
+    "PatchBlock",
+    "PatchNotFoundError",
     "Phase",
     "PostProductionOutput",
     "ProcessingMode",
@@ -41,14 +54,19 @@ __all__ = [
     "TIER_MULTIPLIERS",
     "TimingBlueprint",
     "TokenLedger",
+    "WriterResult",
+    "apply_patch",
+    "apply_patches",
     "build_audio_blueprint",
     "build_debug_payload",
     "build_mute_blueprint",
     "expected_audio_total_duration",
     "expected_mute_total_duration",
     "instantiate_timing_blueprint",
+    "parse_patch_blocks",
     "parse_whisper_timing_blueprint",
     "round_ms",
     "run_lifecycle",
+    "write_decoupled_project",
     "write_debug_log",
 ]

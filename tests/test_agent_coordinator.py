@@ -31,6 +31,15 @@ from matemium.agent.stubs import (
     stub_whisper_json,
     whisper_transcript_from_payload,
 )
+from matemium.agent.writer import (
+    PatchAmbiguousError,
+    PatchBlock,
+    PatchNotFoundError,
+    apply_patch,
+    parse_patch_blocks,
+    write_decoupled_project,
+)
+from matemium.workspace_project import load_scenes_module, workspace_context
 from matemium.agent.timing import (
     INTER_BLOCK_GAP,
     MS_PRECISION,
@@ -383,6 +392,85 @@ def test_lifecycle_mute_mode_completes_with_beat_cadence(tmp_path: Path):
     assert len(waits) == result.blueprint.segment_count
     assert result.post_production.ambient_track_attached is True
     assert result.post_production.audio_track_attached is False
+
+
+def test_writer_patch_apply_exact_unique_match():
+    content = "alpha\nbeta\ngamma\n"
+    result = apply_patch(content, "beta\n", "BETA\n")
+    assert result == "alpha\nBETA\ngamma\n"
+
+
+def test_writer_patch_not_found_raises():
+    with pytest.raises(PatchNotFoundError, match="SEARCH block did not match"):
+        apply_patch("hello", "missing", "x")
+
+
+def test_writer_patch_ambiguous_raises():
+    with pytest.raises(PatchAmbiguousError, match="AMBIGUOUS_PATCH"):
+        apply_patch("dup\ndup\n", "dup\n", "x\n")
+
+
+def test_writer_parse_patch_blocks_roundtrip():
+    doc = (
+        "<<<<<<< SEARCH\n"
+        "old line\n"
+        "=======\n"
+        "new line\n"
+        ">>>>>>> REPLACE\n"
+    )
+    blocks = parse_patch_blocks(doc)
+    assert len(blocks) == 1
+    assert blocks[0].search == "old line\n"
+    assert blocks[0].replace == "new line\n"
+
+
+def test_writer_decoupled_project_writes_files_with_waits(tmp_path: Path):
+    blueprint = parse_whisper_timing_blueprint(SAMPLE_SCRIPT, WHISPER_PAYLOAD)
+    result = write_decoupled_project(tmp_path, SAMPLE_SCRIPT, blueprint)
+
+    scenes_path = tmp_path / "scenes.py"
+    assets_path = tmp_path / "assets.py"
+    assert scenes_path.is_file()
+    assert assets_path.is_file()
+    assert result.patches_applied == 4
+
+    scenes = scenes_path.read_text(encoding="utf-8")
+    assets = assets_path.read_text(encoding="utf-8")
+
+    for segment in blueprint.segments:
+        assert f"b.wait(duration={segment.wait_duration})" in scenes
+
+    assert "import assets" in scenes
+    assert "class AgentScene" in scenes
+    assert "assets.latex_" in scenes
+    assert "add_heading" not in assets
+    assert "def latex_" in assets
+    assert "def surface_" in assets
+
+    compile(scenes, "scenes.py", "exec")
+    compile(assets, "assets.py", "exec")
+    with workspace_context(tmp_path):
+        module = load_scenes_module(tmp_path)
+        assert hasattr(module, "AgentScene")
+
+
+def test_writer_decoupled_output_is_deterministic(tmp_path: Path):
+    blueprint = build_mute_blueprint(SAMPLE_SCRIPT)
+    project_a = tmp_path / "a"
+    project_b = tmp_path / "b"
+    write_decoupled_project(project_a, SAMPLE_SCRIPT, blueprint)
+    write_decoupled_project(project_b, SAMPLE_SCRIPT, blueprint)
+    assert (project_a / "scenes.py").read_text() == (project_b / "scenes.py").read_text()
+    assert (project_a / "assets.py").read_text() == (project_b / "assets.py").read_text()
+
+
+def test_lifecycle_engineer_writes_scenes_and_assets_on_disk(tmp_path: Path):
+    result = run_lifecycle(tmp_path / "disk_project", "Factor quadratics", ProcessingMode.MUTE)
+    assert (tmp_path / "disk_project" / "scenes.py").is_file()
+    assert (tmp_path / "disk_project" / "assets.py").is_file()
+    scenes = (tmp_path / "disk_project" / "scenes.py").read_text(encoding="utf-8")
+    for segment in result.blueprint.segments:
+        assert f"b.wait(duration={segment.wait_duration})" in scenes
 
 
 def test_decoupled_artifacts_separate_math_from_narrative(tmp_path: Path):
