@@ -1,0 +1,54 @@
+"""Matemium multi-agent lifecycle engine."""
+
+from .coordinator import CoordinatorConfig, LifecycleCoordinator, run_lifecycle
+from .critic import CoordinatorHaltError, MAX_CRITIC_RETRIES
+from .debug import DEBUG_FILENAME, build_debug_payload, write_debug_log
+from .models import (
+    DecoupledArtifacts,
+    LifecycleResult,
+    ModelTier,
+    Phase,
+    PostProductionOutput,
+    ProcessingMode,
+    ProjectSession,
+    TimingBlueprint,
+    TokenLedger,
+    TIER_MULTIPLIERS,
+)
+from .timing import (
+    build_audio_blueprint,
+    build_mute_blueprint,
+    expected_audio_total_duration,
+    expected_mute_total_duration,
+    instantiate_timing_blueprint,
+    parse_whisper_timing_blueprint,
+    round_ms,
+)
+
+__all__ = [
+    "CoordinatorConfig",
+    "CoordinatorHaltError",
+    "DEBUG_FILENAME",
+    "DecoupledArtifacts",
+    "LifecycleCoordinator",
+    "LifecycleResult",
+    "MAX_CRITIC_RETRIES",
+    "ModelTier",
+    "Phase",
+    "PostProductionOutput",
+    "ProcessingMode",
+    "ProjectSession",
+    "TIER_MULTIPLIERS",
+    "TimingBlueprint",
+    "TokenLedger",
+    "build_audio_blueprint",
+    "build_debug_payload",
+    "build_mute_blueprint",
+    "expected_audio_total_duration",
+    "expected_mute_total_duration",
+    "instantiate_timing_blueprint",
+    "parse_whisper_timing_blueprint",
+    "round_ms",
+    "run_lifecycle",
+    "write_debug_log",
+]
