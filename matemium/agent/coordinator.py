@@ -8,6 +8,7 @@ from typing import Callable
 
 from .critic import CriticHooks, CoordinatorHaltError, run_critic_loop
 from .models import (
+    AccountTier,
     DirectorOutput,
     LifecycleResult,
     ModelTier,
@@ -77,10 +78,16 @@ class LifecycleCoordinator:
         project_dir: Path | str,
         *,
         model_tier: ModelTier = ModelTier.STANDARD,
+        account_tier: AccountTier = AccountTier.BASIC,
+        watermark_removal_paid: bool = False,
+        extra_project_tokens_spent: bool = False,
         config: CoordinatorConfig | None = None,
     ):
         self.project_dir = Path(project_dir)
         self.model_tier = model_tier
+        self.account_tier = account_tier
+        self.watermark_removal_paid = watermark_removal_paid
+        self.extra_project_tokens_spent = extra_project_tokens_spent
         self.config = config or CoordinatorConfig()
 
     def _charge_phase(self, session: ProjectSession, phase: Phase, label: str) -> None:
@@ -163,6 +170,9 @@ class LifecycleCoordinator:
             project_dir=self.project_dir,
             user_prompt=user_prompt,
             model_tier=self.model_tier,
+            account_tier=self.account_tier,
+            watermark_removal_paid=self.watermark_removal_paid,
+            extra_project_tokens_spent=self.extra_project_tokens_spent,
         )
         try:
             self.run_phase_director(session, user_prompt, mode)
@@ -190,12 +200,18 @@ def run_lifecycle(
     mode: ProcessingMode,
     *,
     model_tier: ModelTier = ModelTier.STANDARD,
+    account_tier: AccountTier = AccountTier.BASIC,
+    watermark_removal_paid: bool = False,
+    extra_project_tokens_spent: bool = False,
     config: CoordinatorConfig | None = None,
 ) -> LifecycleResult:
     """Module-level entry point for sidecar/server integration."""
     coordinator = LifecycleCoordinator(
         project_dir,
         model_tier=model_tier,
+        account_tier=account_tier,
+        watermark_removal_paid=watermark_removal_paid,
+        extra_project_tokens_spent=extra_project_tokens_spent,
         config=config,
     )
     return coordinator.run(user_prompt, mode)

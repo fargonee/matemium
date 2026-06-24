@@ -12,6 +12,7 @@ from typing import Callable
 from matemium.paths import discover_root
 
 from .debug import build_debug_payload, write_debug_log
+from .guard import apply_guard_to_project
 from .models import CriticResult, Phase, ProjectSession
 from .sidecar_outcome import (
     PYTHON_MANIM_ERROR_MARKERS,
@@ -232,6 +233,7 @@ def run_critic_loop(session: ProjectSession, hooks: CriticHooks) -> CriticResult
     last_stderr = ""
 
     for attempt in range(1, MAX_CRITIC_RETRIES + 1):
+        apply_guard_to_project(session)
         success, stderr = hooks.compile_fn()
         last_stderr = stderr
         if not success:

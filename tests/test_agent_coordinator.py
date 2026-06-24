@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from matemium.agent import (
+    AccountTier,
     CoordinatorConfig,
     CoordinatorHaltError,
     LifecycleCoordinator,
@@ -15,11 +16,17 @@ from matemium.agent import (
     Phase,
     ProcessingMode,
     TIER_MULTIPLIERS,
+    apply_guard_to_project,
     build_audio_blueprint,
     build_mute_blueprint,
+    dsl_has_watermark,
+    inject_watermark_if_needed,
+    inject_watermark_to_scenes_source,
     instantiate_timing_blueprint,
     parse_whisper_timing_blueprint,
     run_lifecycle,
+    should_apply_watermark,
+    should_apply_watermark_for_session,
 )
 import subprocess
 
@@ -41,7 +48,7 @@ from matemium.agent.sidecar_outcome import (
     ipc_failure_result,
     merge_ipc_results,
 )
-from matemium.agent.verification_scratch import emit_scratch_artifacts
+from matemium.agent.verification_scratch import emit_guard_scratch_artifacts, emit_scratch_artifacts
 from matemium.agent.debug import DEBUG_FILENAME
 from matemium.agent.models import ProjectSession
 from matemium.agent.script_parser import parse_narrative_blocks
@@ -908,3 +915,168 @@ def test_coordinator_phase_transitions_are_clean_sequence(tmp_path: Path):
         Phase.POST_PRODUCTION,
     ]
     assert session.current_phase is Phase.POST_PRODUCTION
+
+
+def test_guard_should_apply_watermark_matrix():
+    assert should_apply_watermark(AccountTier.BASIC) is True
+    assert should_apply_watermark(AccountTier.PREMIUM) is False
+    assert should_apply_watermark(AccountTier.BASIC, watermark_removal_paid=True) is False
+    assert should_apply_watermark(AccountTier.BASIC, extra_project_tokens_spent=True) is False
+    assert should_apply_watermark(AccountTier.PREMIUM, watermark_removal_paid=False) is False
+
+
+def test_guard_injects_and_strips_watermark_in_scenes_source():
+    clean = """        part_intro(builder)
+        super().__init__(dsl=builder.build(), **kwargs)
+"""
+    watermarked = inject_watermark_to_scenes_source(clean)
+    assert 'builder.add_text("matemium")' in watermarked
+    restored = inject_watermark_if_needed(watermarked, apply_watermark=False)
+    assert "matemium" not in restored
+    assert restored == clean
+
+
+def test_guard_writer_emits_watermark_for_basic_session(tmp_path: Path):
+    blueprint = build_mute_blueprint(SAMPLE_SCRIPT)
+    basic_session = ProjectSession(
+        project_dir=tmp_path / "basic",
+        user_prompt="basic",
+        model_tier=ModelTier.STANDARD,
+        account_tier=AccountTier.BASIC,
+    )
+    write_decoupled_project(tmp_path / "basic", SAMPLE_SCRIPT, blueprint, session=basic_session)
+    scenes = (tmp_path / "basic" / "scenes.py").read_text(encoding="utf-8")
+    assert should_apply_watermark_for_session(basic_session)
+    assert 'builder.add_text("matemium")' in scenes
+
+
+def test_guard_writer_omits_watermark_for_premium_session(tmp_path: Path):
+    blueprint = build_mute_blueprint(SAMPLE_SCRIPT)
+    premium_session = ProjectSession(
+        project_dir=tmp_path / "premium",
+        user_prompt="premium",
+        model_tier=ModelTier.STANDARD,
+        account_tier=AccountTier.PREMIUM,
+    )
+    write_decoupled_project(tmp_path / "premium", SAMPLE_SCRIPT, blueprint, session=premium_session)
+    scenes = (tmp_path / "premium" / "scenes.py").read_text(encoding="utf-8")
+    assert not should_apply_watermark_for_session(premium_session)
+    assert 'builder.add_text("matemium")' not in scenes
+
+
+def test_guard_dsl_reflects_watermark_after_load(tmp_path: Path):
+    import shutil
+
+    basic_dir = tmp_path / "dsl_basic"
+    basic_dir.mkdir()
+    shutil.copy(DEMO_SCENES, basic_dir / "scenes.py")
+    basic_session = ProjectSession(
+        project_dir=basic_dir,
+        user_prompt="dsl",
+        model_tier=ModelTier.STANDARD,
+        account_tier=AccountTier.BASIC,
+    )
+    apply_guard_to_project(basic_session)
+    with workspace_context(basic_dir):
+        module = load_scenes_module(basic_dir)
+        scene = module.PortraitDemo()
+        assert dsl_has_watermark(scene.dsl)
+
+
+def test_guard_critic_applies_watermark_before_compile(tmp_path: Path):
+    blueprint = build_mute_blueprint(SAMPLE_SCRIPT)
+    project_dir = tmp_path / "critic_guard"
+    premium_session = ProjectSession(
+        project_dir=project_dir,
+        user_prompt="critic",
+        model_tier=ModelTier.STANDARD,
+        account_tier=AccountTier.PREMIUM,
+    )
+    write_decoupled_project(project_dir, SAMPLE_SCRIPT, blueprint, session=premium_session)
+    assert 'builder.add_text("matemium")' not in (project_dir / "scenes.py").read_text(encoding="utf-8")
+
+    basic_session = ProjectSession(
+        project_dir=project_dir,
+        user_prompt="critic",
+        model_tier=ModelTier.STANDARD,
+        account_tier=AccountTier.BASIC,
+    )
+    apply_guard_to_project(basic_session)
+    assert 'builder.add_text("matemium")' in (project_dir / "scenes.py").read_text(encoding="utf-8")
+
+
+def test_lifecycle_basic_includes_watermark_on_disk(tmp_path: Path):
+    result = run_lifecycle(
+        tmp_path / "basic_lifecycle",
+        "Factor quadratics",
+        ProcessingMode.MUTE,
+        account_tier=AccountTier.BASIC,
+    )
+    scenes = (tmp_path / "basic_lifecycle" / "scenes.py").read_text(encoding="utf-8")
+    assert result.session.account_tier is AccountTier.BASIC
+    assert 'builder.add_text("matemium")' in scenes
+
+
+def test_lifecycle_premium_omits_watermark_on_disk(tmp_path: Path):
+    result = run_lifecycle(
+        tmp_path / "premium_lifecycle",
+        "Factor quadratics",
+        ProcessingMode.MUTE,
+        account_tier=AccountTier.PREMIUM,
+    )
+    scenes = (tmp_path / "premium_lifecycle" / "scenes.py").read_text(encoding="utf-8")
+    assert result.session.account_tier is AccountTier.PREMIUM
+    assert 'builder.add_text("matemium")' not in scenes
+
+
+@requires_sidecar
+def test_guard_sidecar_compile_basic_and_premium(tmp_path: Path):
+    import shutil
+
+    basic_dir = tmp_path / "sidecar_basic"
+    premium_dir = tmp_path / "sidecar_premium"
+    for target in (basic_dir, premium_dir):
+        target.mkdir()
+        shutil.copy(DEMO_SCENES, target / "scenes.py")
+
+    apply_guard_to_project(
+        ProjectSession(
+            project_dir=basic_dir,
+            user_prompt="basic",
+            model_tier=ModelTier.STANDARD,
+            account_tier=AccountTier.BASIC,
+        )
+    )
+    apply_guard_to_project(
+        ProjectSession(
+            project_dir=premium_dir,
+            user_prompt="premium",
+            model_tier=ModelTier.STANDARD,
+            account_tier=AccountTier.PREMIUM,
+        )
+    )
+    assert 'builder.add_text("matemium")' in (basic_dir / "scenes.py").read_text(encoding="utf-8")
+    assert 'builder.add_text("matemium")' not in (premium_dir / "scenes.py").read_text(encoding="utf-8")
+
+    ok_basic, err_basic = compile_project_via_sidecar(basic_dir, scene="PortraitDemo")
+    ok_premium, err_premium = compile_project_via_sidecar(premium_dir, scene="PortraitDemo")
+    assert ok_basic, err_basic
+    assert ok_premium, err_premium
+
+
+def test_guard_verification_bundle(tmp_path: Path, monkeypatch):
+    scratch = tmp_path / "guard_scratch"
+    monkeypatch.setenv("MATEMIUM_SCRATCH", str(scratch))
+    out = emit_guard_scratch_artifacts(scratch)
+    assert (out / "guard_consumer.log").is_file()
+    assert (out / "guard_launch.log").is_file()
+    assert (out / "guard_source_read.log").is_file()
+    consumer = (out / "guard_consumer.log").read_text(encoding="utf-8")
+    assert "GUARD_CONSUMER_PASS" in consumer
+    assert "basic scenes has watermark: True" in consumer
+    assert "premium scenes has watermark: False" in consumer
+    launch = (out / "guard_launch.log").read_text(encoding="utf-8")
+    assert "GUARD_LAUNCH_OK" in launch
+    source = (out / "guard_source_read.log").read_text(encoding="utf-8")
+    assert "should_apply_watermark" in source
+    assert "inject_watermark" in source

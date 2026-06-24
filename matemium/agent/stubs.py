@@ -245,6 +245,7 @@ def stub_engineer_agent(session: ProjectSession) -> DecoupledArtifacts:
         session.project_dir,
         session.director_output.script,
         session.blueprint,
+        session=session,
     )
     return result.artifacts
 

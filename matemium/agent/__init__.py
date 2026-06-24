@@ -10,7 +10,17 @@ from .critic import (
     sidecar_binary_available,
 )
 from .debug import DEBUG_FILENAME, build_debug_payload, write_debug_log
+from .guard import (
+    apply_guard_to_project,
+    apply_guard_to_scenes_file,
+    dsl_has_watermark,
+    inject_watermark_if_needed,
+    inject_watermark_to_scenes_source,
+    should_apply_watermark,
+    should_apply_watermark_for_session,
+)
 from .models import (
+    AccountTier,
     DecoupledArtifacts,
     LifecycleResult,
     ModelTier,
@@ -47,16 +57,24 @@ from .writer import (
 )
 
 __all__ = [
+    "AccountTier",
     "CoordinatorConfig",
     "CoordinatorHaltError",
+    "apply_guard_to_project",
+    "apply_guard_to_scenes_file",
     "compile_project_via_sidecar",
     "DEBUG_FILENAME",
     "DecoupledArtifacts",
+    "dsl_has_watermark",
+    "inject_watermark_if_needed",
+    "inject_watermark_to_scenes_source",
     "LifecycleCoordinator",
     "LifecycleResult",
     "make_sidecar_compile_fn",
     "MAX_CRITIC_RETRIES",
     "ModelTier",
+    "should_apply_watermark",
+    "should_apply_watermark_for_session",
     "PatchAmbiguousError",
     "PatchBlock",
     "PatchNotFoundError",

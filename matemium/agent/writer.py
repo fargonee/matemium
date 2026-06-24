@@ -9,7 +9,8 @@ from typing import Sequence
 
 from matemium.paths import discover_root
 
-from .models import DecoupledArtifacts, TimingBlueprint
+from .guard import WATERMARK_BUILDER_LINE, WATERMARK_MARKER, should_apply_watermark_for_session
+from .models import DecoupledArtifacts, ProjectSession, TimingBlueprint
 from .script_parser import extract_div_markers, parse_narrative_blocks
 from .separation import build_decoupled_artifacts
 from .timing import round_ms
@@ -260,12 +261,20 @@ def emit_scenes_parts_replace(script: str, blueprint: TimingBlueprint) -> str:
     return "\n".join(parts).rstrip() + "\n"
 
 
-def emit_main_scene_replace(script: str, blueprint: TimingBlueprint) -> str:
+def emit_main_scene_replace(
+    script: str,
+    blueprint: TimingBlueprint,
+    *,
+    apply_watermark: bool = False,
+) -> str:
     """Render CanvasScene class wiring all part_* builders."""
     artifacts = build_decoupled_artifacts(script, blueprint)
     part_calls = "\n        ".join(f"{fn}(builder)" for fn in artifacts.scenes.part_functions)
     class_name = "AgentScene"
     title = div_markers[0] if (div_markers := extract_div_markers(script)) else "Agent Scene"
+    watermark_block = ""
+    if apply_watermark:
+        watermark_block = f"        {WATERMARK_MARKER}\n        {WATERMARK_BUILDER_LINE.strip()}\n"
     return f'''# ---DIV: Main scene---
 class {class_name}(CanvasScene):
     """Decoupled agent-authored scene."""
@@ -276,7 +285,7 @@ class {class_name}(CanvasScene):
             canvas_settings=CanvasSettings.for_reels(title="{title}"),
         )
         {part_calls}
-        super().__init__(dsl=builder.build(), **kwargs)
+{watermark_block}        super().__init__(dsl=builder.build(), **kwargs)
 '''
 
 
@@ -298,7 +307,12 @@ def build_assets_patches(artifacts: DecoupledArtifacts) -> list[PatchBlock]:
     return [PatchBlock(search=search, replace=emit_assets_replace(artifacts))]
 
 
-def build_scenes_patches(script: str, blueprint: TimingBlueprint) -> list[PatchBlock]:
+def build_scenes_patches(
+    script: str,
+    blueprint: TimingBlueprint,
+    *,
+    apply_watermark: bool = False,
+) -> list[PatchBlock]:
     """Patches transforming template scenes.py into decoupled narrative + waits."""
     template = load_template("scenes.py")
     patches: list[PatchBlock] = []
@@ -355,7 +369,10 @@ def build_scenes_patches(script: str, blueprint: TimingBlueprint) -> list[PatchB
     if scene_search not in template:
         raise PatchError("scenes.py template changed; main scene SEARCH anchor missing")
     patches.append(
-        PatchBlock(search=scene_search, replace=emit_main_scene_replace(script, blueprint))
+        PatchBlock(
+            search=scene_search,
+            replace=emit_main_scene_replace(script, blueprint, apply_watermark=apply_watermark),
+        )
     )
     return patches
 
@@ -379,6 +396,9 @@ def write_decoupled_project(
     project_dir: Path | str,
     script: str,
     blueprint: TimingBlueprint,
+    *,
+    session: ProjectSession | None = None,
+    apply_watermark: bool | None = None,
 ) -> WriterResult:
     """Write decoupled scenes.py and assets.py via SEARCH/REPLACE patches only."""
     project_dir = Path(project_dir)
@@ -386,11 +406,14 @@ def write_decoupled_project(
     scenes_path = project_dir / "scenes.py"
     assets_path = project_dir / "assets.py"
 
+    if apply_watermark is None:
+        apply_watermark = should_apply_watermark_for_session(session) if session else False
+
     bootstrap_template_file(scenes_path, "scenes.py")
     bootstrap_template_file(assets_path, "assets.py")
 
     assets_patches = build_assets_patches(artifacts)
-    scenes_patches = build_scenes_patches(script, blueprint)
+    scenes_patches = build_scenes_patches(script, blueprint, apply_watermark=apply_watermark)
     assets_document = format_patch_document(assets_patches)
     scenes_document = format_patch_document(scenes_patches)
 
