@@ -17,6 +17,7 @@ from .timing import round_ms
 SEARCH_MARKER = "<<<<<<< SEARCH"
 DIVIDER_MARKER = "======="
 REPLACE_MARKER = ">>>>>>> REPLACE"
+TEMPLATE_SEED_MARKER = "# <<<Matemium:TEMPLATE_SEED>>>\n"
 
 ADD_MATH_RE = re.compile(r"b\.add_math\s*\(\s*r([\"'])(.*?)\1\s*\)", re.DOTALL)
 ADD_3D_RE = re.compile(r'b\.add_3d\s*\(\s*["\']([^"\']+)["\']\s*\)')
@@ -50,6 +51,7 @@ class WriterResult:
     scenes_path: Path
     assets_path: Path
     patches_applied: int
+    patch_documents: dict[str, str]
 
 
 def _templates_root() -> Path:
@@ -111,6 +113,30 @@ def format_patch_block(search: str, replace: str) -> str:
         f"{replace}"
         f"{REPLACE_MARKER}\n"
     )
+
+
+def format_patch_document(blocks: Sequence[PatchBlock]) -> str:
+    """Serialize ordered patch blocks into one diff document."""
+    return "".join(format_patch_block(block.search, block.replace) for block in blocks)
+
+
+def apply_patch_to_disk(path: Path, block: PatchBlock) -> None:
+    """Read a file, apply one exact unique SEARCH/REPLACE, write back."""
+    content = path.read_text(encoding="utf-8")
+    updated = apply_patch(content, block.search, block.replace)
+    path.write_text(updated, encoding="utf-8")
+
+
+def apply_patches_on_disk(path: Path, blocks: Sequence[PatchBlock]) -> int:
+    """Apply patch blocks sequentially, one disk read/write per block."""
+    for block in blocks:
+        apply_patch_to_disk(path, block)
+    return len(blocks)
+
+
+def apply_patch_document_on_disk(path: Path, document: str) -> int:
+    """Parse a diff document and apply each block to disk in order."""
+    return apply_patches_on_disk(path, parse_patch_blocks(document))
 
 
 def _indent_body(lines: list[str], indent: str = "    ") -> str:
@@ -334,16 +360,19 @@ def build_scenes_patches(script: str, blueprint: TimingBlueprint) -> list[PatchB
     return patches
 
 
-def seed_templates(project_dir: Path) -> tuple[Path, Path, str, str]:
-    """Bootstrap project dir with shared templates (pre-patch seed only)."""
-    project_dir.mkdir(parents=True, exist_ok=True)
-    scenes_path = project_dir / "scenes.py"
-    assets_path = project_dir / "assets.py"
-    scenes_text = load_template("scenes.py")
-    assets_text = load_template("assets.py")
-    scenes_path.write_text(scenes_text, encoding="utf-8")
-    assets_path.write_text(assets_text, encoding="utf-8")
-    return scenes_path, assets_path, scenes_text, assets_text
+def bootstrap_template_file(path: Path, template_name: str) -> None:
+    """Place shared template content via a single SEARCH/REPLACE from seed marker."""
+    template = load_template(template_name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_file():
+        existing = path.read_text(encoding="utf-8")
+        if existing == template:
+            return
+    path.write_text(TEMPLATE_SEED_MARKER, encoding="utf-8")
+    apply_patch_to_disk(
+        path,
+        PatchBlock(search=TEMPLATE_SEED_MARKER, replace=template),
+    )
 
 
 def write_decoupled_project(
@@ -354,20 +383,27 @@ def write_decoupled_project(
     """Write decoupled scenes.py and assets.py via SEARCH/REPLACE patches only."""
     project_dir = Path(project_dir)
     artifacts = build_decoupled_artifacts(script, blueprint)
-    scenes_path, assets_path, scenes_text, assets_text = seed_templates(project_dir)
+    scenes_path = project_dir / "scenes.py"
+    assets_path = project_dir / "assets.py"
+
+    bootstrap_template_file(scenes_path, "scenes.py")
+    bootstrap_template_file(assets_path, "assets.py")
 
     assets_patches = build_assets_patches(artifacts)
     scenes_patches = build_scenes_patches(script, blueprint)
+    assets_document = format_patch_document(assets_patches)
+    scenes_document = format_patch_document(scenes_patches)
 
-    assets_text = apply_patches(assets_text, assets_patches)
-    scenes_text = apply_patches(scenes_text, scenes_patches)
-
-    assets_path.write_text(assets_text, encoding="utf-8")
-    scenes_path.write_text(scenes_text, encoding="utf-8")
+    assets_applied = apply_patches_on_disk(assets_path, assets_patches)
+    scenes_applied = apply_patches_on_disk(scenes_path, scenes_patches)
 
     return WriterResult(
         artifacts=artifacts,
         scenes_path=scenes_path,
         assets_path=assets_path,
-        patches_applied=len(assets_patches) + len(scenes_patches),
+        patches_applied=assets_applied + scenes_applied,
+        patch_documents={
+            "assets.py": assets_document,
+            "scenes.py": scenes_document,
+        },
     )

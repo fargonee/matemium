@@ -35,7 +35,10 @@ from matemium.agent.writer import (
     PatchAmbiguousError,
     PatchBlock,
     PatchNotFoundError,
+    SEARCH_MARKER,
     apply_patch,
+    apply_patches_on_disk,
+    format_patch_document,
     parse_patch_blocks,
     write_decoupled_project,
 )
@@ -424,6 +427,32 @@ def test_writer_parse_patch_blocks_roundtrip():
     assert blocks[0].replace == "new line\n"
 
 
+def test_writer_emits_search_replace_patch_documents(tmp_path: Path):
+    blueprint = build_mute_blueprint(SAMPLE_SCRIPT)
+    result = write_decoupled_project(tmp_path, SAMPLE_SCRIPT, blueprint)
+    assert SEARCH_MARKER in result.patch_documents["scenes.py"]
+    assert SEARCH_MARKER in result.patch_documents["assets.py"]
+    assert result.patch_documents["scenes.py"].count(SEARCH_MARKER) == 3
+    assert result.patch_documents["assets.py"].count(SEARCH_MARKER) == 1
+
+
+def test_writer_applies_patches_incrementally_on_disk(tmp_path: Path, monkeypatch):
+    blueprint = build_mute_blueprint(SAMPLE_SCRIPT)
+    calls: list[str] = []
+    original = apply_patches_on_disk
+
+    def track(path, blocks):
+        calls.append(path.name)
+        return original(path, blocks)
+
+    monkeypatch.setattr(
+        "matemium.agent.writer.apply_patches_on_disk",
+        track,
+    )
+    write_decoupled_project(tmp_path, SAMPLE_SCRIPT, blueprint)
+    assert calls == ["assets.py", "scenes.py"]
+
+
 def test_writer_decoupled_project_writes_files_with_waits(tmp_path: Path):
     blueprint = parse_whisper_timing_blueprint(SAMPLE_SCRIPT, WHISPER_PAYLOAD)
     result = write_decoupled_project(tmp_path, SAMPLE_SCRIPT, blueprint)
@@ -433,6 +462,7 @@ def test_writer_decoupled_project_writes_files_with_waits(tmp_path: Path):
     assert scenes_path.is_file()
     assert assets_path.is_file()
     assert result.patches_applied == 4
+    assert format_patch_document([]) == ""
 
     scenes = scenes_path.read_text(encoding="utf-8")
     assets = assets_path.read_text(encoding="utf-8")
