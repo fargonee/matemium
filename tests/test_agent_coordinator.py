@@ -228,7 +228,7 @@ WHISPER_SEGMENT_TABLE = [
 
 
 @pytest.mark.parametrize("script,payload,expected", WHISPER_SEGMENT_TABLE)
-def test_whisper_segment_table(script, payload, expected):
+def test_whisper_timing_blueprint_segment_table(script, payload, expected):
     """Table-driven frozen segment expectations — run twice for determinism."""
     for _ in range(2):
         blueprint = parse_whisper_timing_blueprint(script, payload)
@@ -246,7 +246,7 @@ def test_whisper_segment_table(script, payload, expected):
                 )
 
 
-def test_parse_whisper_sorts_out_of_order_payload():
+def test_parse_whisper_timing_blueprint_sorts_out_of_order_payload():
     script = """# ---DIV: A---
 def part_a(b):
     b.add_body("first")
@@ -272,7 +272,7 @@ def part_b(b):
     assert blueprint.total_duration >= blueprint.segments[-1].end_time
 
 
-def test_parse_whisper_non_monotonic_word_ends_use_max_in_slice():
+def test_parse_whisper_timing_blueprint_non_monotonic_word_ends_use_max_in_slice():
     """Slice bounds use min(start)/max(end), not list-order first/last."""
     script = """# ---DIV: Only---
 def part_only(b):
