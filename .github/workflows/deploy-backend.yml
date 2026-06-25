@@ -21,13 +21,13 @@ jobs:
 
       - name: Trigger Northflank build from Git (then deploy)
         run: |
-          echo "Triggering Northflank to build from Git (branch: main) for project 'matemium' service 'math'..."
+          echo "Triggering Northflank to build from Git (sha: ${{ github.sha }}) for project 'matemium' service 'math'..."
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "https://api.northflank.com/v1/projects/matemium/services/math/build" \
             -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "branch": "main"
+              "sha": "${{ github.sha }}"
             }')
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
