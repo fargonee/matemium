@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy package definition + source (order for layer caching)
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 COPY matemium_server ./matemium_server
 
 RUN pip install --upgrade pip && \
