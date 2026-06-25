@@ -19,7 +19,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Trigger Northflank build from Git (then deploy)
+      - name: Trigger Northflank build from Git
         run: |
           echo "Triggering Northflank to build from Git (sha: ${{ github.sha }}) for project 'matemium' service 'math'..."
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
@@ -41,7 +41,59 @@ jobs:
             exit 1
           fi
 
-          echo "✅ Build triggered successfully on Northflank. It will deploy if successful."
+          echo "✅ Build triggered successfully on Northflank."
+
+      - name: Wait for build to succeed
+        run: |
+          SHA="${{ github.sha }}"
+          echo "Waiting for build with sha $SHA to succeed..."
+          for i in {1..20}; do
+            BUILDS=$(curl -s -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
+              "https://api.northflank.com/v1/projects/matemium/services/math/builds")
+            STATUS=$(echo "$BUILDS" | jq -r '.builds[] | select(.sha == "'$SHA'") | .status' 2>/dev/null | head -1 || echo "")
+            echo "Build $SHA status: $STATUS"
+            if [ "$STATUS" = "succeeded" ]; then
+              echo "✅ Build succeeded"
+              break
+            elif [ "$STATUS" = "failed" ]; then
+              echo "❌ Build failed"
+              exit 1
+            fi
+            sleep 30
+          done
+          if [ "$STATUS" != "succeeded" ]; then
+            echo "Build did not succeed in time"
+            exit 1
+          fi
+
+      - name: Deploy the specific build
+        run: |
+          SHA="${{ github.sha }}"
+          echo "Deploying build $SHA to service..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.northflank.com/v1/projects/matemium/services/math/deployment" \
+            -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "internal": {
+                "id": "math",
+                "branch": "main",
+                "buildSHA": "'$SHA'"
+              }
+            }')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "Deploy response: $BODY"
+          echo "HTTP: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            echo "❌ Failed to deploy the build"
+            exit 1
+          fi
+
+          echo "✅ Deploy triggered for the build."
 
       - name: Wait for healthy deployment (stay on last successful if this fails)
         run: |
