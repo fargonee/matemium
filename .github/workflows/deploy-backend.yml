@@ -46,9 +46,14 @@ jobs:
       - name: Wait for healthy deployment (stay on last successful if this fails)
         run: |
           echo "Waiting for Northflank deployment to become healthy (zero-downtime: previous version remains active until ready)..."
-          sleep 60
-          for i in {1..20}; do
-            if curl -f -s https://p01--math--zjvwyx4fjqbn.code.run/health > /dev/null 2>&1; then
+          sleep 90
+          BACKEND_URL="${{ vars.NORTHFLANK_PUBLIC_URL }}"
+          if [ -z "$BACKEND_URL" ]; then
+            echo "❌ NORTHFLANK_PUBLIC_URL variable not set in the GitHub environment. Please add it (e.g. https://math--matemium.northflank.app)"
+            exit 1
+          fi
+          for i in {1..30}; do
+            if curl -f -s "${BACKEND_URL}/health" > /dev/null 2>&1; then
               echo "✅ Health check passed on attempt $i"
               exit 0
             fi
