@@ -59,12 +59,17 @@ jobs:
         run: |
           SHA="${{ github.sha }}"
           echo "Deploying build $SHA to service..."
-          PAYLOAD="{\"internal\":{\"id\":\"math\",\"branch\":\"main\",\"buildSHA\":\"$SHA\"}}"
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "https://api.northflank.com/v1/projects/matemium/services/math/deployment" \
             -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD")
+            -d '{
+              "internal": {
+                "id": "math",
+                "branch": "main",
+                "buildSHA": "'$SHA'"
+              }
+            }')
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
@@ -82,5 +87,5 @@ jobs:
       - name: Done
         run: |
           echo "✅ Build and deploy triggered for sha ${{ github.sha }}."
-          echo "Check Northflank UI > service 'math' > Deployments to see rollout."
-          echo "No health check or job-failing logic - previous version stays if new one doesn't promote."
+          echo "Check Northflank UI > service 'math' > Deployments to see the rollout."
+          echo "No health check or job-failing logic."
