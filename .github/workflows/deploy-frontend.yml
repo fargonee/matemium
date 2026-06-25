@@ -1,0 +1,58 @@
+name: Deploy Frontend to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/deploy-frontend.yml'
+
+concurrency:
+  group: deploy-frontend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Trigger Cloudflare Pages deployment
+        run: |
+          echo "Triggering deploy for Cloudflare Pages project 'math' on branch main"
+          RESPONSE=$(curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/pages/projects/math/deployments" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"branch": "main"}')
+          
+          echo "$RESPONSE" | jq .
+          
+          # Check if the request was successful
+          SUCCESS=$(echo "$RESPONSE" | jq -r '.success')
+          if [ "$SUCCESS" != "true" ]; then
+            echo "Deployment trigger failed"
+            echo "$RESPONSE"
+            exit 1
+          fi
+          
+          echo "Deployment triggered successfully for Cloudflare Pages"
+
+      - name: Verify frontend deployment (zero downtime check)
+        run: |
+          echo "Waiting for Cloudflare deployment to propagate..."
+          sleep 90
+          for i in {1..12}; do
+            CONTENT=$(curl -s -I https://matemium.fargonee.space | head -1 || echo "")
+            BODY=$(curl -s https://matemium.fargonee.space | grep -o "Matemium" | head -1 || echo "")
+            if echo "$CONTENT" | grep -q "200" && [ -n "$BODY" ]; then
+              echo "✅ Frontend deployment verified on attempt $i"
+              exit 0
+            fi
+            echo "Verification $i failed (may be propagating), waiting 30s..."
+            sleep 30
+          done
+          echo "❌ Frontend verification failed after deployment. Previous version should still be serving."
+          exit 1

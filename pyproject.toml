@@ -60,7 +60,7 @@ include = [
     # Note: desktop/, server/, website/, shared/, and most root docs
     # are NOT part of the published Python engine package.
     # They are developed and deployed separately:
-    #   - website/   → GitHub Pages
+    #   - website/   → Cloudflare Pages
     #   - server/    → Northflank / PaaS (separate pyproject + Dockerfile)
     #   - desktop/   → Tauri bundles (separate packaging + sidecar build)
 ]

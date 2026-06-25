@@ -1,0 +1,42 @@
+name: Deploy Backend to Northflank
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-backend.yml'
+
+concurrency:
+  group: deploy-backend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to Northflank
+        uses: northflank/deploy-to-northflank@v1
+        with:
+          northflank-api-key: ${{ secrets.NORTHFLANK_API_KEY }}
+          project-id: matemium
+          service-id: math
+
+      - name: Wait for healthy deployment
+        run: |
+          echo "Waiting for Northflank deployment to become healthy..."
+          sleep 45
+          for i in {1..15}; do
+            if curl -f -s https://p01--math--zjvwyx4fjqbn.code.run/health > /dev/null 2>&1; then
+              echo "✅ Health check passed on attempt $i"
+              exit 0
+            fi
+            echo "Health check $i failed, waiting 15s..."
+            sleep 15
+          done
+          echo "❌ Health check failed after deployment. Previous version should still be serving."
+          exit 1

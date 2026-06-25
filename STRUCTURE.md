@@ -8,7 +8,7 @@ Three deployable products + one engine share one repository with **strict publis
 
 | Target           | Build context / entry            | What it must contain (nothing else)                  | Trigger                     |
 |------------------|----------------------------------|------------------------------------------------------|-----------------------------|
-| GitHub Pages     | `website/` only                  | Built static assets from `website/dist`              | `.github/workflows/deploy-website.yml` (path filtered) |
+| Cloudflare Pages | `website/` only                  | Built static assets from `website/dist`              | Cloudflare dashboard Git integration (or CI) |
 | Northflank/PaaS  | `server/Dockerfile` + context `server/` | Only `matemium_server/` + its pyproject               | Docker build on platform    |
 | Desktop apps     | `desktop/` + sidecar from root engine | Tauri bundle + platform `matemium-sidecar` binary only | `desktop/scripts/build-*.sh` + CI |
 | Engine package   | Root `pyproject.toml` (wheel)    | `canvas/` + `matemium/` only                         | `pip wheel` / hatch         |
@@ -41,7 +41,7 @@ math/  (repository root)
 │       └── matemium_server/
 │
 ├── WEBSITE — frontend (isolated publish)
-│   └── website/                Vite React app → GitHub Pages (deploy-website.yml)
+│   └── website/                Vite React app → Cloudflare Pages
 │       └── (node build only; never mixed into other publishes)
 │
 ├── DESKTOP — desktop app (isolated bundles)

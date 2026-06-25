@@ -142,15 +142,15 @@ See also the root [STRUCTURE.md](../STRUCTURE.md) for publish boundaries.
    | `MATEMIUM_SUPABASE_URL`                | `https://xxx.supabase.co`                            | Same project as website |
    | `MATEMIUM_SUPABASE_ANON_KEY`           | `sb_publishable_...`                                 |       |
    | `MATEMIUM_SUPABASE_SERVICE_ROLE_KEY`   | `sb_secret_...` (keep private)                       | Needed for DB + admin ops |
-   | `MATEMIUM_CORS_ORIGINS`                | `https://you.github.io,https://you.github.io/your-repo,https://*.northflank.app` | Add GitHub Pages URL(s) |
-   | `MATEMIUM_SITE_URL`                    | `https://you.github.io`                              | Used for billing redirects |
+   | `MATEMIUM_CORS_ORIGINS`                | `https://your-project.pages.dev,https://*.pages.dev,https://*.northflank.app` | Add Cloudflare Pages + server origins |
+   | `MATEMIUM_SITE_URL`                    | `https://your-project.pages.dev`                     | Used for billing redirects |
    | `MATEMIUM_LLM_STUB`                    | `false`                                              | Set false for real LLM |
    | `MATEMIUM_LLM_API_KEY`                 | `sk-...`                                             |       |
    | `MATEMIUM_LEMON_SQUEEZY_*`             | ...                                                  | If using billing |
    | `MATEMIUM_ADMIN_EMAILS`                | `you@...`                                            |       |
 
 3. Northflank will expose a public URL like `https://matemium-server-abc123.northflank.app`.
-   - Use this as `VITE_API_URL` when building the **website** for GitHub Pages.
+   - Use this as `VITE_API_URL` when building the **website**.
    - Use this in the desktop Tauri app Server settings when connecting to cloud.
 
 Health check endpoint: `GET /health` (already configured).

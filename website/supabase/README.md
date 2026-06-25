@@ -8,8 +8,8 @@
    - `VITE_SUPABASE_ANON_KEY`
 5. For the server, also copy the **service_role** key as `MATEMIUM_SUPABASE_SERVICE_ROLE_KEY` (keep secret).
 6. In Supabase Dashboard → Authentication → URL Configuration:
-   - Site URL: your final site (e.g. `https://you.github.io` or `https://you.github.io/your-repo`)
-   - Redirect URLs: add the same + `https://you.github.io/**/auth/callback` (and any custom domains)
+   - Site URL: your final site (e.g. `https://your-project.pages.dev`)
+   - Redirect URLs: add the same + `https://your-project.pages.dev/**/auth/callback`, preview URLs (`https://*.pages.dev/**/auth/callback`), and any custom domains
 7. Optionally create a `profiles` row policy / trigger already covers signups via the included `handle_new_user`.
 
 ## Row Level Security

@@ -42,7 +42,7 @@ docker build -t matemium .
 docker run --rm -v "$PWD:/workspace" -w /workspace matemium render demo
 ```
 
-Note: See `.dockerignore` + `server/Dockerfile` for isolated PaaS builds (Northflank). GitHub Pages deploys only `website/`.
+Note: See `.dockerignore` + `server/Dockerfile` for isolated PaaS builds (Northflank). Website is deployed to Cloudflare Pages from `website/`.
 
 ## Quick start
 
@@ -241,7 +241,7 @@ Each publish target is isolated (see STRUCTURE.md for details):
 math/
 ├── canvas/, matemium/, projects/   # Engine (pip + Docker root)
 ├── server/                         # Backend (Northflank/PaaS, own Dockerfile + context)
-├── website/                        # Frontend (GitHub Pages)
+├── website/                        # Frontend (Cloudflare Pages)
 ├── desktop/                        # Desktop (Tauri bundles)
 ├── shared/                         # Contracts only
 ├── .dockerignore .gitignore        # Enforce isolation at build time
