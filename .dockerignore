@@ -1,0 +1,127 @@
+# =============================================================================
+# Matemium root .dockerignore
+# Goal: Minimal Docker build context for the root engine image only.
+# Other publish targets use their own contexts (server/, website/ workflows).
+# =============================================================================
+
+# VCS
+.git
+.gitattributes
+.gitignore
+
+# Python caches / envs / packaging
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+.pytest_cache/
+.coverage*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+ENV/
+.hatch/
+__pypackages__/
+
+# Node (website + desktop UI)
+node_modules/
+**/node_modules/
+.vite/
+*.tsbuildinfo
+package-lock.json
+# (we copy inside the subdir builds when needed)
+
+# Rust / Tauri huge build dirs
+target/
+**/target/
+desktop/src-tauri/target/
+**/*.rlib
+**/*.rmeta
+
+# Generated build artifacts from all layers
+dist/
+build/
+**/dist/
+**/build/
+desktop/app/dist/
+desktop/app/dist-ssr/
+website/dist/
+server/dist/
+
+# Manim + project render outputs (very large)
+media/
+videos/
+images/
+Tex/
+tex/
+text/
+partial_movie_files/
+outputs/
+renders/
+exports/
+frames/
+thumbnails/
+scratch/
+drafts/
+sandbox/
+playground/
+*.mp4
+*.mov
+*.webm
+*.gif
+
+# Manim LaTeX intermediates
+.manim/
+*.log
+*.aux
+*.dvi
+*.xdv
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# IDE / OS noise
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Secrets / env
+.env
+.env.*
+*.pem
+*.key
+
+# Dev-only or test (not part of published engine container)
+tests/
+fixtures/
+requirements.txt
+
+# All documentation and meta (root Dockerfile copies explicit files only)
+*.md
+engine/
+desktop/
+website/
+server/
+shared/
+.github/
+docs/
+
+# Generated sidecar binaries and their staging (rebuilt when packaging desktop)
+desktop/src-tauri/binaries/*
+!desktop/src-tauri/binaries/README.md
+desktop/src-tauri/target/
+
+# Local tool outputs
+__pycache__/
+build/

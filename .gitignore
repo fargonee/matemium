@@ -1,3 +1,15 @@
+# =============================================================================
+# Matemium .gitignore
+#
+# Monorepo with separate publish targets:
+#   - Engine (Python)          : pip / PyPI / local `pip install -e .` / Docker (root)
+#   - Website (React SPA)      : GitHub Pages (only website/ is built & deployed)
+#   - Server (FastAPI)         : Northflank / PaaS (server/Dockerfile, context=server/)
+#   - Desktop (Tauri)          : per-platform bundles (PyInstaller sidecar + Tauri build)
+#
+# Build artifacts from one target must never leak into another.
+# =============================================================================
+
 # ----------------------------
 # Python
 # ----------------------------
@@ -18,6 +30,10 @@ dist/
 *.egg-info/
 .eggs/
 pip-wheel-metadata/
+
+# Modern python packaging caches / envs
+.hatch/
+__pypackages__/
 
 # Test / coverage
 .pytest_cache/
@@ -69,14 +85,16 @@ frames/
 thumbnails/
 screenshots/
 
-# Generated assets
+# Generated assets (output visuals)
+# Broad ignores here catch stray generated files.
+# Source assets (app icons, website assets, design docs) are explicitly kept.
 *.png
 *.jpg
 *.jpeg
 *.svg
 *.pdf
 
-# Keep source/design assets if you store them intentionally
+# Re-include source / committed assets
 !assets/**/*.png
 !assets/**/*.jpg
 !assets/**/*.jpeg
@@ -87,6 +105,19 @@ screenshots/
 !docs/**/*.jpeg
 !docs/**/*.svg
 !docs/**/*.pdf
+!desktop/src-tauri/icons/**/*.png
+!desktop/src-tauri/icons/**/*.jpg
+!desktop/src-tauri/icons/**/*.svg
+!desktop/src-tauri/icons/**/*.ico
+!desktop/src-tauri/icons/**/*.icns
+!website/public/**/*.png
+!website/public/**/*.jpg
+!website/public/**/*.svg
+!website/public/**/*.ico
+!website/public/**/*.icns
+!public/**/*.png
+!public/**/*.jpg
+!public/**/*.svg
 
 # ----------------------------
 # Project-specific generated data
@@ -110,6 +141,40 @@ playground/
 .ipynb_checkpoints/
 
 # ----------------------------
+# Node / frontend (covers all subprojects)
+# ----------------------------
+node_modules/
+.vite/
+
+# ----------------------------
+# Desktop (Tauri + Vite app) — covered by more specific rules below
+# (binaries are regenerated; target is huge)
+# ----------------------------
+
+# ----------------------------
+# Website (GitHub Pages publish only)
+# ----------------------------
+website/dist/
+
+# ----------------------------
+# Server (separate publish)
+# ----------------------------
+server/.venv/
+server/dist/
+server/.env
+
+# ----------------------------
+# Desktop / PyInstaller publish artifacts (regenerated per build)
+# ----------------------------
+desktop/src-tauri/binaries/matemium-sidecar*
+desktop/src-tauri/target/
+
+# Root-level PyInstaller / packaging output
+dist/matemium-sidecar
+dist/matemium-sidecar.exe
+build/
+
+# ----------------------------
 # IDE / editor files
 # ----------------------------
 .vscode/
@@ -119,6 +184,7 @@ playground/
 *~
 .DS_Store
 Thumbs.db
+*.tsbuildinfo
 
 # ----------------------------
 # Environment / secrets
@@ -152,6 +218,6 @@ logs/
 .AppleDouble
 .LSOverride
 ._*
-.Trashes
+Trashes
 ehthumbs.db
 Desktop.ini

@@ -1,0 +1,16 @@
+# website/.dockerignore
+# The website is deployed via GitHub Pages (see deploy-website.yml), not Docker.
+# This file exists for completeness and to prevent accidental docker builds
+# from including huge node_modules etc.
+
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+.env
+.env.*
+.DS_Store
+.vscode/
+.idea/
+*.log
+coverage/

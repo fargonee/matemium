@@ -1,0 +1,58 @@
+# =============================================================================
+# server/.dockerignore
+# Used when building the server container (Northflank, Fly, Railway, etc.)
+#
+# Build command recommended:
+#   docker build -t matemium-server -f server/Dockerfile ./server
+# =============================================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+.pytest_cache/
+.coverage*
+htmlcov/
+.venv/
+venv/
+env/
+.hatch/
+
+# Build outputs
+dist/
+build/
+*.whl
+
+# Dev / test
+tests/
+**/__pycache__/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Secrets (never bake in)
+.env
+.env.*
+*.pem
+*.key
+
+# No Node here
+node_modules/
+
+# Git
+.git
+.gitignore
+
+# When the build context is the server/ directory (recommended),
+# parent directories are never sent. This file mainly protects
+# against accidental builds using a larger context.
+
+# Anything not explicitly COPYed by server/Dockerfile is irrelevant:
+#   - only pyproject.toml and matemium_server/ are used at build time.

@@ -1,0 +1,69 @@
+"""Matemium — layout-to-animation compiler for infinite scrollable math sheets.
+
+Elements appear as the view scrolls, stay at fixed positions in default state,
+and can be re-animated on demand. Full-tape export captures the entire sheet
+in its natural aspect (no forced portrait/landscape crop).
+
+**Video formats (portrait-first)**:
+- `CanvasSettings.for_reels()`      → 9:16 vertical (default)
+- `CanvasSettings.for_youtube()`    → 16:9 landscape
+
+Render videos: `./matemium.sh demo` or `python -m matemium --help`
+
+See project-spec.md, architecture.md, and canvas/USAGE.md.
+"""
+
+from .dsl import (
+    SheetDSL,
+    CanvasSettings,
+    CanvasElement,
+    LayoutBox,
+    CameraMove,
+    TransformElement,
+    EntryAnimation,
+    StateBehavior,
+)
+from .layout import LayoutEngine, Style
+from .measure import build_mobject, measure_element
+from .scene import CanvasScene
+from .builder import CanvasBuilder
+
+# High-level builder (recommended for most use, especially AI-generated videos):
+# See canvas/USAGE.md for plain examples and guidelines.
+#
+# builder = CanvasBuilder(title="My Video")
+# builder.add_text("...")
+# builder.add_math(r"...")
+# builder.add_3d("z=x^2-y^2")
+# dsl = builder.build()
+# scene = CanvasScene(dsl)
+#
+# Full static sheet export (PNG/PDF) is available via scene.export_full_sheet(...)
+# (see project-spec.md for full_tape mode etc.)
+from .registry import MobjectRegistry, RegistryEntry
+from .camera import CameraController
+from .animations import get_entry_animation, FLASH_AND_SCALE
+from .cutter import ReelCutter
+
+__all__ = [
+    "SheetDSL",
+    "CanvasSettings",
+    "CanvasElement",
+    "LayoutBox",
+    "LayoutEngine",
+    "Style",
+    "build_mobject",
+    "measure_element",
+    "CameraMove",
+    "TransformElement",
+    "EntryAnimation",
+    "StateBehavior",
+    "CanvasScene",
+    "MobjectRegistry",
+    "RegistryEntry",
+    "CameraController",
+    "get_entry_animation",
+    "FLASH_AND_SCALE",
+    "ReelCutter",
+    "CanvasBuilder",
+]

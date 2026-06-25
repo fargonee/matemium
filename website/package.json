@@ -1,0 +1,36 @@
+{
+  "name": "matemium-website",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:gh-pages": "npm run build && node -e \"const fs=require('fs');fs.copyFileSync('dist/index.html','dist/404.html')\"",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "codegen": "npx @rtk-query/codegen-openapi openapi-config.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.8.2",
+    "@supabase/supabase-js": "^2.49.8",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-redux": "^9.2.0",
+    "react-router-dom": "^7.6.2"
+  },
+  "devDependencies": {
+    "@rtk-query/codegen-openapi": "^2.0.0",
+    "@tailwindcss/postcss": "^4.1.8",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.5.2",
+    "@types/node": "^22.15.29",
+    "tailwindcss": "^4.1.8",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  }
+}

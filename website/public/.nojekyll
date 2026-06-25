@@ -1,0 +1,2 @@
+# Prevent GitHub Pages from processing with Jekyll.
+# Required for correct asset serving and _redirects / 404 handling in SPAs.

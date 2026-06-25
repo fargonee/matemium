@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matemium.app/schemas/chat-completion.schema.json",
+  "title": "ChatCompletionResponse",
+  "type": "object",
+  "required": ["id", "message", "model"],
+  "properties": {
+    "id": { "type": "string" },
+    "message": {
+      "type": "object",
+      "required": ["role", "content"],
+      "properties": {
+        "role": { "type": "string", "enum": ["assistant"] },
+        "content": { "type": "string" }
+      }
+    },
+    "code_edit": {
+      "type": ["object", "null"],
+      "description": "v1 chat: optional single-file patch",
+      "properties": {
+        "description": { "type": "string" },
+        "filename": { "type": "string", "enum": ["scenes.py", "assets.py"] },
+        "search": { "type": ["string", "null"] },
+        "replace": { "type": ["string", "null"] },
+        "full_file": { "type": ["string", "null"] },
+        "patches": {
+          "type": ["string", "null"],
+          "description": "One or more SEARCH/REPLACE blocks (Aider-style)"
+        }
+      }
+    },
+    "tool_calls": {
+      "type": ["array", "null"],
+      "description": "v2 agent: OpenAI-compatible tool calls (view_file, edit_file, compile_manim)",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "function"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string", "enum": ["function"] },
+          "function": {
+            "type": "object",
+            "required": ["name", "arguments"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": ["view_file", "edit_file", "compile_manim"]
+              },
+              "arguments": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "model": { "type": "string" },
+    "stub": { "type": "boolean", "default": false }
+  }
+}

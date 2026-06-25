@@ -1,0 +1,61 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Matemium",
+  "version": "0.1.0",
+  "identifier": "app.matemium.canvas",
+  "build": {
+    "beforeDevCommand": "npm run dev --prefix app",
+    "beforeBuildCommand": "npm run build --prefix app",
+    "frontendDist": "../app/dist",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Matemium Canvas",
+        "width": 1280,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* http://localhost:* https://*; media-src 'self' asset: http://asset.localhost https://asset.localhost blob: data:; img-src 'self' asset: http://asset.localhost https://asset.localhost blob: data:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "requireLiteralLeadingDot": false,
+          "allow": [
+            "$DATA/matemium/**/*",
+            "$HOME/.local/share/matemium/**/*"
+          ]
+        }
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage"],
+    "externalBin": ["binaries/matemium-sidecar"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "ffmpeg",
+          "texlive-latex-extra",
+          "texlive-fonts-extra",
+          "texlive-science",
+          "cm-super",
+          "dvipng"
+        ]
+      }
+    }
+  }
+}

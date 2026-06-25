@@ -1,0 +1,1 @@
+"""Bundled project scaffolds shipped with the matemium package."""

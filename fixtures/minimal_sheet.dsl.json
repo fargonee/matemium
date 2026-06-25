@@ -1,0 +1,36 @@
+{
+  "canvas_settings": {
+    "title": "Quadratic Formula",
+    "orientation": "portrait"
+  },
+  "timeline": [
+    {
+      "id": "heading_1",
+      "type": "Text",
+      "content": "The Quadratic Formula",
+      "canvas_position": [0, 0, 0],
+      "entry_animation": { "type": "Write", "run_time": 1.0 }
+    },
+    {
+      "id": "math_1",
+      "type": "MathTex",
+      "content": "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+      "canvas_position": [0, -2, 0],
+      "entry_animation": { "type": "Write", "run_time": 1.5 }
+    },
+    {
+      "id": "scroll_1",
+      "type": "CameraMove",
+      "target_position": [0, -6, 0],
+      "run_time": 2.0
+    },
+    {
+      "id": "graph_1",
+      "type": "ThreeDGraph",
+      "content": "z = x^2 - 4",
+      "canvas_position": [0, -6, 0],
+      "entry_animation": { "type": "FadeIn", "run_time": 1.0 },
+      "pitch": 45
+    }
+  ]
+}

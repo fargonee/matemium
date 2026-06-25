@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matemium.app/schemas/project.schema.json",
+  "title": "MatemiumProject",
+  "type": "object",
+  "required": ["id", "name", "created_at", "updated_at"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string", "maxLength": 2000 },
+    "scene_class": {
+      "type": "string",
+      "default": "MyScene",
+      "description": "CanvasScene subclass name in scenes.py"
+    },
+    "orientation": {
+      "type": "string",
+      "enum": ["portrait", "landscape"],
+      "default": "portrait"
+    },
+    "authoring_mode": {
+      "type": "string",
+      "enum": ["single_file", "two_file"],
+      "default": "single_file",
+      "description": "single_file: scenes.py only (v1 chat). two_file: scenes.py + assets.py (v2 agent)."
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,53 @@
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
+import { AuthProvider } from "@/components/AuthProvider";
+import { AdminLayout } from "@/layouts/AdminLayout";
+import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { RootLayout } from "@/layouts/RootLayout";
+import { AdminOverviewPage } from "@/pages/admin/AdminOverviewPage";
+import { AdminSubscriptionsPage } from "@/pages/admin/AdminSubscriptionsPage";
+import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
+import { AuthCallbackPage } from "@/pages/AuthCallbackPage";
+import { DashboardBillingPage } from "@/pages/dashboard/DashboardBillingPage";
+import { DashboardDownloadsPage } from "@/pages/dashboard/DashboardDownloadsPage";
+import { DashboardOverviewPage } from "@/pages/dashboard/DashboardOverviewPage";
+import { HomePage } from "@/pages/HomePage";
+import { LoginPage } from "@/pages/LoginPage";
+import { PricingPage } from "@/pages/PricingPage";
+import { AdminGuard } from "@/routes/AdminGuard";
+import { AuthGuard } from "@/routes/AuthGuard";
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route element={<RootLayout />}>
+            <Route index element={<HomePage />} />
+            <Route path="pricing" element={<PricingPage />} />
+            <Route path="login" element={<LoginPage />} />
+            <Route path="auth/callback" element={<AuthCallbackPage />} />
+
+            <Route element={<AuthGuard />}>
+              <Route path="dashboard" element={<DashboardLayout />}>
+                <Route index element={<DashboardOverviewPage />} />
+                <Route path="billing" element={<DashboardBillingPage />} />
+                <Route path="downloads" element={<DashboardDownloadsPage />} />
+              </Route>
+            </Route>
+
+            <Route element={<AdminGuard />}>
+              <Route path="admin" element={<AdminLayout />}>
+                <Route index element={<AdminOverviewPage />} />
+                <Route path="users" element={<AdminUsersPage />} />
+                <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
