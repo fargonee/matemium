@@ -19,29 +19,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Trigger Northflank build from Git
+      - name: Cancel any active builds (free tier limit)
         run: |
-          echo "Triggering Northflank to build from Git (sha: ${{ github.sha }}) for project 'matemium' service 'math'..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "https://api.northflank.com/v1/projects/matemium/services/math/build" \
-            -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "sha": "${{ github.sha }}"
-            }')
-
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-
-          echo "Northflank API response: $BODY"
-          echo "HTTP status: $HTTP_CODE"
-
-          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
-            echo "❌ Failed to trigger Northflank build"
-            exit 1
-          fi
-
-          echo "✅ Build triggered successfully on Northflank."
+          echo "Cancelling any active or queued builds to free up the slot..."
+          BUILDS=$(curl -s -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
+            "https://api.northflank.com/v1/projects/matemium/services/math/builds" || echo '{}')
+          ACTIVE=$(echo "$BUILDS" | jq -r '.builds[]? | select(.status == "building" or .status == "queued" or .status == "pending") | .id' 2>/dev/null || echo "")
+          for ID in $ACTIVE; do
+            echo "Cancelling build $ID"
+            curl -X DELETE -s -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
+              "https://api.northflank.com/v1/projects/matemium/services/math/builds/$ID" || true
+          done
 
       - name: Trigger Northflank build from Git
         run: |
@@ -96,8 +84,8 @@ jobs:
 
           echo "✅ Deploy triggered for the build."
 
-      - name: Done (check Northflank UI)
+      - name: Done
         run: |
-          echo "✅ Build and deploy triggered."
-          echo "Check Northflank Deployments tab for the 'math' service to see the rollout."
-          echo "No health check or rollback logic in this workflow."
+          echo "✅ Build and deploy triggered for sha ${{ github.sha }}."
+          echo "Check Northflank UI > service 'math' > Deployments to see rollout."
+          echo "No health check or job-failing logic - previous version stays if new one doesn't promote."
