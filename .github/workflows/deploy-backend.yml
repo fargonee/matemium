@@ -19,24 +19,43 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy to Northflank
-        uses: northflank/deploy-to-northflank@v1
-        with:
-          northflank-api-key: ${{ secrets.NORTHFLANK_API_KEY }}
-          project-id: matemium
-          service-id: math
-
-      - name: Wait for healthy deployment
+      - name: Trigger Northflank deployment from Git source
         run: |
-          echo "Waiting for Northflank deployment to become healthy..."
-          sleep 45
-          for i in {1..15}; do
+          echo "Triggering Northflank to build and deploy from Git (branch: main) for project 'matemium' service 'math'..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.northflank.com/v1/projects/matemium/services/math/deployments" \
+            -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "git": {
+                "branch": "main"
+              }
+            }')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "Northflank API response: $BODY"
+          echo "HTTP status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            echo "❌ Failed to trigger Northflank deployment"
+            exit 1
+          fi
+
+          echo "✅ Deployment triggered successfully on Northflank. Build will start from Git source."
+
+      - name: Wait for healthy deployment (stay on last successful if this fails)
+        run: |
+          echo "Waiting for Northflank deployment to become healthy (zero-downtime: previous version remains active until ready)..."
+          sleep 60
+          for i in {1..20}; do
             if curl -f -s https://p01--math--zjvwyx4fjqbn.code.run/health > /dev/null 2>&1; then
               echo "✅ Health check passed on attempt $i"
               exit 0
             fi
-            echo "Health check $i failed, waiting 15s..."
-            sleep 15
+            echo "Health check $i failed, waiting 20s..."
+            sleep 20
           done
-          echo "❌ Health check failed after deployment. Previous version should still be serving."
+          echo "❌ Health check failed after deployment. Previous version should still be serving (no promotion of bad deploy)."
           exit 1
