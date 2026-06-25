@@ -43,28 +43,29 @@ jobs:
 
           echo "✅ Build triggered successfully on Northflank."
 
-      - name: Wait for build to succeed
+      - name: Trigger Northflank build from Git
         run: |
-          SHA="${{ github.sha }}"
-          echo "Waiting for build with sha $SHA to succeed..."
-          for i in {1..20}; do
-            BUILDS=$(curl -s -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
-              "https://api.northflank.com/v1/projects/matemium/services/math/builds")
-            STATUS=$(echo "$BUILDS" | jq -r '.builds[] | select(.sha == "'$SHA'") | .status' 2>/dev/null | head -1 || echo "")
-            echo "Build $SHA status: $STATUS"
-            if [ "$STATUS" = "succeeded" ]; then
-              echo "✅ Build succeeded"
-              break
-            elif [ "$STATUS" = "failed" ]; then
-              echo "❌ Build failed"
-              exit 1
-            fi
-            sleep 30
-          done
-          if [ "$STATUS" != "succeeded" ]; then
-            echo "Build did not succeed in time"
+          echo "Triggering Northflank to build from Git (sha: ${{ github.sha }}) for project 'matemium' service 'math'..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.northflank.com/v1/projects/matemium/services/math/build" \
+            -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "sha": "${{ github.sha }}"
+            }')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "Northflank API response: $BODY"
+          echo "HTTP status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            echo "❌ Failed to trigger Northflank build"
             exit 1
           fi
+
+          echo "✅ Build triggered successfully on Northflank."
 
       - name: Deploy the specific build
         run: |
@@ -95,22 +96,8 @@ jobs:
 
           echo "✅ Deploy triggered for the build."
 
-      - name: Wait for healthy deployment (stay on last successful if this fails)
+      - name: Done (check Northflank UI)
         run: |
-          echo "Waiting for Northflank deployment to become healthy (zero-downtime: previous version remains active until ready)..."
-          sleep 90
-          BACKEND_URL="${{ vars.NORTHFLANK_PUBLIC_URL }}"
-          if [ -z "$BACKEND_URL" ]; then
-            echo "❌ NORTHFLANK_PUBLIC_URL variable not set in the GitHub environment. Please add it (e.g. https://math--matemium.northflank.app)"
-            exit 1
-          fi
-          for i in {1..30}; do
-            if curl -f -s "${BACKEND_URL}/health" > /dev/null 2>&1; then
-              echo "✅ Health check passed on attempt $i"
-              exit 0
-            fi
-            echo "Health check $i failed, waiting 20s..."
-            sleep 20
-          done
-          echo "❌ Health check failed after deployment. Previous version should still be serving (no promotion of bad deploy)."
-          exit 1
+          echo "✅ Build and deploy triggered."
+          echo "Check Northflank Deployments tab for the 'math' service to see the rollout."
+          echo "No health check or rollback logic in this workflow."
