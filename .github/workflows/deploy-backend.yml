@@ -19,17 +19,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Trigger Northflank deployment from Git source
+      - name: Trigger Northflank build from Git (then deploy)
         run: |
-          echo "Triggering Northflank to build and deploy from Git (branch: main) for project 'matemium' service 'math'..."
+          echo "Triggering Northflank to build from Git (branch: main) for project 'matemium' service 'math'..."
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "https://api.northflank.com/v1/projects/matemium/services/math/deployments" \
+            "https://api.northflank.com/v1/projects/matemium/services/math/build" \
             -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "git": {
-                "branch": "main"
-              }
+              "branch": "main"
             }')
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
@@ -39,11 +37,11 @@ jobs:
           echo "HTTP status: $HTTP_CODE"
 
           if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
-            echo "❌ Failed to trigger Northflank deployment"
+            echo "❌ Failed to trigger Northflank build"
             exit 1
           fi
 
-          echo "✅ Deployment triggered successfully on Northflank. Build will start from Git source."
+          echo "✅ Build triggered successfully on Northflank. It will deploy if successful."
 
       - name: Wait for healthy deployment (stay on last successful if this fails)
         run: |
