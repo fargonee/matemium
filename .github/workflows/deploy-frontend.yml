@@ -14,7 +14,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: math
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
