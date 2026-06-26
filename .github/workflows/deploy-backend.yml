@@ -23,12 +23,12 @@ jobs:
         run: |
           echo "Cancelling any active or queued builds to free up the slot..."
           BUILDS=$(curl -s -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
-            "https://api.northflank.com/v1/projects/matemium/services/math/builds" || echo '{}')
-          ACTIVE=$(echo "$BUILDS" | jq -r '.builds[]? | select(.status == "building" or .status == "queued" or .status == "pending") | .id' 2>/dev/null || echo "")
+            "https://api.northflank.com/v1/projects/matemium/services/math/build" || echo '{}')
+          ACTIVE=$(echo "$BUILDS" | jq -r '.data.builds[]? | select(.status == "PENDING" or .status == "BUILDING" or .status == "QUEUED") | .id' 2>/dev/null || echo "")
           for ID in $ACTIVE; do
             echo "Cancelling build $ID"
             curl -X DELETE -s -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
-              "https://api.northflank.com/v1/projects/matemium/services/math/builds/$ID" || true
+              "https://api.northflank.com/v1/projects/matemium/services/math/build/$ID" || true
           done
 
       - name: Trigger Northflank build from Git
@@ -53,23 +53,54 @@ jobs:
             exit 1
           fi
 
+          BUILD_ID=$(echo "$BODY" | jq -r '.data.id // ""')
+          echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
+          echo "Triggered build id: $BUILD_ID for sha ${{ github.sha }}"
+
           echo "✅ Build triggered successfully on Northflank."
+
+      - name: Wait for build to succeed
+        run: |
+          echo "Waiting for build $BUILD_ID (sha ${{ github.sha }}) to succeed..."
+          if [ -z "$BUILD_ID" ]; then
+            echo "❌ No BUILD_ID captured from trigger step"
+            exit 1
+          fi
+          for i in {1..60}; do   # up to ~20 minutes
+            BUILD_INFO=$(curl -s -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
+              "https://api.northflank.com/v1/projects/matemium/services/math/build/$BUILD_ID")
+            echo "Build status check #$i: ${BUILD_INFO:0:300}..."
+            STATUS=$(echo "$BUILD_INFO" | jq -r '.data.status // ""')
+            echo "Current status: $STATUS"
+            if [ "$STATUS" = "SUCCESS" ]; then
+              echo "✅ Build succeeded"
+              echo "BUILD_SUCCEEDED=true" >> $GITHUB_ENV
+              break
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "ERROR" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "❌ Build failed with status: $STATUS"
+              exit 1
+            fi
+            sleep 20
+          done
+
+          if [ "${BUILD_SUCCEEDED}" != "true" ]; then
+            echo "❌ Build did not reach SUCCESS in time (or status never confirmed)"
+            exit 1
+          fi
 
       - name: Deploy the specific build
         run: |
-          SHA="${{ github.sha }}"
-          echo "Deploying build $SHA to service..."
+          echo "Deploying build $BUILD_ID (sha ${{ github.sha }}) to service..."
+          if [ -z "$BUILD_ID" ]; then
+            echo "❌ No BUILD_ID available for deploy"
+            exit 1
+          fi
+          PAYLOAD="{\"internal\":{\"id\":\"math\",\"branch\":\"main\",\"buildId\":\"$BUILD_ID\"}}"
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "https://api.northflank.com/v1/projects/matemium/services/math/deployment" \
             -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "internal": {
-                "id": "math",
-                "branch": "main",
-                "buildSHA": "'$SHA'"
-              }
-            }')
+            -d "$PAYLOAD")
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
@@ -86,6 +117,6 @@ jobs:
 
       - name: Done
         run: |
-          echo "✅ Build and deploy triggered for sha ${{ github.sha }}."
+          echo "✅ Build and deploy triggered for sha ${{ github.sha }} (buildId: $BUILD_ID)."
           echo "Check Northflank UI > service 'math' > Deployments to see the rollout."
           echo "No health check or job-failing logic."
