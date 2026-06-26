@@ -11,7 +11,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-transparent bg-bg/85 backdrop-blur-md supports-[backdrop-filter]:bg-bg/70">
       <nav className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4">
         <Link to="/" className="inline-flex items-center gap-2.5 font-semibold text-text">
-          <img src="/assets/icon.png" alt="" width={32} height={32} />
+          <img src="/assets/matemium-logo-180.png" alt="Matemium" width={32} height={32} />
           <span>Matemium</span>
         </Link>
 

@@ -84,12 +84,7 @@ jobs:
           mkdir -p desktop/src-tauri/binaries
           DUMMY_BIN="desktop/src-tauri/binaries/matemium-sidecar-x86_64-unknown-linux-gnu"
           if [ ! -f "$DUMMY_BIN" ]; then
-            cat > "$DUMMY_BIN" << 'EOF'
-#!/bin/sh
-echo "matemium-sidecar (dummy for cargo check / PR verification)"
-echo "version: 0.0.0-dummy"
-# In real builds the script in build-linux.sh overwrites this with the PyInstaller output.
-EOF
+            printf '#!/bin/sh\necho "matemium-sidecar (dummy for cargo check / PR verification)"\necho "version: 0.0.0-dummy"\n# In real builds the script in build-linux.sh overwrites this with the PyInstaller output.\n' > "$DUMMY_BIN"
             chmod +x "$DUMMY_BIN"
             echo "Created placeholder: $DUMMY_BIN"
           else

@@ -1,0 +1,41 @@
+{
+  "name": "Matemium",
+  "short_name": "Matemium",
+  "description": "Animated math lessons, compiled from a sheet",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0d12",
+  "theme_color": "#0b0d12",
+  "icons": [
+    {
+      "src": "/assets/matemium-logo-16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/matemium-logo-48.png",
+      "sizes": "48x48",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/matemium-logo-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/matemium-logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/matemium-logo-1254.png",
+      "sizes": "1254x1254",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/matemium-logo-5016.png",
+      "sizes": "5016x5016",
+      "type": "image/png"
+    }
+  ]
+}

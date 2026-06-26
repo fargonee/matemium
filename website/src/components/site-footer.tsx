@@ -6,7 +6,7 @@ export function SiteFooter() {
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 md:grid-cols-4">
         <div className="md:col-span-1">
           <div className="mb-3 inline-flex items-center gap-2 font-semibold">
-            <img src="/assets/icon.png" alt="" width={28} height={28} />
+            <img src="/assets/matemium-logo-180.png" alt="Matemium" width={28} height={28} />
             <span>Matemium</span>
           </div>
           <p className="max-w-xs text-sm text-text-subtle">
