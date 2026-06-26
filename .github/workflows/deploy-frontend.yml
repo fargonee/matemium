@@ -19,40 +19,53 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Trigger Cloudflare Pages deployment
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        working-directory: website
+        run: npm ci
+
+      - name: Build (production)
+        working-directory: website
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SITE_URL: ${{ secrets.VITE_SITE_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_ADMIN_EMAILS: ${{ secrets.VITE_ADMIN_EMAILS }}
+          VITE_BASE: ${{ secrets.VITE_BASE }}
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages (direct upload)
+        working-directory: website
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          echo "Triggering deploy for Cloudflare Pages project 'math' on branch main"
-          RESPONSE=$(curl -s -X POST \
-            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/pages/projects/math/deployments" \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"branch": "main"}')
-          
-          echo "$RESPONSE" | jq .
-          
-          # Check if the request was successful
-          SUCCESS=$(echo "$RESPONSE" | jq -r '.success')
-          if [ "$SUCCESS" != "true" ]; then
-            echo "Deployment trigger failed"
-            echo "$RESPONSE"
-            exit 1
-          fi
-          
-          echo "Deployment triggered successfully for Cloudflare Pages"
+          echo "Deploying built assets to Cloudflare Pages project 'math' (branch: main)"
+          npx wrangler pages deploy dist \
+            --project-name=math \
+            --branch=main \
+            --commit-dirty=true
 
       - name: Verify frontend deployment (zero downtime check)
         run: |
           echo "Waiting for Cloudflare deployment to propagate..."
-          sleep 90
-          for i in {1..12}; do
+          sleep 60
+          for i in {1..15}; do
             CONTENT=$(curl -s -I https://matemium.fargonee.space | head -1 || echo "")
             BODY=$(curl -s https://matemium.fargonee.space | grep -o "Matemium" | head -1 || echo "")
             if echo "$CONTENT" | grep -q "200" && [ -n "$BODY" ]; then
               echo "✅ Frontend deployment verified on attempt $i"
               exit 0
             fi
-            echo "Verification $i failed (may be propagating), waiting 30s..."
-            sleep 30
+            echo "Verification $i failed (may be propagating), waiting 20s..."
+            sleep 20
           done
           echo "❌ Frontend verification failed after deployment. Previous version should still be serving."
           exit 1
