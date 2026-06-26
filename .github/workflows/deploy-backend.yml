@@ -66,6 +66,7 @@ jobs:
             echo "❌ No BUILD_ID captured from trigger step"
             exit 1
           fi
+          succeeded=false
           for i in {1..60}; do   # up to ~20 minutes
             BUILD_INFO=$(curl -s -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
               "https://api.northflank.com/v1/projects/matemium/services/math/build/$BUILD_ID")
@@ -74,7 +75,8 @@ jobs:
             echo "Current status: $STATUS"
             if [ "$STATUS" = "SUCCESS" ]; then
               echo "✅ Build succeeded"
-              echo "BUILD_SUCCEEDED=true" >> $GITHUB_ENV
+              succeeded=true
+              echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
               break
             elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "ERROR" ] || [ "$STATUS" = "CANCELLED" ]; then
               echo "❌ Build failed with status: $STATUS"
@@ -83,7 +85,7 @@ jobs:
             sleep 20
           done
 
-          if [ "${BUILD_SUCCEEDED}" != "true" ]; then
+          if [ "$succeeded" != "true" ]; then
             echo "❌ Build did not reach SUCCESS in time (or status never confirmed)"
             exit 1
           fi
