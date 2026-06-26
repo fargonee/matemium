@@ -180,16 +180,55 @@ jobs:
             echo "❌ No BUILD_ID available for deploy"
             exit 1
           fi
-          PAYLOAD='{
-            "internal": {
-              "id": "math",
-              "branch": "main",
-              "buildId": "'$BUILD_ID'"
-            },
-            "runtimeEnvironment": {
-              "COMMIT_SHA": "'$SHA'"
-            }
-          }'
+          # Inject GitHub environment secrets/vars as runtimeEnvironment.
+          # This is required because we switched to GHA-driven deploys (no longer relying on
+          # env vars configured directly in the Northflank service UI for every deploy).
+          RUNTIME_ENV=$(jq -n \
+            --arg commit "$SHA" \
+            --arg supabase_url "${{ secrets.MATEMIUM_SUPABASE_URL }}" \
+            --arg supabase_anon "${{ secrets.MATEMIUM_SUPABASE_ANON_KEY }}" \
+            --arg service_role "${{ secrets.MATEMIUM_SUPABASE_SERVICE_ROLE_KEY }}" \
+            --arg admin_emails "${{ secrets.MATEMIUM_ADMIN_EMAILS || vars.MATEMIUM_ADMIN_EMAILS || '' }}" \
+            --arg cors "${{ secrets.MATEMIUM_CORS_ORIGINS || vars.MATEMIUM_CORS_ORIGINS || '' }}" \
+            --arg site_url "${{ secrets.MATEMIUM_SITE_URL || vars.MATEMIUM_SITE_URL || '' }}" \
+            --arg llm_stub "${{ secrets.MATEMIUM_LLM_STUB || 'false' }}" \
+            --arg llm_key "${{ secrets.MATEMIUM_LLM_API_KEY || '' }}" \
+            --arg llm_model "${{ secrets.MATEMIUM_LLM_MODEL || 'gpt-4o-mini' }}" \
+            --arg llm_base "${{ secrets.MATEMIUM_LLM_API_BASE || 'https://api.openai.com/v1' }}" \
+            '{
+              "COMMIT_SHA": $commit,
+              "MATEMIUM_ENV": "production",
+              "MATEMIUM_SUPABASE_URL": $supabase_url,
+              "MATEMIUM_SUPABASE_ANON_KEY": $supabase_anon,
+              "MATEMIUM_SUPABASE_SERVICE_ROLE_KEY": $service_role,
+              "MATEMIUM_ADMIN_EMAILS": $admin_emails,
+              "MATEMIUM_CORS_ORIGINS": $cors,
+              "MATEMIUM_SITE_URL": $site_url,
+              "MATEMIUM_LLM_STUB": $llm_stub,
+              "MATEMIUM_LLM_API_KEY": $llm_key,
+              "MATEMIUM_LLM_MODEL": $llm_model,
+              "MATEMIUM_LLM_API_BASE": $llm_base
+            }')
+
+          PAYLOAD=$(jq -n \
+            --argjson runtime "$RUNTIME_ENV" \
+            --arg buildId "$BUILD_ID" \
+            '{
+              "internal": {
+                "id": "math",
+                "branch": "main",
+                "buildId": $buildId
+              },
+              "runtimeEnvironment": $runtime
+            }')
+
+          echo "Using runtimeEnvironment keys: $(echo "$RUNTIME_ENV" | jq -r 'keys | .[]' | tr '\n' ' ')"
+          echo "Deploying with payload (sensitive values redacted in logs)"
+
+          if [ -z "$(echo "$RUNTIME_ENV" | jq -r '.MATEMIUM_SUPABASE_SERVICE_ROLE_KEY // ""')" ]; then
+            echo "❌ WARNING: MATEMIUM_SUPABASE_SERVICE_ROLE_KEY missing!"
+          fi
+
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "https://api.northflank.com/v1/projects/matemium/services/math/deployment" \
             -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
