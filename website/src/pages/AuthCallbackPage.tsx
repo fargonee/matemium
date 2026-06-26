@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { supabase } from "@/supabase/client";
@@ -7,12 +7,23 @@ export function AuthCallbackPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const handledRef = useRef(false);
 
   useEffect(() => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+
     const code = params.get("code");
+    const errorParam = params.get("error");
+    const errorDescription =
+      params.get("error_description") || params.get("error_code");
     const next = params.get("next") ?? "/dashboard";
 
     async function exchange() {
+      if (errorParam) {
+        setError(errorDescription || errorParam);
+        return;
+      }
       if (!code) {
         setError("Missing auth code");
         return;
