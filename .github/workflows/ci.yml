@@ -47,13 +47,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install system dependencies (for manimpango / manim wheels)
+      - name: Install system dependencies (manimpango + LaTeX for MathTex/measure)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             pkg-config \
             libcairo2-dev \
-            libpango1.0-dev
+            libpango1.0-dev \
+            ffmpeg \
+            texlive-latex-extra \
+            texlive-fonts-extra \
+            texlive-science \
+            cm-super \
+            dvipng
 
       - name: Install dependencies
         run: |

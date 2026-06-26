@@ -20,7 +20,7 @@ create table if not exists public.subscriptions (
   lemon_subscription_id text unique,
   lemon_variant_id text,
   status text not null default 'active' check (
-    status in ('active', 'trialing', 'past_due', 'canceled', 'incomplete')
+    status in ('active', 'trialing', 'past_due', 'canceled', 'paused', 'refunded', 'incomplete')
   ),
   plan text not null default 'pro' check (plan in ('free', 'pro', 'teams')),
   current_period_end timestamptz,

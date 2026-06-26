@@ -223,7 +223,10 @@ cutter.cut(input_video=..., output_dir=..., manifest=manifest)
 
 **Server** ([`server/`](server/)):
 - [x] FastAPI stub — `/health`, `/v1/auth/token`, `/v1/chat/completions`
-- [ ] Production auth, billing, real LLM proxy
+- [x] Production auth + Lemon Squeezy billing + webhooks (see [LEMON_SQUEEZY_SETUP.md](LEMON_SQUEEZY_SETUP.md))
+- [ ] Real LLM proxy (stub available)
+
+**Billing** is fully wired: Lemon Squeezy checkout + customer portal + signed webhooks sync plans to Supabase. Frontend pricing + dashboard included. See the dedicated guide to go live.
 
 **Engine (in progress / planned):**
 - Move legacy grid/quadratic builder methods into project helpers

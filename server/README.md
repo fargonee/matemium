@@ -52,7 +52,7 @@ Or: `uvicorn matemium_server.app:app --reload --port 8080`
 | `GET` | `/v1/me` | Bearer | Profile + subscription (website dashboard) |
 | `POST` | `/v1/billing/checkout` | Bearer | Lemon Squeezy checkout URL |
 | `POST` | `/v1/billing/portal` | Bearer | Lemon Squeezy customer portal URL |
-| `POST` | `/v1/webhooks/lemonsqueezy` | X-Signature | Subscription sync → Supabase |
+| `POST` | `/v1/webhooks/lemonsqueezy` | X-Signature | Full subscription + order (incl. refunds) sync → Supabase (register in Lemon Squeezy) |
 | `GET` | `/v1/admin/stats` | Admin | User/subscription counts |
 | `GET` | `/v1/admin/users` | Admin | User list |
 | `GET` | `/v1/admin/subscriptions` | Admin | Subscription list |
@@ -73,6 +73,8 @@ See [`.env.example`](.env.example). Production requires:
 - Supabase service role key
 - LLM API key (unless using stubs)
 - Lemon Squeezy keys (if billing enabled)
+
+**Lemon Squeezy billing**: Full setup instructions (products, webhooks, env vars, testing) are in the root [`../LEMON_SQUEEZY_SETUP.md`](../LEMON_SQUEEZY_SETUP.md).
 
 ## Deployment
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..services.billing import BillingService
 from ..services.supabase import SupabaseService, get_supabase_service
@@ -8,11 +10,19 @@ from ..services.supabase import SupabaseService, get_supabase_service
 router = APIRouter(tags=["webhooks"])
 
 
+def _billing_service(
+    supabase: SupabaseService = Depends(get_supabase_service),
+) -> BillingService:
+    return BillingService(supabase)
+
+
 @router.post("/webhooks/lemonsqueezy")
-async def lemon_squeezy_webhook(request: Request) -> dict[str, bool]:
+async def lemon_squeezy_webhook(
+    request: Request,
+    billing: Annotated[BillingService, Depends(_billing_service)],
+) -> dict[str, bool]:
     payload = await request.body()
-    signature = request.headers.get("x-signature")
-    billing = BillingService(get_supabase_service())
+    signature = request.headers.get("x-signature") or request.headers.get("X-Signature")
 
     try:
         await billing.handle_webhook(payload, signature)

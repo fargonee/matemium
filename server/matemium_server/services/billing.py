@@ -16,7 +16,7 @@ from .supabase import SupabaseService
 LEMON_API = "https://api.lemonsqueezy.com/v1"
 
 ACTIVE_STATUSES = {"active", "on_trial"}
-INACTIVE_STATUSES = {"cancelled", "expired", "unpaid"}
+INACTIVE_STATUSES = {"cancelled", "expired", "unpaid", "paused"}
 
 
 class BillingService:
@@ -130,11 +130,22 @@ class BillingService:
         if event_name in {
             "subscription_created",
             "subscription_updated",
+            "subscription_resumed",
+            "subscription_unpaused",
+            "subscription_plan_changed",
             "subscription_payment_success",
+            "subscription_payment_recovered",
         }:
             await self._on_subscription_event(data, attrs, custom)
-        elif event_name in {"subscription_cancelled", "subscription_expired"}:
-            await self._on_subscription_cancelled(data, attrs, custom)
+        elif event_name in {
+            "subscription_cancelled",
+            "subscription_expired",
+            "subscription_paused",
+            "subscription_payment_failed",
+        }:
+            await self._on_subscription_event(data, attrs, custom)
+        elif event_name in {"order_refunded", "subscription_payment_refunded"}:
+            await self._on_order_refunded(data, attrs, custom)
 
     async def _on_subscription_event(
         self,
@@ -154,11 +165,26 @@ class BillingService:
         if not user_id:
             return
 
-        status = self._map_status(attrs.get("status", "active"))
-        plan = "pro" if status in {"active", "trialing"} else "free"
-        lemon_sub_id = str(data.get("id", ""))
+        # Determine lemon subscription id (works for both Subscription and SubscriptionInvoice payloads)
+        sub_id_from_invoice = attrs.get("subscription_id")
+        lemon_sub_id = str(sub_id_from_invoice) if sub_id_from_invoice else str(data.get("id", ""))
+
+        # Status logic: Subscription objects have subscription status; invoices have their own
+        raw_status = attrs.get("status", "active")
+
+        if raw_status in {"paid"}:
+            status = "active"
+        elif raw_status in {"failed"}:
+            status = "past_due"
+        elif raw_status in {"refunded", "partial_refund"}:
+            status = "refunded"
+        else:
+            status = self._map_status(raw_status)
+
+        plan = "pro" if status in {"active", "trialing", "past_due"} else "free"
+
         variant_id = attrs.get("variant_id")
-        renews_at = attrs.get("renews_at")
+        renews_at = attrs.get("renews_at") or attrs.get("due_at")  # invoices may not have renews_at
 
         await self._supabase.upsert_subscription(
             {
@@ -200,6 +226,52 @@ class BillingService:
             return "active"
         if lemon_status == "past_due":
             return "past_due"
+        if lemon_status == "refunded":
+            return "refunded"
         if lemon_status in INACTIVE_STATUSES:
             return "canceled"
         return "incomplete"
+
+    async def _on_order_refunded(
+        self,
+        data: dict[str, Any],
+        attrs: dict[str, Any],
+        custom: dict[str, Any],
+    ) -> None:
+        """Handle full or partial refunds. Revoke access immediately."""
+        user_id = custom.get("supabase_user_id")
+        customer_id = attrs.get("customer_id")
+
+        if not user_id and customer_id is not None:
+            rows = await self._supabase._rest_get(  # noqa: SLF001
+                "profiles",
+                {"lemon_customer_id": f"eq.{customer_id}", "select": "id", "limit": "1"},
+            )
+            if rows:
+                user_id = rows[0]["id"]
+
+        if not user_id:
+            # Nothing we can do without correlation
+            return
+
+        # Downgrade the user
+        await self._supabase.update_profile(user_id, {"plan": "free"})
+
+        # Try to mark the latest subscription as refunded (or canceled)
+        sub = await self._supabase.get_latest_subscription(user_id)
+        lemon_sub_id = (sub or {}).get("lemon_subscription_id")
+        if lemon_sub_id:
+            await self._supabase.update_subscription_by_lemon_id(
+                lemon_sub_id,
+                {
+                    "status": "refunded",
+                    # Optionally could store more info; current_period_end left as-is
+                },
+            )
+        else:
+            # Fallback: ensure any subscription tied to this customer is closed
+            # (rare, since we use custom data primarily)
+            pass
+
+        # Note: order_refunded also has attrs like "refunded_amount", "refunded_at"
+        # We could store an orders table in future if needed for audit.

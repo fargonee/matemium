@@ -11,9 +11,14 @@ import { AuthCallbackPage } from "@/pages/AuthCallbackPage";
 import { DashboardBillingPage } from "@/pages/dashboard/DashboardBillingPage";
 import { DashboardDownloadsPage } from "@/pages/dashboard/DashboardDownloadsPage";
 import { DashboardOverviewPage } from "@/pages/dashboard/DashboardOverviewPage";
+import { AcceptableUsePage } from "@/pages/AcceptableUsePage";
+import { EULAPage } from "@/pages/EULAPage";
 import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { PricingPage } from "@/pages/PricingPage";
+import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
+import { RefundPolicyPage } from "@/pages/RefundPolicyPage";
+import { TermsOfServicePage } from "@/pages/TermsOfServicePage";
 import { AdminGuard } from "@/routes/AdminGuard";
 import { AuthGuard } from "@/routes/AuthGuard";
 
@@ -27,6 +32,13 @@ export function App() {
             <Route path="pricing" element={<PricingPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="auth/callback" element={<AuthCallbackPage />} />
+
+            {/* Legal / Policy pages */}
+            <Route path="privacy" element={<PrivacyPolicyPage />} />
+            <Route path="terms" element={<TermsOfServicePage />} />
+            <Route path="refund" element={<RefundPolicyPage />} />
+            <Route path="license" element={<EULAPage />} />
+            <Route path="acceptable-use" element={<AcceptableUsePage />} />
 
             <Route element={<AuthGuard />}>
               <Route path="dashboard" element={<DashboardLayout />}>

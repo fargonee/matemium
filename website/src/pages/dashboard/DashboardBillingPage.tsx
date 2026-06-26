@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
 import { useSelector } from "react-redux";
 
 import { useGetMeQuery } from "@/api/matemiumApi";
@@ -8,12 +9,32 @@ import type { RootState } from "@/store";
 
 export function DashboardBillingPage() {
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: account } = useGetMeQuery(undefined, { skip: !user });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const checkoutSuccess = searchParams.get("checkout") === "success";
+
+  const { data: account, refetch } = useGetMeQuery(undefined, { skip: !user });
   const plan = account?.profile.plan ?? "free";
   const sub = account?.subscription;
 
+  useEffect(() => {
+    if (checkoutSuccess && user) {
+      // Refetch latest plan/subscription after Lemon Squeezy redirect
+      void refetch();
+      // Remove the query param for cleaner URL
+      setTimeout(() => {
+        setSearchParams({}, { replace: true });
+      }, 1500);
+    }
+  }, [checkoutSuccess, user, refetch, setSearchParams]);
+
   return (
     <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+      {checkoutSuccess ? (
+        <div className="lg:col-span-2 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm">
+          Thank you! Your checkout completed. Your subscription status is updating…
+        </div>
+      ) : null}
+
       <Card>
         <h2 className="text-lg font-semibold">Subscription</h2>
         <dl className="mt-4 space-y-3 text-sm">

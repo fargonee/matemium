@@ -24,8 +24,11 @@ export function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-text-subtle">
-          By signing in you agree to our terms and privacy policy.{" "}
-          <Link to="/pricing" className="text-accent">
+          By signing in you agree to our{" "}
+          <Link to="/terms" className="text-accent hover:underline">Terms of Service</Link>,{" "}
+          <Link to="/privacy" className="text-accent hover:underline">Privacy Policy</Link>, and{" "}
+          <Link to="/refund" className="text-accent hover:underline">Refund Policy</Link>.{" "}
+          <Link to="/pricing" className="text-accent hover:underline">
             View plans
           </Link>
         </p>

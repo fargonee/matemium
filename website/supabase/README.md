@@ -3,6 +3,7 @@
 1. Create a Supabase project at https://supabase.com
 2. Go to SQL Editor and run the contents of `schema.sql`.
 3. (If you previously used Stripe columns) run `migrations/002_lemon_squeezy.sql`.
+4. Billing (Lemon Squeezy) columns are already included. See root `LEMON_SQUEEZY_SETUP.md` for full integration.
 4. Copy the **Project URL** and **anon public** key into your hosting env:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`

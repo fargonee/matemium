@@ -49,9 +49,12 @@ export function SiteFooter() {
           <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-subtle">
             Legal
           </h4>
-          <span className="text-text-muted">Terms of use</span>
-          <span className="text-text-muted">Privacy policy</span>
-          <span className="text-text-subtle">© 2026 Matemium. All rights reserved.</span>
+          <Link to="/terms" className="text-text-muted hover:text-text">Terms of Service</Link>
+          <Link to="/privacy" className="text-text-muted hover:text-text">Privacy Policy</Link>
+          <Link to="/refund" className="text-text-muted hover:text-text">Refund &amp; Cancellation</Link>
+          <Link to="/license" className="text-text-muted hover:text-text">Desktop License (EULA)</Link>
+          <Link to="/acceptable-use" className="text-text-muted hover:text-text">Acceptable Use</Link>
+          <span className="mt-1 text-text-subtle">© 2026 Matemium. All rights reserved.</span>
         </div>
       </div>
     </footer>

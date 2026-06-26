@@ -8,3 +8,12 @@ alter table public.subscriptions
 
 alter table public.subscriptions
   rename column stripe_price_id to lemon_variant_id;
+
+-- Optional: expand allowed statuses (run if you have the table already)
+alter table public.subscriptions
+  drop constraint if exists subscriptions_status_check;
+
+alter table public.subscriptions
+  add constraint subscriptions_status_check check (
+    status in ('active', 'trialing', 'past_due', 'canceled', 'paused', 'refunded', 'incomplete')
+  );
