@@ -6,19 +6,21 @@ import { isAdmin } from "@/lib/auth";
 import type { RootState } from "@/store";
 
 export function AdminGuard() {
-  const user = useSelector((state: RootState) => state.auth.user);
-  const { data: account, isLoading } = useGetMeQuery(undefined, { skip: !user });
+  const { user, initialized } = useSelector((state: RootState) => state.auth);
+  const { data: account, isLoading: meIsLoading } = useGetMeQuery(undefined, {
+    skip: !user || !initialized,
+  });
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (isLoading) {
+  if (!initialized) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-text-muted">
         Loading…
       </div>
     );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
 
   const profile = account?.profile
@@ -31,7 +33,19 @@ export function AdminGuard() {
       }
     : null;
 
-  if (!isAdmin(user, profile)) {
+  const knownAdmin = isAdmin(user, profile);
+
+  // If we don't yet have confirmation from profile and the client email list
+  // doesn't match, keep waiting for /me (server may upgrade role via MATEMIUM_ADMIN_EMAILS).
+  if (meIsLoading && !knownAdmin) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-text-muted">
+        Loading…
+      </div>
+    );
+  }
+
+  if (!knownAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
 

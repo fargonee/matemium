@@ -2,7 +2,15 @@ import { useGetAdminSubscriptionsQuery } from "@/api/matemiumApi";
 import { Card } from "@/components/ui/card";
 
 export function AdminSubscriptionsPage() {
-  const { data: rows = [] } = useGetAdminSubscriptionsQuery();
+  const { data: rows = [], error } = useGetAdminSubscriptionsQuery();
+
+  if (error) {
+    return (
+      <Card className="border-red-500/40 bg-red-500/5 p-4 text-sm text-red-300">
+        Failed to load subscriptions. Admin access required on the backend.
+      </Card>
+    );
+  }
 
   return (
     <Card className="overflow-hidden p-0">

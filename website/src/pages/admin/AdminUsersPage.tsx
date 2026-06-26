@@ -2,7 +2,15 @@ import { useGetAdminUsersQuery } from "@/api/matemiumApi";
 import { Card } from "@/components/ui/card";
 
 export function AdminUsersPage() {
-  const { data: rows = [] } = useGetAdminUsersQuery();
+  const { data: rows = [], error } = useGetAdminUsersQuery();
+
+  if (error) {
+    return (
+      <Card className="border-red-500/40 bg-red-500/5 p-4 text-sm text-red-300">
+        Failed to load users. You may not have admin access on the server (MATEMIUM_ADMIN_EMAILS) or the API token is not being sent.
+      </Card>
+    );
+  }
 
   return (
     <Card className="overflow-hidden p-0">

@@ -21,7 +21,8 @@ export function DashboardLayout() {
     : null;
 
   const name = user ? displayName(user, profile) : "User";
-  const showAdmin = isAdmin(user, profile);
+  // Show immediately for client-listed admins; also show once server confirms via profile.role
+  const showAdmin = isAdmin(user, profile) || isAdmin(user, null);
 
   return (
     <section className="px-4 py-10">
