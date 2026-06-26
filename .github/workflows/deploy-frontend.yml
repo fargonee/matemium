@@ -66,10 +66,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           echo "Deploying built assets to Cloudflare Pages project 'math' (branch: main)"
-          npx wrangler pages deploy dist \
+          DEPLOY_OUTPUT=$(npx wrangler@3 pages deploy dist \
             --project-name=math \
             --branch=main \
-            --commit-dirty=true
+            --commit-dirty=true 2>&1)
+          echo "$DEPLOY_OUTPUT"
+          DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^ ]*\.pages\.dev' | tail -1 || echo "")
+          echo "DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_ENV
+          echo "New deployment URL: $DEPLOY_URL"
 
       - name: Verify frontend deployment (zero downtime check) with rollback
         env:
@@ -77,23 +81,29 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           echo "Waiting for Cloudflare deployment to propagate and become stable..."
-          sleep 60
+          sleep 30
 
           ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID"
           TOKEN="$CLOUDFLARE_API_TOKEN"
-          SITE_URL="https://matemium.fargonee.space"
+          CUSTOM_URL="https://matemium.fargonee.space"
+
+          # Prefer the specific new deployment URL (instant), fall back to custom
+          VERIFY_URL="${DEPLOY_URL:-$CUSTOM_URL}"
+          echo "Verifying URL: $VERIFY_URL (custom: $CUSTOM_URL)"
 
           VERIFIED=false
           for i in {1..20}; do
-            # Check HTTP + basic content
-            HEADERS=$(curl -s -I --max-time 10 "$SITE_URL" || echo "")
-            BODY=$(curl -s --max-time 10 "$SITE_URL" || echo "")
+            HEADERS=$(curl -s -I --max-time 10 "$VERIFY_URL" || echo "")
+            BODY=$(curl -s --max-time 10 "$VERIFY_URL" || echo "")
 
             STATUS=$(echo "$HEADERS" | head -1)
-            HAS_CONTENT=$(echo "$BODY" | grep -o "Math lessons that scroll like a document" | head -1 || echo "")
 
-            if echo "$STATUS" | grep -q "200" && [ -n "$HAS_CONTENT" ]; then
-              echo "✅ Frontend deployment verified on attempt $i (real content detected)"
+            # Use static content from index.html (SPA, so no JS-rendered text via curl)
+            # The title is always present in the shell HTML
+            HAS_STATIC=$(echo "$BODY" | grep -o "Matemium — Animated math lessons" | head -1 || echo "")
+
+            if echo "$STATUS" | grep -q "200" && [ -n "$HAS_STATIC" ]; then
+              echo "✅ Frontend deployment verified on attempt $i (static shell + 200 OK)"
               VERIFIED=true
               break
             fi
@@ -102,33 +112,36 @@ jobs:
             sleep 15
           done
 
+          # Optional: also quickly confirm custom domain is eventually serving (best effort)
+          if [ "$VERIFY_URL" != "$CUSTOM_URL" ]; then
+            echo "Checking custom domain as well..."
+            CUSTOM_BODY=$(curl -s --max-time 10 "$CUSTOM_URL" || echo "")
+            if echo "$CUSTOM_BODY" | grep -q "Matemium — Animated math lessons"; then
+              echo "Custom domain also serving new content."
+            else
+              echo "Note: Custom domain may still be propagating old version (common with custom domains)."
+            fi
+          fi
+
           if [ "$VERIFIED" != "true" ]; then
             echo "❌ Frontend verification failed after deployment."
 
-            # Attempt safe rollback by removing the bad latest deployment
             if [ -n "$PREV_DEPLOY_ID" ]; then
-              echo "Attempting automatic rollback to previous deployment ($PREV_DEPLOY_ID)..."
-
-              # Get the latest (bad) deployment
-              LATEST=$(curl -s -H "Authorization: Bearer $TOKEN" \
-                "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/math/deployments?per_page=1")
-              BAD_ID=$(echo "$LATEST" | jq -r '.result[0].id // ""')
-
-              if [ -n "$BAD_ID" ] && [ "$BAD_ID" != "$PREV_DEPLOY_ID" ]; then
-                echo "Deleting bad deployment $BAD_ID to restore previous version..."
-                DELETE_RESP=$(curl -s -X DELETE \
-                  -H "Authorization: Bearer $TOKEN" \
-                  "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/math/deployments/$BAD_ID")
-                echo "Rollback response: $DELETE_RESP"
-                echo "✅ Rolled back. Previous version should now be live."
-              else
-                echo "Could not determine bad deployment ID for auto-rollback."
-              fi
-            else
-              echo "No previous deployment ID captured. Manual rollback required."
+              echo ""
+              echo "=== SAFE ROLLBACK INSTRUCTIONS ==="
+              echo "Previous deployment ID: $PREV_DEPLOY_ID"
+              echo ""
+              echo "To rollback immediately:"
+              echo "1. Go to Cloudflare Dashboard > Pages > math > Deployments"
+              echo "2. Find the deployment with ID $PREV_DEPLOY_ID"
+              echo "3. Click the '...' menu > 'Rollback to this deployment'"
+              echo ""
+              echo "This will make the previous version the active production deployment again."
+              echo "==================================="
             fi
 
-            echo "❌ Failing the job. Check Cloudflare dashboard > Deployments to confirm state or manually rollback."
+            echo ""
+            echo "❌ Failing the job. The new deployment may be live on the preview URL above."
             exit 1
           fi
 
