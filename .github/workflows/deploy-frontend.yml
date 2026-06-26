@@ -33,12 +33,14 @@ jobs:
       - name: Build (production)
         working-directory: website
         env:
+          # Sensitive / key material — use Environment secrets (or repo secrets)
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_SITE_URL: ${{ secrets.VITE_SITE_URL }}
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          VITE_ADMIN_EMAILS: ${{ secrets.VITE_ADMIN_EMAILS }}
-          VITE_BASE: ${{ secrets.VITE_BASE }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || vars.VITE_API_URL }}
+          # Non-sensitive config — prefer Environment variables, fall back to secrets
+          VITE_SITE_URL: ${{ vars.VITE_SITE_URL || secrets.VITE_SITE_URL }}
+          VITE_ADMIN_EMAILS: ${{ vars.VITE_ADMIN_EMAILS || secrets.VITE_ADMIN_EMAILS }}
+          VITE_BASE: ${{ vars.VITE_BASE || secrets.VITE_BASE || '/' }}
         run: npm run build
 
       - name: Deploy to Cloudflare Pages (direct upload)
