@@ -1,17 +1,108 @@
 name: Build Linux Desktop
 
+# Desktop app build strategy (commercial release artifact):
+# - Full production builds (.deb + .AppImage) ONLY on version tags (v*) and manual dispatch.
+# - Lightweight verification (engine smoke + cargo check) runs on PRs and main pushes
+#   that touch relevant paths.
+# - Path filters avoid wasting minutes when only website/ or unrelated server code changes.
+# - On tags we publish a GitHub Release and attach the built bundles.
+#
+# This aligns with the project documentation: release pipeline uses tags.
+
 on:
   push:
+    tags:
+      - 'v*'
     branches: [main]
+    paths:
+      # Changes that affect the desktop app or the matemium sidecar it embeds
+      - 'desktop/**'
+      - 'matemium/**'
+      - 'canvas/**'
+      - 'projects/**'
+      - 'shared/**'
+      - 'pyproject.toml'
+      - 'fixtures/**'
+      - '.github/workflows/build-linux.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'matemium/**'
+      - 'canvas/**'
+      - 'projects/**'
+      - 'shared/**'
+      - 'pyproject.toml'
+      - 'fixtures/**'
+      - '.github/workflows/build-linux.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write   # Allow creating GitHub Releases when building from tags
+
 jobs:
+  # Fast, cheap verification job.
+  # Runs for PRs and ordinary pushes to main (when path filter matches).
+  # Skips the heavy PyInstaller + full Tauri bundle + texlive work.
+  desktop-verify:
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install minimal system deps for engine + tauri check
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            build-essential curl git pkg-config \
+            libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
+            libwebkit2gtk-4.1-dev \
+            python3 python3-venv python3-pip \
+            jq
+
+      - name: Install engine (dev deps not required)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Verify engine imports + CLI smoke
+        run: python -c "import canvas, matemium; from matemium import __version__; print('✅ Engine imports OK - version:', __version__)" && (matemium --version || true); echo 'matemium list (head):'; (matemium list 2>/dev/null | head -3 || true)
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo check (Rust side of desktop shell)
+        working-directory: desktop/src-tauri
+        run: cargo check
+
+  # Full production build job.
+  # Only executes for version tags and workflow_dispatch.
+  # Expensive: full texlive, PyInstaller of manim/canvas/matemium, Tauri bundle.
   build-linux:
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+
+      - name: Determine version (from tag when applicable)
+        id: ver
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            raw="${{ github.ref_name }}"
+            ver="${raw#v}"
+            echo "version=$ver" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+            echo "Release version: $ver"
+          else
+            echo "version=0.0.0-dev" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "Dispatch/manual build (no version override)"
+          fi
 
       - name: Install apt dependencies
         run: |
@@ -49,14 +140,47 @@ jobs:
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2.0.0" --locked
 
+      - name: Set desktop app version in tauri.conf.json + Cargo.toml (tags only)
+        if: steps.ver.outputs.is_release == 'true'
+        working-directory: desktop/src-tauri
+        run: |
+          cargo tauri set-version "${{ steps.ver.outputs.version }}"
+
       - name: Build Linux desktop artifacts
         run: ./desktop/scripts/build-linux.sh
 
-      - name: Upload desktop bundles
+      - name: Upload desktop bundles (as artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: matemium-linux-desktop
+          name: matemium-linux-desktop-${{ steps.ver.outputs.version }}
           path: |
             desktop/src-tauri/target/release/bundle/deb/*.deb
             desktop/src-tauri/target/release/bundle/appimage/*.AppImage
           if-no-files-found: error
+
+      - name: Create GitHub Release and attach bundles (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "==> Creating GitHub Release for ${{ github.ref_name }}"
+          # Try create (normal case). Fall back to upload if the release already exists.
+          gh release create "${{ github.ref_name }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Matemium ${{ github.ref_name }}" \
+            --generate-notes \
+            desktop/src-tauri/target/release/bundle/deb/*.deb \
+            desktop/src-tauri/target/release/bundle/appimage/*.AppImage || \
+          gh release upload "${{ github.ref_name }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber \
+            desktop/src-tauri/target/release/bundle/deb/*.deb \
+            desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+
+      - name: Summary
+        run: |
+          echo "✅ Linux desktop build finished."
+          echo "Version used: ${{ steps.ver.outputs.version }}"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          fi

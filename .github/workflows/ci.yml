@@ -1,10 +1,40 @@
 name: CI
 
+# Core matemium tool + server tests.
+# Triggered only on changes that affect the Python engine, canvas, tests, server, or shared contracts.
+# Pure website, desktop UI (app/), or docs changes do not run this.
+
 on:
   push:
     branches: [main]
+    paths:
+      # Core matemium engine + canvas
+      - 'matemium/**'
+      - 'canvas/**'
+      - 'projects/**'
+      - 'tests/**'
+      - 'shared/**'
+      - 'pyproject.toml'
+      - 'fixtures/**'
+      # Server (its own tests job)
+      - 'server/**'
+      - 'server/pyproject.toml'
+      # Workflow itself
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'matemium/**'
+      - 'canvas/**'
+      - 'projects/**'
+      - 'tests/**'
+      - 'shared/**'
+      - 'pyproject.toml'
+      - 'fixtures/**'
+      - 'server/**'
+      - 'server/pyproject.toml'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
 
 jobs:
   test:

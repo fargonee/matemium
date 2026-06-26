@@ -6,13 +6,89 @@ on:
     paths:
       - 'website/**'
       - '.github/workflows/deploy-frontend.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'website/**'
+  workflow_dispatch:
 
 concurrency:
   group: deploy-frontend-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  # Lightweight validation for pull requests.
+  # Uses placeholder values so it works without secrets (forks, external PRs).
+  build-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Typecheck & build (placeholders for PR validation)
+        env:
+          VITE_SUPABASE_URL: https://placeholder.supabase.co
+          VITE_SUPABASE_ANON_KEY: placeholder-anon-key
+          VITE_SITE_URL: https://example.com
+          VITE_API_URL: https://api.example.com
+        run: npm run build
+
+  # Full production test + build on push to main and manual dispatch.
+  # Must succeed before the deploy job is allowed to run.
+  build:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Typecheck & build (with production env)
+        env:
+          # Sensitive
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || vars.VITE_API_URL }}
+          # Non-sensitive (can also come from environment variables)
+          VITE_SITE_URL: ${{ vars.VITE_SITE_URL || secrets.VITE_SITE_URL }}
+          VITE_ADMIN_EMAILS: ${{ vars.VITE_ADMIN_EMAILS || secrets.VITE_ADMIN_EMAILS }}
+          VITE_BASE: ${{ vars.VITE_BASE || secrets.VITE_BASE || '/' }}
+        run: npm run build
+
+  # The original deploy job — preserved as-is except for the dependency.
   deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: math
     steps:
