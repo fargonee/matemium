@@ -150,7 +150,7 @@ The `.deb` declares apt dependencies for FFmpeg and TeX Live. On a clean Ubuntu 
 | Package group | Purpose |
 |---------------|---------|
 | `ffmpeg` | Video encoding |
-| `texlive-latex-extra`, `texlive-fonts-extra`, `texlive-science`, `cm-super`, `dvipng` | Manim math/LaTeX |
+| `texlive-latex-extra`, `texlive-fonts-extra`, `texlive-science`, `cm-super`, `dvipng`, `dvisvgm` | Manim math/LaTeX |
 | `libwebkit2gtk-4.1-0` | Tauri WebView (usually preinstalled on desktop Ubuntu) |
 
 Post-install validation checklist: [`COMPLETE_LINUX_UBUNTU_APP_TODO.md`](../../COMPLETE_LINUX_UBUNTU_APP_TODO.md) Phase 8.

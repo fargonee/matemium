@@ -25,7 +25,7 @@ echo "==> Phase 0 verification (repo: $ROOT)"
 echo ""
 
 echo "--- 0.1 System packages (build + Manim + Tauri GTK) ---"
-for pkg in ffmpeg pdflatex pkg-config; do
+for pkg in ffmpeg pdflatex dvisvgm pkg-config; do
   check_cmd "$pkg" "$pkg" -version 2>/dev/null || check_cmd "$pkg" "$pkg" --version
 done
 

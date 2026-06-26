@@ -49,7 +49,7 @@ if [[ "$SKIP_APT" == false ]]; then
     python3 python3-venv python3-pip \
     ffmpeg \
     texlive-latex-extra texlive-fonts-extra texlive-science \
-    cm-super dvipng \
+    cm-super dvipng dvisvgm \
     jq
   echo "    ffmpeg: $(ffmpeg -version 2>&1 | head -1)"
   echo "    pdflatex: $(pdflatex --version 2>&1 | head -1)"

@@ -39,7 +39,7 @@ The sidecar binary **does not** include FFmpeg or LaTeX. The host system (or `.d
 | Tool | Used for |
 |------|----------|
 | `ffmpeg` | Video encoding |
-| `pdflatex` + TeX Live packages | Math typesetting (`texlive-latex-extra`, `texlive-fonts-extra`, `texlive-science`, `cm-super`, `dvipng`) |
+| `pdflatex` + TeX Live packages | Math typesetting (`texlive-latex-extra`, `texlive-fonts-extra`, `texlive-science`, `cm-super`, `dvipng`, `dvisvgm`) |
 
 `lint_project` optionally calls `ruff` if installed on PATH; otherwise syntax check via `py_compile` only.
 

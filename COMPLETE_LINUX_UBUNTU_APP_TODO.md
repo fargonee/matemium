@@ -70,7 +70,7 @@ sudo apt install -y \
   python3 python3-venv python3-pip \
   ffmpeg \
   texlive-latex-extra texlive-fonts-extra texlive-science \
-  cm-super dvipng
+  cm-super dvipng dvisvgm
 ```
 
 - [x] All packages install without error (`setup-ubuntu-dev.sh` or manual apt below)
@@ -286,7 +286,7 @@ cargo tauri init \
     "externalBin": ["binaries/matemium-sidecar"],
     "linux": {
       "deb": {
-        "depends": ["ffmpeg", "texlive-latex-extra", "texlive-fonts-extra", "texlive-science", "cm-super", "dvipng"]
+        "depends": ["ffmpeg", "texlive-latex-extra", "texlive-fonts-extra", "texlive-science", "cm-super", "dvipng", "dvisvgm"]
       }
     }
   }

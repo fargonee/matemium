@@ -40,7 +40,7 @@ export function SiteFooter() {
           <Link to="/dashboard" className="text-text-muted hover:text-text">
             Dashboard
           </Link>
-          <a href="mailto:hello@matemium.app" className="text-text-muted hover:text-text">
+          <a href="mailto:contact@matemium.fargonee.space" className="text-text-muted hover:text-text">
             Contact
           </a>
         </div>

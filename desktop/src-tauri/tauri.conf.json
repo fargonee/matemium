@@ -53,7 +53,8 @@
           "texlive-fonts-extra",
           "texlive-science",
           "cm-super",
-          "dvipng"
+          "dvipng",
+          "dvisvgm"
         ]
       }
     }

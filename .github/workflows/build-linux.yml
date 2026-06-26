@@ -116,7 +116,7 @@ jobs:
             python3 python3-venv python3-pip \
             ffmpeg \
             texlive-latex-extra texlive-fonts-extra texlive-science \
-            cm-super dvipng \
+            cm-super dvipng dvisvgm \
             jq
 
       - name: Set up Python

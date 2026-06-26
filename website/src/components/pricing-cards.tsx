@@ -58,7 +58,7 @@ export function PricingCards() {
             </ul>
 
             {plan.contactSales ? (
-              <a href="mailto:hello@matemium.app?subject=Matemium%20Teams">
+              <a href="mailto:contact@matemium.fargonee.space?subject=Matemium%20Teams">
                 <Button variant="secondary" fullWidth>
                   Contact sales
                 </Button>

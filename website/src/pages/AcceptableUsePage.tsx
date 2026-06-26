@@ -70,7 +70,7 @@ export function AcceptableUsePage() {
 
         <h2>6. Reporting Violations</h2>
         <p>
-          If you become aware of any violation of this Acceptable Use Policy, please report it to <a href="mailto:hello@matemium.app" className="text-accent">hello@matemium.app</a>.
+          If you become aware of any violation of this Acceptable Use Policy, please report it to <a href="mailto:contact@matemium.fargonee.space" className="text-accent">contact@matemium.fargonee.space</a>.
         </p>
 
         <h2>7. Changes</h2>

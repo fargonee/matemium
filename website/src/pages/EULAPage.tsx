@@ -90,7 +90,7 @@ export function EULAPage() {
 
         <h2>11. Contact</h2>
         <p>
-          For questions regarding this EULA, contact <a href="mailto:hello@matemium.app" className="text-accent">hello@matemium.app</a>.
+          For questions regarding this EULA, contact <a href="mailto:contact@matemium.fargonee.space" className="text-accent">contact@matemium.fargonee.space</a>.
         </p>
 
         <p className="mt-10 text-xs text-text-subtle">

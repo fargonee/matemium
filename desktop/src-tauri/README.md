@@ -26,7 +26,7 @@ Configured in `tauri.conf.json`:
     "externalBin": ["binaries/matemium-sidecar"],
     "linux": {
       "deb": {
-        "depends": ["ffmpeg", "texlive-latex-extra", "texlive-fonts-extra", "texlive-science", "cm-super", "dvipng"]
+        "depends": ["ffmpeg", "texlive-latex-extra", "texlive-fonts-extra", "texlive-science", "cm-super", "dvipng", "dvisvgm"]
       }
     }
   }

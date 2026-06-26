@@ -54,7 +54,7 @@ export function RefundPolicyPage() {
 
         <h2>4. How to Request a Refund</h2>
         <p>
-          To request a refund, contact us within 14 days of the charge at <a href="mailto:hello@matemium.app" className="text-accent">hello@matemium.app</a> with your Lemon Squeezy order number and a description of the issue. We will review the request and respond within a reasonable time.
+          To request a refund, contact us within 14 days of the charge at <a href="mailto:contact@matemium.fargonee.space" className="text-accent">contact@matemium.fargonee.space</a> with your Lemon Squeezy order number and a description of the issue. We will review the request and respond within a reasonable time.
         </p>
 
         <h2>5. Chargebacks and Disputes</h2>
@@ -74,7 +74,7 @@ export function RefundPolicyPage() {
 
         <h2>8. Contact</h2>
         <p>
-          For questions about billing, cancellation, or refunds, email <strong>hello@matemium.app</strong> or use the support channels available in your dashboard.
+          For questions about billing, cancellation, or refunds, email <strong>contact@matemium.fargonee.space</strong> or use the support channels available in your dashboard.
         </p>
 
         <p className="mt-8 text-xs text-text-subtle">

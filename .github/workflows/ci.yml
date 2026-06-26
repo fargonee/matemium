@@ -47,7 +47,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install system dependencies (manimpango + LaTeX for MathTex/measure)
+      - name: Install system dependencies (manimpango + full TeX for MathTex/dvisvgm)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -59,7 +59,8 @@ jobs:
             texlive-fonts-extra \
             texlive-science \
             cm-super \
-            dvipng
+            dvipng \
+            dvisvgm
 
       - name: Install dependencies
         run: |

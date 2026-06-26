@@ -135,7 +135,7 @@ export function TermsOfServicePage() {
 
         <h2>14. Contact</h2>
         <p>
-          Questions about these Terms? Contact us at <a href="mailto:hello@matemium.app" className="text-accent">hello@matemium.app</a>.
+          Questions about these Terms? Contact us at <a href="mailto:contact@matemium.fargonee.space" className="text-accent">contact@matemium.fargonee.space</a>.
         </p>
 
         <p className="mt-10 text-xs text-text-subtle">

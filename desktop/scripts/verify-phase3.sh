@@ -37,7 +37,7 @@ assert "binaries/matemium-sidecar" in bundle.get("externalBin", []), bundle.get(
 targets = bundle.get("targets", [])
 assert "deb" in targets and "appimage" in targets, targets
 deps = bundle.get("linux", {}).get("deb", {}).get("depends", [])
-for pkg in ("ffmpeg", "texlive-latex-extra", "dvipng"):
+for pkg in ("ffmpeg", "texlive-latex-extra", "dvipng", "dvisvgm"):
     assert pkg in deps, deps
 print("  OK  identifier, bundle.externalBin, deb depends")
 PY

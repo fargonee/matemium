@@ -88,7 +88,7 @@ export function PrivacyPolicyPage() {
           <li>Data portability.</li>
           <li>Withdraw consent (where processing is based on consent).</li>
         </ul>
-        <p>To exercise these rights, email <a href="mailto:hello@matemium.app" className="text-accent">hello@matemium.app</a>.</p>
+        <p>To exercise these rights, email <a href="mailto:contact@matemium.fargonee.space" className="text-accent">contact@matemium.fargonee.space</a>.</p>
 
         <h2>7. Children's Privacy</h2>
         <p>
@@ -114,7 +114,7 @@ export function PrivacyPolicyPage() {
         <p>
           If you have questions about this Privacy Policy or our data practices, contact us at:
           <br />
-          <strong>hello@matemium.app</strong>
+          <strong>contact@matemium.fargonee.space</strong>
         </p>
 
         <p className="mt-10 text-xs text-text-subtle">
