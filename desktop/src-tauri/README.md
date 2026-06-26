@@ -49,18 +49,20 @@ Configured in `tauri.conf.json`:
 | Command | Description |
 |---------|-------------|
 | `project_list` | List workspaces with `project.json` |
-| `project_create` | New UUID dir + template `scenes.py` |
-| `project_open` | Paths + `scenes.py` content |
-| `project_save` | Write editor buffer to disk |
+| `project_create` | New UUID dir + template `scenes.py` (+ `assets.py` for agent) |
+| `project_open` | Paths + `scenes.py` + `assets.py` content |
+| `project_save` / `project_save_assets` | Write editor buffer(s) to disk |
 | `project_delete` | Remove workspace dir |
 | `sidecar_ping` | IPC `ping` |
 | `sidecar_lint` | IPC `lint_project` |
 | `sidecar_check` | IPC `check_project` |
 | `sidecar_list_scenes` | IPC `list_scenes` |
 | `sidecar_render` | IPC `render_project` |
+| `sidecar_cancel` | Cancel running render job |
 | `cloud_chat` | POST `/v1/chat/completions` |
-| `auth_login` | POST `/v1/auth/token` — returns access token for settings |
+| `auth_login` | POST `/v1/auth/token` (dev) or `/v1/auth/session` (Supabase / Google) |
 | `settings_get` / `settings_set` | `~/.config/matemium/settings.json` |
+| Outputs | `project_list_outputs`, delete, reveal, clear cache helpers |
 
 Events: listen for `sidecar-event` (`{ event, data }`).
 

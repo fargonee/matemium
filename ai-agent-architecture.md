@@ -1,6 +1,6 @@
 # Matemium AI Agent Architecture
 
-**Status:** Authoritative (2026-06-24)  
+**Status:** Authoritative (2026-06-26)  
 **Audience:** Desktop shell, cloud router, sidecar, and AI integration authors.
 
 This document records how Matemium upgrades from a **standard chat canvas** (LLM returns markdown code blocks the user copies) to an **autonomous, file-aware AI coding agent** — similar to Cursor or Claude Code — specialized for Manim/Matemium scene authoring.

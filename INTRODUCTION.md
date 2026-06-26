@@ -4,7 +4,7 @@ Matemium is a **layout-to-animation compiler** for math education videos. It sit
 
 ---
 
-## Product direction (2026-06)
+## Product direction (2026-06-26)
 
 We are building a **commercial/freemium desktop application** — not an open-source developer CLI as the primary product.
 
@@ -248,6 +248,7 @@ Each folder under `projects/` is one video module with a required `scenes.py`:
 | `em_waves` | Multi-section physics — Maxwell's equations, wave equation, 3D surfaces |
 | `quadratic_graphs` | Side-by-side parabola comparison, plot traces, camera focus |
 | `inscribed_sphere` | 3D solids — cube + inscribed sphere, lift, camera orbit |
+| `olmoshlar` | Additional lesson |
 
 Topic-specific geometry lives in `helpers.py` (dev repo) or `assets.py` (desktop agent mode); the scene file stays readable narrative.
 
@@ -312,20 +313,20 @@ Dependencies: Python 3.11+, Manim Community Edition, Pillow. Desktop also needs 
 - Full static canvas export (PNG/PDF)
 - Reel cutter + manifest generator
 - CLI with project scaffolding
-- Five lesson projects + demo suite
+- Multiple lesson projects (demo, quadratic_*, em_waves, inscribed_sphere, olmoshlar) + demo suite
 
-### Desktop (in progress)
+### Desktop (Linux MVP shipping)
 
 | Phase | Status | Deliverable |
 |-------|--------|-------------|
-| Sidecar IPC | **done** | `lint/check/list/render_project` |
+| Sidecar IPC | **done** | `lint/check/list/render_project` + progress, export, cut etc. |
 | PyInstaller (Linux) | **done** | `matemium-sidecar` binary + Tauri `binaries/` |
-| Tauri scaffold | **done** | `src-tauri/`, sidecar spawn, invoke bridge |
-| UI shell (MVP) | **done** | Editor, AI chat, preview |
-| Cloud client | **done** | Auth + chat API stub |
+| Tauri scaffold + Rust shell | **done** | `src-tauri/`, sidecar spawn, invoke bridge, project CRUD |
+| UI shell (MVP) | **done** | Editor (Monaco + sections), AI chat, preview, two-file support |
+| Cloud client + auth | **done** | Auth (Supabase/Google) + chat API |
 | Linux ship | **done** | `.deb` / `.AppImage` + CI workflow |
 | CI matrix (Win/Mac) | pending | Windows + macOS GitHub Actions |
-| Agent mode (v2) | pending | Tool loop, patch engine, `assets.py` drawer |
+| Agent mode (v2) | partial | Two-file + chat/patch foundation; full tool loop + self-correction |
 | TinyTeX bootstrap | pending | First-run install + PATH injection |
 
 ### Engine (planned)

@@ -1,6 +1,6 @@
 # Matemium — Project Spec & Status
 
-## Product direction (2026-06-23)
+## Product direction (2026-06-26)
 
 **We are building a commercial/freemium desktop application**, not an open-source developer tool as the primary product.
 
@@ -182,7 +182,7 @@ cutter.cut(
 )
 ```
 
-## Current status (2026-06-22)
+## Current status (2026-06-26)
 
 - [x] DSL (JSON + Python builder)
 - [x] Registry + persistent elements
@@ -207,7 +207,7 @@ cutter.cut(
 - [ ] SolutionTape integration (embed tapes as canvas elements)
 - [ ] Reel cutting polish (audio, titles, padding)
 
-## Abstraction audit (2026-06-22)
+## Abstraction audit (2026-06-26)
 
 Audit after test-scene iteration (`quadratic_graphs`, `em_waves`, `demo/tictactoe`). Goal: measure how much scene/topic logic leaked into the engine.
 
@@ -260,32 +260,33 @@ Audit after test-scene iteration (`quadratic_graphs`, `em_waves`, `demo/tictacto
 
 ## Desktop build phases
 
-See [`desktop-architecture.md`](desktop-architecture.md) §6 for full detail.
+See [`desktop-architecture.md`](desktop-architecture.md) §6 for full detail. (Linux desktop MVP shipping.)
 
 | Phase | Status | Deliverable |
 |-------|--------|-------------|
 | P0 — Document | **done** | Product architecture engraved in repo docs |
-| P1 — Sidecar | **done** | `matemium-sidecar`, project IPC (`lint/check/list/render_project`), `workspace_project.py` |
+| P1 — Sidecar | **done** | `matemium-sidecar`, project IPC (`lint/check/list/render_project` + more), `workspace_project.py` |
 | P2 — PyInstaller | **done** | `dist/matemium-sidecar`, Tauri `binaries/` copy, `verify-sidecar-binary.sh` |
-| P3 — Tauri scaffold | pending | `src-tauri/`, sidecar spawn, `invoke` bridge |
-| P4 — UI shell | pending | Editor, AI chat, preview matrix |
-| P5 — Cloud client | pending | Auth + chat API (mockable offline) |
-| P6 — Ship | pending | Signing, auto-update, store packages (Linux deb/AppImage) |
-| P7 — CI matrix | partial | Linux: [`.github/workflows/build-linux.yml`](.github/workflows/build-linux.yml); Windows + macOS pending |
+| P3 — Tauri scaffold | **done** | `src-tauri/`, sidecar spawn, `invoke` bridge |
+| P4 — Rust shell | **done** | sidecar IPC, project CRUD, `cloud_chat` |
+| P5 — UI shell | **done** | Vite + React + Monaco (editor, chat, preview, sections, assets support) |
+| P6 — Cloud client + auth | **done** | `auth_login`, Supabase/Google, `cloud_chat` → [`server/`](../server/) |
+| P7 — Linux ship | **done** | `build-linux.sh` → `.deb` / `.AppImage`; CI in [`.github/workflows/build-linux.yml`](.github/workflows/build-linux.yml) |
+| P8 — CI matrix (Win/Mac) | pending | Windows + macOS GitHub Actions workflows (Linux done) |
 
 **Cross-platform rule:** PyInstaller sidecars cannot be cross-compiled — one native binary per OS triple, built on matching CI runners. See [`desktop/targets/README.md`](desktop/targets/README.md).
 
 ## Agent mode phases (v2)
 
-See [`ai-agent-architecture.md`](ai-agent-architecture.md) §12.
+See [`ai-agent-architecture.md`](ai-agent-architecture.md) §12. (UI supports two-file scenes+assets + chat; full autonomous loop + patch engine in progress.)
 
 | Phase | Status | Deliverable |
 |-------|--------|-------------|
-| A1 — Patch engine | pending | Rust Search/Replace parser + Monaco sync |
-| A2 — Context bundler | pending | Selection, section map, compile errors in payload |
-| A3 — Tool loop orchestrator | pending | Desktop executes `view_file` / `edit_file` / `compile_manim` |
-| A4 — Async render bridge | pending | Non-blocking `start_render` + streamed progress events |
-| A5 — Two-file workspace | pending | `assets.py` template + Advanced Assets drawer UI |
+| A1 — Patch engine | partial | Code edit utils + apply; Rust parser / full apply in progress |
+| A2 — Context bundler | partial | Sections, editor state in chat context; full bundle for agent |
+| A3 — Tool loop orchestrator | partial | `compile_manim` via sidecar + render pipeline; full view/edit/compile agent loop |
+| A4 — Async render bridge | **done** | Non-blocking render + streamed `render_progress` events |
+| A5 — Two-file workspace | **done** | `assets.py` template + editor support for scenes/assets files |
 | A6 — TinyTeX bootstrap | pending | First-run install + PATH injection in sidecar |
 | A7 — Agent system prompt | **done** | [`shared/prompts/agent-system.txt`](shared/prompts/agent-system.txt) |
 

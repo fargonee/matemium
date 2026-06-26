@@ -40,7 +40,8 @@ export function AdminUsersPage() {
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-text-muted">
-                  No users yet.
+                  No users yet. Profiles are created on first server-authenticated login
+                  (or via the DB trigger). Try signing in again or check Supabase profiles table.
                 </td>
               </tr>
             ) : null}

@@ -1,6 +1,6 @@
 # Sidecar IPC (reference)
 
-Canonical spec: [`matemium/ipc/PROTOCOL.md`](../../matemium/ipc/PROTOCOL.md)
+Canonical spec: [`matemium/ipc/PROTOCOL.md`](../../matemium/ipc/PROTOCOL.md) (commands include project lint/check/render + legacy dsl + progress events)
 
 Transport: newline-delimited JSON on the PyInstaller `matemium-sidecar` process stdin/stdout.
 

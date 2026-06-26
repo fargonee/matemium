@@ -1,6 +1,6 @@
 # Matemium Monorepo Structure
 
-**Status:** Authoritative (2026-06-23)
+**Status:** Authoritative (2026-06-26)
 
 Three deployable products + one engine share one repository with **strict publish isolation**.
 

@@ -635,4 +635,4 @@ sudo dpkg -i desktop/src-tauri/target/release/bundle/deb/*.deb
 
 ---
 
-*Last updated: 2026-06-23 — Phases 0–7 and 9 complete on dev machine; Phase 8 (clean VM) and Phase 10 deferred.*
+*Last updated: 2026-06-26 — Phases 0–7 and 9 complete on dev machine; Phase 8 (clean VM) and Phase 10 deferred. Desktop MVP + deploys active.*

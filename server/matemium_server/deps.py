@@ -45,6 +45,26 @@ async def get_optional_user(
         return None
 
     profile = await supabase.get_profile(user["id"])
+
+    # Backfill profile row if the DB trigger didn't create one (e.g. migration timing,
+    # early signups, or Google OAuth edge cases). This makes admin lists etc. work.
+    if not profile:
+        meta = user.get("user_metadata") or {}
+        email_for_profile = user.get("email") or meta.get("email") or ""
+        await supabase.upsert_profile({
+            "id": user["id"],
+            "email": email_for_profile,
+            "full_name": meta.get("full_name") or meta.get("name"),
+            "avatar_url": meta.get("avatar_url") or meta.get("picture"),
+        })
+        profile = await supabase.get_profile(user["id"])
+
+        # If this email is in the admin bootstrap list, persist the role so the
+        # users list in admin console reflects it.
+        if email_for_profile.lower() in settings.admin_email_list:
+            await supabase.update_profile(user["id"], {"role": "admin"})
+            profile = await supabase.get_profile(user["id"])
+
     role = (profile or {}).get("role", "user")
     plan = (profile or {}).get("plan", "free")
     email = (profile or {}).get("email") or user.get("email") or ""

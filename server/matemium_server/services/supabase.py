@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import Any
 
 import httpx
 
 from ..config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class SupabaseService:
@@ -83,6 +86,10 @@ class SupabaseService:
     async def upsert_subscription(self, data: dict[str, Any]) -> None:
         await self._rest_post("subscriptions", data, upsert=True, on_conflict="lemon_subscription_id")
 
+    async def upsert_profile(self, data: dict[str, Any]) -> None:
+        """Idempotent insert/update of a minimal profile row (used as backfill)."""
+        await self._rest_post("profiles", data, upsert=True, on_conflict="id")
+
     async def update_subscription_by_lemon_id(
         self, lemon_subscription_id: str, data: dict[str, Any]
     ) -> None:
@@ -103,6 +110,12 @@ class SupabaseService:
                 headers=self._service_headers(),
             )
         if response.status_code != 200:
+            logger.warning(
+                "Supabase REST GET %s failed: status=%s body=%s",
+                table,
+                response.status_code,
+                response.text[:300],
+            )
             return []
         return response.json()
 
@@ -113,12 +126,19 @@ class SupabaseService:
             return
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            await client.patch(
+            resp = await client.patch(
                 f"{self._base}/rest/v1/{table}",
                 params=match,
                 json=data,
                 headers={**self._service_headers(), "Prefer": "return=minimal"},
             )
+            if resp.status_code >= 400:
+                logger.warning(
+                    "Supabase REST PATCH %s failed: status=%s body=%s",
+                    table,
+                    resp.status_code,
+                    resp.text[:300],
+                )
 
     async def _rest_post(
         self,
@@ -139,11 +159,18 @@ class SupabaseService:
             headers["Prefer"] = prefer
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            await client.post(
+            resp = await client.post(
                 f"{self._base}/rest/v1/{table}",
                 json=data,
                 headers=headers,
             )
+            if resp.status_code >= 400:
+                logger.warning(
+                    "Supabase REST POST %s failed: status=%s body=%s",
+                    table,
+                    resp.status_code,
+                    resp.text[:300],
+                )
 
     def _service_headers(self) -> dict[str, str]:
         return {

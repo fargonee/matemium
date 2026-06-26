@@ -114,6 +114,7 @@ Each folder is one video. A project has `scenes.py` (required; **the desktop app
 | `em_waves` | `EmWaves` | Multi-section physics — Maxwell's equations, wave propagation, 3D surfaces |
 | `quadratic_graphs` | `QuadraticGraphs` | Side-by-side parabola comparison, plot traces, camera focus (uses `helpers.py`) |
 | `inscribed_sphere` | `InscribedSphere` | 3D solids on the tape — cube + inscribed sphere, lift, camera orbit inspect |
+| `olmoshlar` | (various) | Additional lesson content |
 
 The `projects/_template/` folder scaffolds new projects. `projects/_lib/` is reserved for helpers shared across multiple lessons (explicit import only).
 
@@ -212,21 +213,25 @@ cutter.cut(input_video=..., output_dir=..., manifest=manifest)
 - Full static canvas export (PNG/PDF)
 - Reel cutter + manifest generator
 - CLI tool with project scaffolding and isolated outputs
-- Five lesson projects + demo suite
+- Multiple lesson projects (demo, quadratic_*, em_waves, inscribed_sphere, olmoshlar) + demo suite
 
 **Desktop** ([`desktop/`](desktop/)):
 - [x] Monorepo layout (`desktop/app`, `desktop/src-tauri`, `desktop/packaging`, `desktop/targets`)
 - [x] Sidecar JSON IPC (`matemium-sidecar`, `matemium/ipc/`)
-- [ ] Tauri v2 scaffold + TypeScript UI (editor, AI chat, preview)
-- [x] Sidecar project commands — `lint_project`, `check_project`, `list_scenes`, `render_project`
-- [x] PyInstaller Linux binary — `./desktop/scripts/build-sidecar.sh` (~127MB)
+- [x] Tauri v2 + TypeScript UI (Monaco editor, AI chat, section outline, render preview, project workspaces)
+- [x] Sidecar project commands — `lint_project`, `check_project`, `list_scenes`, `render_project`, `export_sheet`, etc. + progress events
+- [x] PyInstaller Linux binary + full Linux ship (`.deb` / `.AppImage`) via `./desktop/scripts/build-linux.sh`
+- [x] Cloud auth + chat client (Supabase / Google sign-in + billing)
+- [ ] Full CI matrix for Windows + macOS desktop builds (Linux complete)
 
 **Server** ([`server/`](server/)):
-- [x] FastAPI stub — `/health`, `/v1/auth/token`, `/v1/chat/completions`
+- [x] FastAPI — `/health`, auth (Supabase token + Google sign-in session), `/v1/chat/completions`, billing (Lemon Squeezy checkout/portal + signed webhooks), admin routes
 - [x] Production auth + Lemon Squeezy billing + webhooks (see [LEMON_SQUEEZY_SETUP.md](LEMON_SQUEEZY_SETUP.md))
-- [ ] Real LLM proxy (stub available)
+- [x] LLM proxy (OpenAI-compatible; stub mode for dev)
 
 **Billing** is fully wired: Lemon Squeezy checkout + customer portal + signed webhooks sync plans to Supabase. Frontend pricing + dashboard included. See the dedicated guide to go live.
+
+**CI / Deploy**: Engine tests on path changes; zero-downtime deploys for `server/` (Northflank) and `website/` (Cloudflare) with health verification + rollback. See `.github/workflows/`.
 
 **Engine (in progress / planned):**
 - Move legacy grid/quadratic builder methods into project helpers

@@ -1,6 +1,6 @@
 # Matemium Desktop — Product Architecture & Goals
 
-**Status:** Authoritative (2026-06-23)  
+**Status:** Authoritative (2026-06-26)  
 **Audience:** All contributors — engine, desktop shell, cloud middleware, and AI integration authors.
 
 This document records the **strategic pivot** to a **commercial/freemium desktop application** where users author animations as **Python project code** assisted by an **AI chat** — not as cloud-generated JSON specs. Engine internals remain in [`architecture.md`](architecture.md); feature status in [`project-spec.md`](project-spec.md).
@@ -272,6 +272,7 @@ TypeScript  ──(Tauri invoke)──►  Rust  ──(IPC)──►  Python si
 | `render_project` | `{ workspace, scene?, quality, output_dir }` | `{ video, workspace, duration_estimate }` |
 | `export_sheet` | `{ workspace, scene?, format }` | `{ path, format }` |
 | `cut_reels` | `{ video, workspace, scene? }` | `{ reels[], manifest }` |
+| `compile_preview`, `estimate_duration` | ... | Progress + preview assets / timing |
 
 **Legacy / dev commands** (inline DSL, not desktop authoring):
 

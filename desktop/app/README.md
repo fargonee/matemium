@@ -2,17 +2,18 @@
 
 Vite + React + Monaco editor for the Tauri shell.
 
-## Features (Phase 5 MVP)
+## Features (MVP shipping)
 
 - Project list — create, open, delete
-- Monaco Python editor with lint markers
+- Monaco Python editor (scenes.py + assets.py) with lint markers
 - Section outline from `# ---DIV:` comments
-- Toolbar — Save, Lint, Check, Render (preview/low)
+- Toolbar — Save, Lint, Check, Render (quality selection)
 - Scene picker from `sidecar_list_scenes`
-- Output log + sidecar event stream
+- Output log + sidecar event stream + progress panel
 - MP4 preview via `convertFileSrc`
-- AI chat panel with Apply edit
-- Settings — server URL, API token, dev login (`auth_login` → `/v1/auth/token`)
+- AI chat panel with Apply edit / diff support
+- Settings — server URL, API token, auth (stub or real Supabase/Google)
+- Render modal, bottom dock tabs (progress, terminal, outputs)
 
 ## Dev
 

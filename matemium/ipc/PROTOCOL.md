@@ -1,6 +1,7 @@
 # Matemium Sidecar IPC Protocol
 
 **Version:** 1.0  
+**Last updated:** 2026-06-26 (reflects current sidecar commands + events)  
 **Transport:** newline-delimited JSON on stdin (requests) and stdout (responses + events)
 
 The Tauri Rust shell spawns `matemium-sidecar` as a child process. All engine work flows through this protocol — the TypeScript UI never talks to Python directly.
