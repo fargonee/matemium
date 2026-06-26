@@ -155,9 +155,18 @@ See also the root [STRUCTURE.md](../STRUCTURE.md) for publish boundaries.
 
 Health check endpoint: `GET /health` (already configured).
 
-Recommended Northflank settings:
-- Health check path: `/health`
-- Port: leave default or match the exposed `PORT` (we auto bind to `0.0.0.0:$PORT`)
+Response includes `status`, `version`, and `commit` (populated with `COMMIT_SHA` when the GHA deploy passes it).
+
+Recommended Northflank settings (critical for zero-downtime):
+- Health check path: `/health` (readiness + startup probe recommended)
+- Instances: 2+ (enables rolling updates with no downtime)
+- Port: leave default or match the exposed `PORT`
+
+The GitHub deploy workflow now:
+- Waits for build
+- Deploys the specific build
+- Verifies the live `/health`
+- Automatically rolls back to the previous successful build if verification fails, then marks the job failed.
 
 ### Local stub (development)
 
