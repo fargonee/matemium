@@ -1,14 +1,15 @@
 name: CI
 
-# Core matemium tool + server tests.
-# Triggered only on changes that affect the Python engine, canvas, tests, server, or shared contracts.
-# Pure website, desktop UI (app/), or docs changes do not run this.
+# Core matemium tool tests (engine, canvas, projects, shared contracts).
+# Server tests have moved to deploy-backend.yml (to gate actual deployments).
+# Triggered only on changes that affect the Python engine, canvas, tests, or shared.
+# Pure server changes, website, desktop UI (app/), or docs changes do not run this.
 
 on:
   push:
     branches: [main]
     paths:
-      # Core matemium engine + canvas
+      # Core matemium engine + canvas + shared
       - 'matemium/**'
       - 'canvas/**'
       - 'projects/**'
@@ -16,9 +17,6 @@ on:
       - 'shared/**'
       - 'pyproject.toml'
       - 'fixtures/**'
-      # Server (its own tests job)
-      - 'server/**'
-      - 'server/pyproject.toml'
       # Workflow itself
       - '.github/workflows/ci.yml'
   pull_request:
@@ -31,8 +29,6 @@ on:
       - 'shared/**'
       - 'pyproject.toml'
       - 'fixtures/**'
-      - 'server/**'
-      - 'server/pyproject.toml'
       - '.github/workflows/ci.yml'
   workflow_dispatch:
 
@@ -63,23 +59,3 @@ jobs:
         run: |
           matemium --version
           matemium list
-
-  server:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install server package
-        working-directory: server
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-
-      - name: Run server tests
-        working-directory: server
-        run: pytest
