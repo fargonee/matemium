@@ -21,13 +21,67 @@ on:
     paths:
       - 'server/**'
       - '.github/workflows/deploy-backend.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/**'
+  workflow_dispatch:
 
 concurrency:
   group: deploy-backend-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  # Lightweight server test for pull requests.
+  # Provides early feedback without requiring deploy secrets.
+  test-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install server package
+        working-directory: server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run server tests
+        working-directory: server
+        run: pytest
+
+  # Server tests on push to main and manual dispatch.
+  # This must succeed before the deploy job is allowed to run.
+  test:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install server package
+        working-directory: server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run server tests
+        working-directory: server
+        run: pytest
+
+  # The original deploy job — preserved as-is except for the dependency.
   deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: math
     steps:
