@@ -295,7 +295,7 @@ math/
 └── project-spec.md         # Feature status
 ```
 
-Dependencies: Python 3.10+, Manim Community Edition, Pillow. Desktop also needs Rust, Node.js, and per-platform PyInstaller builds.
+Dependencies: Python 3.11+, Manim Community Edition, Pillow. Desktop also needs Rust, Node.js, and per-platform PyInstaller builds.
 
 ---
 

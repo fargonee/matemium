@@ -1,9 +1,9 @@
 name: CI
 
-# Core matemium tool tests (engine, canvas, projects, shared contracts).
-# Server tests have moved to deploy-backend.yml (to gate actual deployments).
+# Core matemium tool tests (engine + canvas + projects + shared).
+# Requires Python >= 3.11 because of manim>=0.20.1.
 # Triggered only on changes that affect the Python engine, canvas, tests, or shared.
-# Pure server changes, website, desktop UI (app/), or docs changes do not run this.
+# Pure website, desktop UI (app/), or unrelated changes do not run this.
 
 on:
   push:
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +46,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies (for manimpango / manim wheels)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libcairo2-dev \
+            libpango1.0-dev
 
       - name: Install dependencies
         run: |

@@ -251,7 +251,7 @@ math/
 
 ## Dependencies
 
-- Python 3.10+
+- Python 3.11+
 - `manim >= 0.20.1`
 - `pillow >= 12.0.0`
 

@@ -45,6 +45,7 @@ if [[ "$SKIP_APT" == false ]]; then
     build-essential curl git pkg-config \
     libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
     libwebkit2gtk-4.1-dev \
+    libcairo2-dev libpango1.0-dev \
     python3 python3-venv python3-pip \
     ffmpeg \
     texlive-latex-extra texlive-fonts-extra texlive-science \
