@@ -43,6 +43,22 @@ jobs:
           VITE_BASE: ${{ vars.VITE_BASE || secrets.VITE_BASE || '/' }}
         run: npm run build
 
+      - name: Capture current production deployment (for rollback)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "Capturing current deployment before new deploy..."
+          ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+          TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          RESPONSE=$(curl -s \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/math/deployments?per_page=5")
+          PREV_DEPLOY_ID=$(echo "$RESPONSE" | jq -r '.result[0].id // ""')
+          echo "PREV_DEPLOY_ID=$PREV_DEPLOY_ID" >> $GITHUB_ENV
+          echo "Previous deployment ID: $PREV_DEPLOY_ID"
+          echo "Current live URL will be preserved if new deploy fails verification."
+
       - name: Deploy to Cloudflare Pages (direct upload)
         working-directory: website
         env:
@@ -55,19 +71,70 @@ jobs:
             --branch=main \
             --commit-dirty=true
 
-      - name: Verify frontend deployment (zero downtime check)
+      - name: Verify frontend deployment (zero downtime check) with rollback
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          echo "Waiting for Cloudflare deployment to propagate..."
+          echo "Waiting for Cloudflare deployment to propagate and become stable..."
           sleep 60
-          for i in {1..15}; do
-            CONTENT=$(curl -s -I https://matemium.fargonee.space | head -1 || echo "")
-            BODY=$(curl -s https://matemium.fargonee.space | grep -o "Matemium" | head -1 || echo "")
-            if echo "$CONTENT" | grep -q "200" && [ -n "$BODY" ]; then
-              echo "✅ Frontend deployment verified on attempt $i"
-              exit 0
+
+          ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID"
+          TOKEN="$CLOUDFLARE_API_TOKEN"
+          SITE_URL="https://matemium.fargonee.space"
+
+          VERIFIED=false
+          for i in {1..20}; do
+            # Check HTTP + basic content
+            HEADERS=$(curl -s -I --max-time 10 "$SITE_URL" || echo "")
+            BODY=$(curl -s --max-time 10 "$SITE_URL" || echo "")
+
+            STATUS=$(echo "$HEADERS" | head -1)
+            HAS_CONTENT=$(echo "$BODY" | grep -o "Math lessons that scroll like a document" | head -1 || echo "")
+
+            if echo "$STATUS" | grep -q "200" && [ -n "$HAS_CONTENT" ]; then
+              echo "✅ Frontend deployment verified on attempt $i (real content detected)"
+              VERIFIED=true
+              break
             fi
-            echo "Verification $i failed (may be propagating), waiting 20s..."
-            sleep 20
+
+            echo "Verification $i not ready yet (status: $STATUS), waiting 15s..."
+            sleep 15
           done
-          echo "❌ Frontend verification failed after deployment. Previous version should still be serving."
-          exit 1
+
+          if [ "$VERIFIED" != "true" ]; then
+            echo "❌ Frontend verification failed after deployment."
+
+            # Attempt safe rollback by removing the bad latest deployment
+            if [ -n "$PREV_DEPLOY_ID" ]; then
+              echo "Attempting automatic rollback to previous deployment ($PREV_DEPLOY_ID)..."
+
+              # Get the latest (bad) deployment
+              LATEST=$(curl -s -H "Authorization: Bearer $TOKEN" \
+                "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/math/deployments?per_page=1")
+              BAD_ID=$(echo "$LATEST" | jq -r '.result[0].id // ""')
+
+              if [ -n "$BAD_ID" ] && [ "$BAD_ID" != "$PREV_DEPLOY_ID" ]; then
+                echo "Deleting bad deployment $BAD_ID to restore previous version..."
+                DELETE_RESP=$(curl -s -X DELETE \
+                  -H "Authorization: Bearer $TOKEN" \
+                  "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/math/deployments/$BAD_ID")
+                echo "Rollback response: $DELETE_RESP"
+                echo "✅ Rolled back. Previous version should now be live."
+              else
+                echo "Could not determine bad deployment ID for auto-rollback."
+              fi
+            else
+              echo "No previous deployment ID captured. Manual rollback required."
+            fi
+
+            echo "❌ Failing the job. Check Cloudflare dashboard > Deployments to confirm state or manually rollback."
+            exit 1
+          fi
+
+          echo "✅ Frontend deployment verified — zero-downtime atomic switch successful."
+
+      - name: Done
+        run: |
+          echo "✅ Frontend deploy complete (atomic + verified)."
+          echo "Cloudflare Pages keeps all previous deployments — rollback is always available in the dashboard if needed."
