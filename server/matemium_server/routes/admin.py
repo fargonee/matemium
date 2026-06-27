@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from ..config import settings
 from ..deps import AuthUser, require_admin
 from ..services.llm import scene_authoring_system_prompt
+from ..services.llm_management import get_autonomous_status, get_spend_summary
 from ..services.supabase import SupabaseService, get_supabase_service
 
 router = APIRouter(tags=["admin"])
@@ -53,6 +54,7 @@ class UpdateUserRequest(BaseModel):
     plan: str | None = None
     role: str | None = None
     ai_calls_count: int | None = None
+    llm_credits: int | None = None  # admin can grant/revoke platform tokens
 
 
 class UpdateSubscriptionRequest(BaseModel):
@@ -196,6 +198,9 @@ async def update_admin_user(
         updates["ai_calls_count"] = max(0, body.ai_calls_count)
         updates["usage_updated_at"] = "now()"
 
+    if body.llm_credits is not None:
+        updates["llm_credits"] = max(0, body.llm_credits)
+
     if updates:
         await supabase.update_profile(user_id, updates)
 
@@ -257,3 +262,106 @@ async def admin_llm(
         prompt_loaded=prompt_loaded,
         total_ai_calls=total_calls,
     )
+
+
+# ==================== Advanced LLM Management (our accounts + autonomous) ====================
+
+class PlatformProviderIn(BaseModel):
+    name: str
+    display_name: str | None = None
+    api_base: str
+    api_key: str | None = None   # will be stored; admin only
+    is_active: bool = True
+    monthly_budget_usd: float | None = None
+    auto_replenish: bool = False
+
+
+class PlatformProviderOut(BaseModel):
+    id: str
+    name: str
+    display_name: str | None = None
+    api_base: str
+    is_active: bool
+    monthly_budget_usd: float | None = None
+    auto_replenish: bool
+    # Never return the actual key
+    has_key: bool
+
+
+@router.get("/admin/llm/providers", response_model=list[PlatformProviderOut])
+async def list_platform_providers(
+    _: Annotated[AuthUser, Depends(require_admin)],
+    supabase: SupabaseService = Depends(get_supabase_service),
+):
+    rows = await supabase.list_active_platform_providers()
+    return [
+        PlatformProviderOut(
+            id=r["id"],
+            name=r["name"],
+            display_name=r.get("display_name"),
+            api_base=r["api_base"],
+            is_active=r.get("is_active", True),
+            monthly_budget_usd=r.get("monthly_budget_usd"),
+            auto_replenish=r.get("auto_replenish", False),
+            has_key=bool(r.get("api_key")),
+        )
+        for r in rows
+    ]
+
+
+@router.post("/admin/llm/providers", response_model=PlatformProviderOut)
+async def create_platform_provider(
+    body: PlatformProviderIn,
+    _: Annotated[AuthUser, Depends(require_admin)],
+    supabase: SupabaseService = Depends(get_supabase_service),
+):
+    data = body.model_dump()
+    # Never return key
+    key = data.pop("api_key", None)
+    if key:
+        data["api_key"] = key  # stored server-side
+
+    await supabase._rest_post("llm_providers", data)
+    # return fresh
+    created = await supabase.get_platform_provider(body.name)
+    return PlatformProviderOut(
+        id=created["id"],
+        name=created["name"],
+        display_name=created.get("display_name"),
+        api_base=created["api_base"],
+        is_active=created.get("is_active", True),
+        monthly_budget_usd=created.get("monthly_budget_usd"),
+        auto_replenish=created.get("auto_replenish", False),
+        has_key=bool(created.get("api_key")),
+    )
+
+
+@router.get("/admin/llm/spend")
+async def get_llm_spend(
+    _: Annotated[AuthUser, Depends(require_admin)],
+):
+    return await get_spend_summary()
+
+
+@router.get("/admin/llm/autonomous")
+async def get_llm_autonomous(
+    _: Annotated[AuthUser, Depends(require_admin)],
+):
+    return await get_autonomous_status()
+
+
+class MarginUpdate(BaseModel):
+    margin: float
+
+
+@router.patch("/admin/llm/margin")
+async def update_margin(
+    body: MarginUpdate,
+    _: Annotated[AuthUser, Depends(require_admin)],
+    supabase: SupabaseService = Depends(get_supabase_service),
+):
+    await supabase._rest_post("system_settings", {
+        "key": "llm_profit_margin",
+        "value": body.margin
+    }, upsert=True)
+    return {"margin": body.margin}

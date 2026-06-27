@@ -1,4 +1,4 @@
-export type PlanId = "free" | "pro" | "teams";
+export type PlanId = "free" | "pro" | "teams" | "tokens_1000" | "tokens_5000";
 
 export interface Plan {
   id: PlanId;
@@ -8,6 +8,8 @@ export interface Plan {
   features: string[];
   highlighted?: boolean;
   contactSales?: boolean;
+  isTokenPack?: boolean;
+  credits?: number;
 }
 
 export const PLANS: Plan[] = [
@@ -52,3 +54,28 @@ export const PLANS: Plan[] = [
 export function planById(id: PlanId): Plan | undefined {
   return PLANS.find((p) => p.id === id);
 }
+
+// Platform credit / token packs for LLM usage (one-time purchases)
+export const CREDIT_PACKS: Plan[] = [
+  {
+    id: "tokens_1000",
+    name: "1,000 Credits",
+    priceLabel: "Buy",
+    description: "Platform LLM & TTS usage. Credits priced with our margin on real provider costs.",
+    features: ["~1,000,000 tokens equivalent (model dependent)", "Use with our hosted models", "Auto pricing with profit margin"],
+    isTokenPack: true,
+    credits: 1000,
+  },
+  {
+    id: "tokens_5000",
+    name: "5,000 Credits",
+    priceLabel: "Buy",
+    description: "Better value for heavy AI usage (code + audio).",
+    features: ["~5M tokens equivalent", "Priority in platform pool when available", "Full access to supported models"],
+    isTokenPack: true,
+    credits: 5000,
+    highlighted: true,
+  },
+];
+
+export const ALL_PURCHASABLE = [...PLANS.filter(p => p.id !== 'free' && !p.contactSales), ...CREDIT_PACKS];

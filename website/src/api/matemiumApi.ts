@@ -84,6 +84,41 @@ const injectedRtkApi = api.injectEndpoints({
     getAdminLLM: build.query<GetAdminLLMApiResponse, GetAdminLLMApiArg>({
       query: () => ({ url: `/v1/admin/llm` }),
     }),
+    getAdminLLMProviders: build.query<
+      GetAdminLLMProvidersApiResponse,
+      GetAdminLLMProvidersApiArg
+    >({
+      query: () => ({ url: `/v1/admin/llm/providers` }),
+    }),
+    getAdminLLMSpend: build.query<GetAdminLLMSpendApiResponse, GetAdminLLMSpendApiArg>({
+      query: () => ({ url: `/v1/admin/llm/spend` }),
+    }),
+    getAdminLLMAutonomous: build.query<
+      GetAdminLLMAutonomousApiResponse,
+      GetAdminLLMAutonomousApiArg
+    >({
+      query: () => ({ url: `/v1/admin/llm/autonomous` }),
+    }),
+    updateAdminLLMMargin: build.mutation<
+      UpdateAdminLLMMarginApiResponse,
+      UpdateAdminLLMMarginApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/v1/admin/llm/margin`,
+        method: "PATCH",
+        body: queryArg.marginUpdate,
+      }),
+    }),
+    updateLLMSettings: build.mutation<
+      UpdateLLMSettingsApiResponse,
+      UpdateLLMSettingsApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/v1/settings/llm`,
+        method: "PATCH",
+        body: queryArg.lLMSettingsUpdate,
+      }),
+    }),
     lemonSqueezyWebhookV1WebhooksLemonsqueezyPost: build.mutation<
       LemonSqueezyWebhookV1WebhooksLemonsqueezyPostApiResponse,
       LemonSqueezyWebhookV1WebhooksLemonsqueezyPostApiArg
@@ -161,6 +196,52 @@ export type UpdateAdminSubscriptionApiArg = {
 export type GetAdminLLMApiResponse =
   /** status 200 Successful Response */ LLMInfo;
 export type GetAdminLLMApiArg = void;
+export type GetAdminLLMProvidersApiResponse =
+  /** status 200 Successful Response */ PlatformProviderOut[];
+export type GetAdminLLMProvidersApiArg = void;
+export type GetAdminLLMSpendApiResponse =
+  /** status 200 Successful Response */ {
+    [key: string]: any;
+  };
+export type GetAdminLLMSpendApiArg = void;
+export type GetAdminLLMAutonomousApiResponse =
+  /** status 200 Successful Response */ {
+    [key: string]: any;
+  };
+export type GetAdminLLMAutonomousApiArg = void;
+export type UpdateAdminLLMMarginApiResponse =
+  /** status 200 Successful Response */ {
+    [key: string]: any;
+  };
+export type UpdateAdminLLMMarginApiArg = {
+  marginUpdate: { margin: number };
+};
+
+export type PlatformProviderOut = {
+  id: string;
+  name: string;
+  display_name?: string | null;
+  api_base: string;
+  is_active: boolean;
+  monthly_budget_usd?: number | null;
+  auto_replenish: boolean;
+  has_key: boolean;
+};
+export type UpdateLLMSettingsApiResponse =
+  /** status 200 Successful Response */ {
+    [key: string]: any;
+  };
+export type UpdateLLMSettingsApiArg = {
+  lLMSettingsUpdate: LLMSettingsUpdate;
+};
+export type LLMSettingsUpdate = {
+  llm_provider?: string | null;
+  llm_api_key?: string | null;
+  llm_model?: string | null;
+  tts_provider?: string | null;
+  tts_api_key?: string | null;
+  tts_voice?: string | null;
+};
 export type LemonSqueezyWebhookV1WebhooksLemonsqueezyPostApiResponse =
   /** status 200 Successful Response */ {
     [key: string]: boolean;
@@ -202,6 +283,11 @@ export type MeResponse = {
   role: string;
   plan: string;
   lemon_customer_id?: string | null;
+  llm_credits?: number;
+  llm_provider?: string | null;
+  has_own_llm_key?: boolean;
+  tts_provider?: string | null;
+  has_own_tts_key?: boolean;
 };
 export type SubscriptionResponse = {
   status?: string | null;
@@ -310,6 +396,11 @@ export const {
   useUpdateAdminUserMutation,
   useUpdateAdminSubscriptionMutation,
   useGetAdminLLMQuery,
+  useGetAdminLLMProvidersQuery,
+  useGetAdminLLMSpendQuery,
+  useGetAdminLLMAutonomousQuery,
+  useUpdateAdminLLMMarginMutation,
+  useUpdateLLMSettingsMutation,
   useLemonSqueezyWebhookV1WebhooksLemonsqueezyPostMutation,
   useChatCompletionsV1ChatCompletionsPostMutation,
 } = injectedRtkApi;

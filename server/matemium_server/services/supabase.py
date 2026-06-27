@@ -98,6 +98,87 @@ class SupabaseService:
         rows = await self._rest_get("profiles", {"select": "ai_calls_count"})
         return sum(int(r.get("ai_calls_count") or 0) for r in rows)
 
+    # === User LLM / TTS config + platform credits (BYO keys vs platform tokens) ===
+
+    async def get_user_llm_config(self, user_id: str) -> dict[str, Any]:
+        rows = await self._rest_get(
+            "profiles",
+            {
+                "id": f"eq.{user_id}",
+                "select": "llm_provider,llm_api_key,llm_model,llm_credits,tts_provider,tts_api_key,tts_voice",
+            },
+        )
+        if not rows:
+            return {
+                "llm_provider": "openai",
+                "llm_api_key": None,
+                "llm_model": None,
+                "llm_credits": 0,
+                "tts_provider": "openai",
+                "tts_api_key": None,
+                "tts_voice": "alloy",
+            }
+        return rows[0]
+
+    async def get_user_personal_key(self, user_id: str, provider: str | None, for_tts: bool = False) -> dict[str, Any] | None:
+        """Return the user's stored personal key/config for a provider, or None."""
+        cfg = await self.get_user_llm_config(user_id)
+        key_field = "tts_api_key" if for_tts else "llm_api_key"
+        prov_field = "tts_provider" if for_tts else "llm_provider"
+        if cfg.get(key_field):
+            return {
+                "provider": cfg.get(prov_field) or provider or "openai",
+                "api_key": cfg.get(key_field),
+                "model": cfg.get("llm_model") if not for_tts else None,
+            }
+        return None
+
+    async def set_user_llm_config(self, user_id: str, data: dict[str, Any]) -> None:
+        # Only update the provided keys. Never return keys back to client.
+        safe_data = {k: v for k, v in data.items() if k in {
+            "llm_provider", "llm_model", "tts_provider", "tts_voice"
+        } or k.endswith("_api_key")}
+        if safe_data:
+            await self.update_profile(user_id, safe_data)
+
+    async def adjust_llm_credits(self, user_id: str, delta: int) -> int:
+        """Atomically-ish adjust credits. Returns new balance (best effort)."""
+        current = await self.get_user_llm_config(user_id)
+        new_balance = max(0, int(current.get("llm_credits") or 0) + delta)
+        await self.update_profile(user_id, {"llm_credits": new_balance})
+        return new_balance
+
+    async def has_sufficient_credits(self, user_id: str, required: int = 1) -> bool:
+        cfg = await self.get_user_llm_config(user_id)
+        return int(cfg.get("llm_credits") or 0) >= required
+
+    # === Platform (our) LLM provider management ===
+
+    async def list_active_platform_providers(self) -> list[dict[str, Any]]:
+        return await self._rest_get(
+            "llm_providers",
+            {"is_active": "eq.true", "select": "*", "order": "priority.asc"},
+        )
+
+    async def get_platform_provider(self, name: str) -> dict[str, Any] | None:
+        rows = await self._rest_get(
+            "llm_providers",
+            {"name": f"eq.{name}", "select": "*", "limit": "1"},
+        )
+        return rows[0] if rows else None
+
+    async def pick_best_platform_provider(self, preferred_name: str | None = None) -> dict[str, Any] | None:
+        if preferred_name:
+            p = await self.get_platform_provider(preferred_name)
+            if p and p.get("is_active"):
+                return p
+        providers = await self.list_active_platform_providers()
+        return providers[0] if providers else None
+
+    async def log_llm_usage(self, data: dict[str, Any]) -> None:
+        """Insert detailed usage + cost log."""
+        await self._rest_post("llm_usages", data)
+
     async def upsert_subscription(self, data: dict[str, Any]) -> None:
         await self._rest_post("subscriptions", data, upsert=True, on_conflict="lemon_subscription_id")
 

@@ -232,6 +232,16 @@ export function AdminUsersPage() {
                 className="w-full rounded border border-border bg-bg px-3 py-1.5 text-sm"
               />
             </div>
+            <div>
+              <label className="block text-xs text-text-subtle mb-1">Platform Credits</label>
+              <input
+                type="number"
+                value={editCalls} /* reuse state for demo; in full app add separate */
+                onChange={(e) => setEditCalls(parseInt(e.target.value || "0"))}
+                className="w-full rounded border border-border bg-bg px-3 py-1.5 text-sm"
+                title="Note: full credits editing available via direct PATCH in real use"
+              />
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-3">

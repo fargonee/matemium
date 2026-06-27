@@ -19,7 +19,7 @@ from .middleware import (
     setup_logging,
 )
 from .openapi import configure_openapi
-from .routes import admin, auth, billing, chat, health, me, webhooks
+from .routes import admin, audio, auth, billing, chat, health, me, settings as settings_router, webhooks
 
 
 def create_app() -> FastAPI:
@@ -54,6 +54,8 @@ def create_app() -> FastAPI:
     app.include_router(admin.router, prefix="/v1")
     app.include_router(webhooks.router, prefix="/v1")
     app.include_router(chat.router, prefix="/v1")
+    app.include_router(audio.router, prefix="/v1")
+    app.include_router(settings_router.router, prefix="/v1")
 
     # Global error handling for consistent production responses
     @app.exception_handler(StarletteHTTPException)

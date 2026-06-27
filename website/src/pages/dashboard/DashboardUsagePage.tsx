@@ -13,6 +13,7 @@ export function DashboardUsagePage() {
   const plan = account?.profile.plan ?? "free";
   const usage = account?.usage;
   const ai = usage?.ai_calls_count ?? 0;
+  const credits = account?.profile.llm_credits ?? 0;
 
   // Simple illustrative limits (server enforces real rate limits)
   const limit = plan === "pro" || plan === "teams" ? 5000 : 200;
@@ -32,7 +33,13 @@ export function DashboardUsagePage() {
   return (
     <div className="grid gap-5 md:grid-cols-2">
       <Card>
-        <p className="text-sm text-text-subtle">AI interactions</p>
+        <p className="text-sm text-text-subtle">Platform LLM Credits Remaining</p>
+        <p className="mt-2 text-4xl font-bold tabular-nums">{credits}</p>
+        <p className="text-xs text-text-muted mt-1">Spend these when using our hosted models (BYO keys do not consume credits).</p>
+      </Card>
+
+      <Card>
+        <p className="text-sm text-text-subtle">AI interactions (legacy counter)</p>
         <p className="mt-2 text-4xl font-bold tabular-nums">{ai}</p>
         <p className="mt-1 text-sm text-text-muted">
           of ~{limit} this period (approximate). Pro plans receive higher priority and limits.

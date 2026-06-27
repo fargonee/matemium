@@ -189,3 +189,39 @@ cd server && source .venv/bin/activate && python -m matemium_server
 
 - **No imports from `canvas/` or `matemium/`** — server is a separate Python package.
 - Shared contracts live in [`shared/`](../shared/).
+
+## Launch / Production Checklist (Webapp)
+
+1. Run all Supabase migrations in order:
+   - schema.sql
+   - 002_lemon_squeezy.sql (if needed)
+   - 003_usage_counters.sql
+   - 004_user_llm_and_credits.sql
+   - 005_llm_management.sql
+
+2. Set production env vars (never commit secrets):
+   - `MATEMIUM_ENV=production`
+   - `MATEMIUM_AUTH_STUB=false`
+   - `MATEMIUM_LLM_STUB=false`
+   - `MATEMIUM_LLM_API_KEY=...` (your platform key)
+   - `MATEMIUM_LEMON_SQUEEZY_*` (real keys + `TEST_MODE=false`)
+   - `MATEMIUM_LEMON_SQUEEZY_TOKEN_VARIANTS=variantId:1000,other:5000`
+   - Supabase service role, admin emails, CORS with your real domains.
+
+3. For LLM management (autonomous pricing):
+   - Set `llm_profit_margin` in `system_settings` table (default 0.40).
+   - Populate `llm_providers` (via admin API or SQL) with your platform accounts + budgets.
+   - Update `llm_model_pricing` with accurate costs.
+
+4. Website build: set `VITE_API_URL` and `VITE_SITE_URL` to production values before `npm run build`.
+
+5. Deploy order:
+   - Supabase (DB + auth)
+   - Server (Northflank/Fly/etc.) → verify /health and /v1/me
+   - Website (Cloudflare Pages)
+   - Update desktop (later) to point to prod server.
+
+6. Post-launch:
+   - Monitor LLM spend via Admin → LLM page.
+   - Rotate keys regularly.
+   - Encrypt user `*_api_key` columns in production (pgsodium recommended).

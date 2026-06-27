@@ -69,7 +69,8 @@ export function HomePage() {
                 <strong className="block text-base text-text">Local</strong> rendering
               </li>
               <li>
-                <strong className="block text-base text-text">AI</strong> built in
+                <strong className="block text-base text-text">Flexible AI</strong> built in
+                <span className="text-xs text-text-muted"> — your keys or our tokens with auto pricing</span>
               </li>
             </ul>
           </div>

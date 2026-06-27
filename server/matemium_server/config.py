@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     lemon_squeezy_webhook_secret: str = ""
     lemon_squeezy_store_id: str = ""
     lemon_squeezy_variant_pro_monthly: str = ""
+    # Token packs for platform LLM credits (map variant id -> credits to grant)
+    lemon_squeezy_token_variants: str = ""  # e.g. "12345:1000,67890:5000"
     lemon_squeezy_test_mode: bool = True
     site_url: str = "http://localhost:5173"
 
@@ -62,6 +64,22 @@ class Settings(BaseSettings):
     @property
     def admin_email_list(self) -> list[str]:
         return [e.strip().lower() for e in self.admin_emails.split(",") if e.strip()]
+
+    @property
+    def token_variant_map(self) -> dict[str, int]:
+        """Map from Lemon Squeezy variant_id (str) -> credits to grant."""
+        result: dict[str, int] = {}
+        for pair in self.lemon_squeezy_token_variants.split(","):
+            pair = pair.strip()
+            if not pair:
+                continue
+            if ":" in pair:
+                vid, credits = pair.split(":", 1)
+                try:
+                    result[vid.strip()] = int(credits)
+                except ValueError:
+                    pass
+        return result
 
     def validate_for_production(self) -> None:
         """Fail fast in production if critical configuration is missing or unsafe."""

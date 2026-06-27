@@ -146,6 +146,8 @@ class BillingService:
             await self._on_subscription_event(data, attrs, custom)
         elif event_name in {"order_refunded", "subscription_payment_refunded"}:
             await self._on_order_refunded(data, attrs, custom)
+        elif event_name in {"order_created", "order_paid"}:
+            await self._on_order_paid(data, attrs, custom)
 
     async def _on_subscription_event(
         self,
@@ -275,3 +277,31 @@ class BillingService:
 
         # Note: order_refunded also has attrs like "refunded_amount", "refunded_at"
         # We could store an orders table in future if needed for audit.
+
+    async def _on_order_paid(
+        self,
+        data: dict[str, Any],
+        attrs: dict[str, Any],
+        custom: dict[str, Any],
+    ) -> None:
+        """Handle one-time token pack purchases (and other orders)."""
+        user_id = custom.get("supabase_user_id")
+        if not user_id:
+            # Try to resolve via customer
+            customer_id = attrs.get("customer_id")
+            if customer_id:
+                rows = await self._supabase._rest_get(
+                    "profiles",
+                    {"lemon_customer_id": f"eq.{customer_id}", "select": "id", "limit": "1"},
+                )
+                if rows:
+                    user_id = rows[0]["id"]
+
+        if not user_id:
+            return
+
+        variant_id = str(attrs.get("variant_id") or data.get("variant_id") or "")
+        credits_to_grant = settings.token_variant_map.get(variant_id, 0)
+
+        if credits_to_grant > 0:
+            await self._supabase.adjust_llm_credits(user_id, credits_to_grant)
