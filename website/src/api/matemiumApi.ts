@@ -61,6 +61,29 @@ const injectedRtkApi = api.injectEndpoints({
     >({
       query: () => ({ url: `/v1/admin/subscriptions` }),
     }),
+    getAdminUser: build.query<GetAdminUserApiResponse, GetAdminUserApiArg>({
+      query: (queryArg) => ({ url: `/v1/admin/users/${queryArg.userId}` }),
+    }),
+    updateAdminUser: build.mutation<UpdateAdminUserApiResponse, UpdateAdminUserApiArg>({
+      query: (queryArg) => ({
+        url: `/v1/admin/users/${queryArg.userId}`,
+        method: "PATCH",
+        body: queryArg.updateUserRequest,
+      }),
+    }),
+    updateAdminSubscription: build.mutation<
+      UpdateAdminSubscriptionApiResponse,
+      UpdateAdminSubscriptionApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/v1/admin/subscriptions/${queryArg.subscriptionId}`,
+        method: "PATCH",
+        body: queryArg.updateSubscriptionRequest,
+      }),
+    }),
+    getAdminLLM: build.query<GetAdminLLMApiResponse, GetAdminLLMApiArg>({
+      query: () => ({ url: `/v1/admin/llm` }),
+    }),
     lemonSqueezyWebhookV1WebhooksLemonsqueezyPost: build.mutation<
       LemonSqueezyWebhookV1WebhooksLemonsqueezyPostApiResponse,
       LemonSqueezyWebhookV1WebhooksLemonsqueezyPostApiArg
@@ -118,6 +141,26 @@ export type GetAdminUsersApiArg = void;
 export type GetAdminSubscriptionsApiResponse =
   /** status 200 Successful Response */ SubscriptionRow[];
 export type GetAdminSubscriptionsApiArg = void;
+export type GetAdminUserApiResponse =
+  /** status 200 Successful Response */ AdminUserDetail;
+export type GetAdminUserApiArg = {
+  userId: string;
+};
+export type UpdateAdminUserApiResponse =
+  /** status 200 Successful Response */ AdminUserDetail;
+export type UpdateAdminUserApiArg = {
+  userId: string;
+  updateUserRequest: UpdateUserRequest;
+};
+export type UpdateAdminSubscriptionApiResponse =
+  /** status 200 Successful Response */ SubscriptionRow;
+export type UpdateAdminSubscriptionApiArg = {
+  subscriptionId: string;
+  updateSubscriptionRequest: UpdateSubscriptionRequest;
+};
+export type GetAdminLLMApiResponse =
+  /** status 200 Successful Response */ LLMInfo;
+export type GetAdminLLMApiArg = void;
 export type LemonSqueezyWebhookV1WebhooksLemonsqueezyPostApiResponse =
   /** status 200 Successful Response */ {
     [key: string]: boolean;
@@ -165,9 +208,13 @@ export type SubscriptionResponse = {
   plan?: string | null;
   current_period_end?: string | null;
 };
+export type UsageResponse = {
+  ai_calls_count?: number;
+};
 export type AccountResponse = {
   profile: MeResponse;
   subscription?: SubscriptionResponse | null;
+  usage?: UsageResponse | null;
 };
 export type UrlResponse = {
   url: string;
@@ -179,6 +226,35 @@ export type AdminStats = {
   total_users: number;
   pro_users: number;
   active_subscriptions: number;
+};
+export type AdminUserDetail = {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  role: string;
+  plan: string;
+  lemon_customer_id?: string | null;
+  ai_calls_count?: number;
+  created_at?: string | null;
+  subscription?: SubscriptionRow | null;
+};
+export type UpdateUserRequest = {
+  plan?: string | null;
+  role?: string | null;
+  ai_calls_count?: number | null;
+};
+export type UpdateSubscriptionRequest = {
+  status?: string | null;
+  plan?: string | null;
+  current_period_end?: string | null;
+  lemon_subscription_id?: string | null;
+};
+export type LLMInfo = {
+  model: string;
+  api_base: string;
+  stub: boolean;
+  prompt_loaded: boolean;
+  total_ai_calls?: number;
 };
 export type ProfileRow = {
   id: string;
@@ -230,6 +306,10 @@ export const {
   useGetAdminStatsQuery,
   useGetAdminUsersQuery,
   useGetAdminSubscriptionsQuery,
+  useGetAdminUserQuery,
+  useUpdateAdminUserMutation,
+  useUpdateAdminSubscriptionMutation,
+  useGetAdminLLMQuery,
   useLemonSqueezyWebhookV1WebhooksLemonsqueezyPostMutation,
   useChatCompletionsV1ChatCompletionsPostMutation,
 } = injectedRtkApi;

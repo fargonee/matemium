@@ -50,6 +50,11 @@ class Settings(BaseSettings):
         "tauri://localhost,http://localhost,http://127.0.0.1"
     )
 
+    # Rate limiting (requests per minute). Applied primarily to chat.
+    # Free users get strict limits; Pro/Teams are higher.
+    rate_limit_free_rpm: int = 12
+    rate_limit_pro_rpm: int = 120
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -58,5 +63,20 @@ class Settings(BaseSettings):
     def admin_email_list(self) -> list[str]:
         return [e.strip().lower() for e in self.admin_emails.split(",") if e.strip()]
 
+    def validate_for_production(self) -> None:
+        """Fail fast in production if critical configuration is missing or unsafe."""
+        if self.env != "production":
+            return
+        problems: list[str] = []
+        if self.auth_stub:
+            problems.append("MATEMIUM_AUTH_STUB must be false in production")
+        if self.llm_stub:
+            problems.append("MATEMIUM_LLM_STUB must be false in production (or set LLM key)")
+        if not self.supabase_url or not self.supabase_service_role_key:
+            problems.append("Supabase URL and service role key are required in production")
+        if problems:
+            raise RuntimeError("Production configuration errors: " + "; ".join(problems))
+
 
 settings = Settings()
+settings.validate_for_production()

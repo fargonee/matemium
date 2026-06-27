@@ -65,6 +65,13 @@ Or: `uvicorn matemium_server.app:app --reload --port 8080`
 
 **v1 chat:** desktop calls `/v1/chat/completions` with project context; user applies edits locally.
 
+Production-grade additions:
+- Per-plan rate limiting (free vs pro) on chat with `X-RateLimit-*` headers.
+- Structured request logging + `X-Request-ID`.
+- Global error responses + startup validation (stubs disabled in prod).
+- Basic AI usage counters surfaced in `/me` (used by dashboard Usage view).
+- Pagination + search on admin lists.
+
 **v2 agent:** desktop sends a **context bundle** (files, selection, last compile errors), receives tool calls (`view_file`, `edit_file`, `compile_manim`), executes them locally, and posts tool results until compile succeeds. See [`ai-agent-architecture.md`](../ai-agent-architecture.md) §10.
 
 ## Configuration

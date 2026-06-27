@@ -26,9 +26,14 @@ class SubscriptionResponse(BaseModel):
     current_period_end: str | None = None
 
 
+class UsageResponse(BaseModel):
+    ai_calls_count: int = 0
+
+
 class AccountResponse(BaseModel):
     profile: MeResponse
     subscription: SubscriptionResponse | None = None
+    usage: UsageResponse | None = None
 
 
 @router.get("/me", response_model=AccountResponse, operation_id="getMe")
@@ -38,6 +43,7 @@ async def get_me(
 ) -> AccountResponse:
     profile = await supabase.get_profile(user.id)
     sub = await supabase.get_latest_subscription(user.id)
+    ai_calls = await supabase.get_ai_calls_count(user.id)
 
     return AccountResponse(
         profile=MeResponse(
@@ -57,4 +63,5 @@ async def get_me(
             if sub
             else None
         ),
+        usage=UsageResponse(ai_calls_count=ai_calls),
     )

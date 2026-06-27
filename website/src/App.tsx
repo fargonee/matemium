@@ -4,13 +4,16 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { RootLayout } from "@/layouts/RootLayout";
+import { AdminLLMPage } from "@/pages/admin/AdminLLMPage";
 import { AdminOverviewPage } from "@/pages/admin/AdminOverviewPage";
 import { AdminSubscriptionsPage } from "@/pages/admin/AdminSubscriptionsPage";
 import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
 import { AuthCallbackPage } from "@/pages/AuthCallbackPage";
+import { DashboardAccountPage } from "@/pages/dashboard/DashboardAccountPage";
 import { DashboardBillingPage } from "@/pages/dashboard/DashboardBillingPage";
 import { DashboardDownloadsPage } from "@/pages/dashboard/DashboardDownloadsPage";
 import { DashboardOverviewPage } from "@/pages/dashboard/DashboardOverviewPage";
+import { DashboardUsagePage } from "@/pages/dashboard/DashboardUsagePage";
 import { AcceptableUsePage } from "@/pages/AcceptableUsePage";
 import { EULAPage } from "@/pages/EULAPage";
 import { HomePage } from "@/pages/HomePage";
@@ -43,8 +46,10 @@ export function App() {
             <Route element={<AuthGuard />}>
               <Route path="dashboard" element={<DashboardLayout />}>
                 <Route index element={<DashboardOverviewPage />} />
+                <Route path="usage" element={<DashboardUsagePage />} />
                 <Route path="billing" element={<DashboardBillingPage />} />
                 <Route path="downloads" element={<DashboardDownloadsPage />} />
+                <Route path="account" element={<DashboardAccountPage />} />
               </Route>
             </Route>
 
@@ -53,6 +58,7 @@ export function App() {
                 <Route index element={<AdminOverviewPage />} />
                 <Route path="users" element={<AdminUsersPage />} />
                 <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
+                <Route path="llm" element={<AdminLLMPage />} />
               </Route>
             </Route>
 

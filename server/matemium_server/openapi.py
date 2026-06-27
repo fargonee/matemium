@@ -12,6 +12,9 @@ WEBSITE_PATHS = {
     "/v1/admin/stats",
     "/v1/admin/users",
     "/v1/admin/subscriptions",
+    "/v1/admin/users/{user_id}",
+    "/v1/admin/subscriptions/{subscription_id}",
+    "/v1/admin/llm",
 }
 
 

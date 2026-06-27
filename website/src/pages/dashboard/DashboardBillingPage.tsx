@@ -12,7 +12,7 @@ export function DashboardBillingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const checkoutSuccess = searchParams.get("checkout") === "success";
 
-  const { data: account, refetch } = useGetMeQuery(undefined, { skip: !user });
+  const { data: account, refetch, isLoading, error } = useGetMeQuery(undefined, { skip: !user });
   const plan = account?.profile.plan ?? "free";
   const sub = account?.subscription;
 
@@ -26,6 +26,13 @@ export function DashboardBillingPage() {
       }, 1500);
     }
   }, [checkoutSuccess, user, refetch, setSearchParams]);
+
+  if (isLoading) {
+    return <div className="text-sm text-text-muted">Loading billing…</div>;
+  }
+  if (error) {
+    return <div className="text-sm text-red-300">Failed to load billing status.</div>;
+  }
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">

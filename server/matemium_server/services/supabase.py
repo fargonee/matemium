@@ -80,6 +80,24 @@ class SupabaseService:
     async def update_profile(self, user_id: str, data: dict[str, Any]) -> None:
         await self._rest_patch("profiles", {"id": f"eq.{user_id}"}, data)
 
+    async def get_detailed_user(self, user_id: str) -> dict[str, Any] | None:
+        """Return profile + latest subscription + usage for admin detail views."""
+        profile = await self.get_profile(user_id)
+        if not profile:
+            return None
+        sub = await self.get_latest_subscription(user_id)
+        ai_calls = await self.get_ai_calls_count(user_id)
+        profile["ai_calls_count"] = ai_calls
+        profile["subscription"] = sub
+        return profile
+
+    async def update_subscription(self, subscription_id: str, data: dict[str, Any]) -> None:
+        await self._rest_patch("subscriptions", {"id": f"eq.{subscription_id}"}, data)
+
+    async def get_total_ai_calls(self) -> int:
+        rows = await self._rest_get("profiles", {"select": "ai_calls_count"})
+        return sum(int(r.get("ai_calls_count") or 0) for r in rows)
+
     async def upsert_subscription(self, data: dict[str, Any]) -> None:
         await self._rest_post("subscriptions", data, upsert=True, on_conflict="lemon_subscription_id")
 
@@ -96,6 +114,27 @@ class SupabaseService:
             data,
         )
 
+    # --- Usage tracking (simple counters on profile for production dashboard) ---
+    async def get_ai_calls_count(self, user_id: str) -> int:
+        rows = await self._rest_get(
+            "profiles",
+            {"id": f"eq.{user_id}", "select": "ai_calls_count"},
+        )
+        if not rows:
+            return 0
+        return int(rows[0].get("ai_calls_count") or 0)
+
+    async def increment_ai_calls(self, user_id: str, amount: int = 1) -> int:
+        # Read-modify-write is acceptable for low volume. For higher contention use DB RPC.
+        current = await self.get_ai_calls_count(user_id)
+        new_count = current + amount
+        await self._rest_patch(
+            "profiles",
+            {"id": f"eq.{user_id}"},
+            {"ai_calls_count": new_count, "usage_updated_at": "now()"},
+        )
+        return new_count
+
     async def _rest_get(self, table: str, params: dict[str, str]) -> list[dict[str, Any]]:
         if not self._db_configured():
             return []
@@ -107,7 +146,8 @@ class SupabaseService:
                 headers=self._service_headers(),
             )
         if response.status_code != 200:
-            return []
+            # Raise to surface DB issues instead of silent empty results (prod observability)
+            raise RuntimeError(f"Supabase REST GET {table} failed: {response.status_code} {response.text}")
         return response.json()
 
     async def _rest_patch(
@@ -117,12 +157,14 @@ class SupabaseService:
             return
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            await client.patch(
+            response = await client.patch(
                 f"{self._base}/rest/v1/{table}",
                 params=match,
                 json=data,
                 headers={**self._service_headers(), "Prefer": "return=minimal"},
             )
+        if response.status_code >= 400:
+            raise RuntimeError(f"Supabase REST PATCH {table} failed: {response.status_code} {response.text}")
 
     async def _rest_post(
         self,
@@ -143,11 +185,13 @@ class SupabaseService:
             headers["Prefer"] = prefer
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            await client.post(
+            response = await client.post(
                 f"{self._base}/rest/v1/{table}",
                 json=data,
                 headers=headers,
             )
+        if response.status_code >= 400:
+            raise RuntimeError(f"Supabase REST POST {table} failed: {response.status_code} {response.text}")
 
     def _service_headers(self) -> dict[str, str]:
         return {
