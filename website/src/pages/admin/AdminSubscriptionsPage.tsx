@@ -7,7 +7,7 @@ export function AdminSubscriptionsPage() {
   if (error) {
     return (
       <Card className="border-red-500/40 bg-red-500/5 p-4 text-sm text-red-300">
-        Failed to load subscriptions. Admin access required on the backend.
+        Failed to load subscriptions.
       </Card>
     );
   }

@@ -7,7 +7,7 @@ export function AdminOverviewPage() {
   if (error) {
     return (
       <Card className="border-red-500/40 bg-red-500/5">
-        <p className="text-sm text-red-300">Failed to load admin stats. Are you an admin? Check that MATEMIUM_ADMIN_EMAILS includes your email on the server and that you are using the correct VITE_API_URL.</p>
+        <p className="text-sm text-red-300">Failed to load admin stats.</p>
       </Card>
     );
   }

@@ -180,9 +180,6 @@ jobs:
             echo "❌ No BUILD_ID available for deploy"
             exit 1
           fi
-          # Inject GitHub environment secrets/vars as runtimeEnvironment.
-          # This is required because we switched to GHA-driven deploys (no longer relying on
-          # env vars configured directly in the Northflank service UI for every deploy).
           RUNTIME_ENV=$(jq -n \
             --arg commit "$SHA" \
             --arg supabase_url "${{ secrets.MATEMIUM_SUPABASE_URL }}" \
@@ -222,12 +219,7 @@ jobs:
               "runtimeEnvironment": $runtime
             }')
 
-          echo "Using runtimeEnvironment keys: $(echo "$RUNTIME_ENV" | jq -r 'keys | .[]' | tr '\n' ' ')"
-          echo "Deploying with payload (sensitive values redacted in logs)"
 
-          if [ -z "$(echo "$RUNTIME_ENV" | jq -r '.MATEMIUM_SUPABASE_SERVICE_ROLE_KEY // ""')" ]; then
-            echo "❌ WARNING: MATEMIUM_SUPABASE_SERVICE_ROLE_KEY missing!"
-          fi
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "https://api.northflank.com/v1/projects/matemium/services/math/deployment" \

@@ -7,7 +7,7 @@ export function AdminUsersPage() {
   if (error) {
     return (
       <Card className="border-red-500/40 bg-red-500/5 p-4 text-sm text-red-300">
-        Failed to load users. You may not have admin access on the server (MATEMIUM_ADMIN_EMAILS) or the API token is not being sent.
+        Failed to load users.
       </Card>
     );
   }
@@ -40,8 +40,7 @@ export function AdminUsersPage() {
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-text-muted">
-                  No users yet. Profiles are created on first server-authenticated login
-                  (or via the DB trigger). Try signing in again or check Supabase profiles table.
+                  No users yet.
                 </td>
               </tr>
             ) : null}

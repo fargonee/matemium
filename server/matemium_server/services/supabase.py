@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import logging
 from functools import lru_cache
 from typing import Any
 
 import httpx
 
 from ..config import settings
-
-logger = logging.getLogger(__name__)
 
 
 class SupabaseService:
@@ -110,12 +107,6 @@ class SupabaseService:
                 headers=self._service_headers(),
             )
         if response.status_code != 200:
-            logger.warning(
-                "Supabase REST GET %s failed: status=%s body=%s",
-                table,
-                response.status_code,
-                response.text[:300],
-            )
             return []
         return response.json()
 
@@ -126,19 +117,12 @@ class SupabaseService:
             return
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.patch(
+            await client.patch(
                 f"{self._base}/rest/v1/{table}",
                 params=match,
                 json=data,
                 headers={**self._service_headers(), "Prefer": "return=minimal"},
             )
-            if resp.status_code >= 400:
-                logger.warning(
-                    "Supabase REST PATCH %s failed: status=%s body=%s",
-                    table,
-                    resp.status_code,
-                    resp.text[:300],
-                )
 
     async def _rest_post(
         self,
@@ -159,18 +143,11 @@ class SupabaseService:
             headers["Prefer"] = prefer
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
+            await client.post(
                 f"{self._base}/rest/v1/{table}",
                 json=data,
                 headers=headers,
             )
-            if resp.status_code >= 400:
-                logger.warning(
-                    "Supabase REST POST %s failed: status=%s body=%s",
-                    table,
-                    resp.status_code,
-                    resp.text[:300],
-                )
 
     def _service_headers(self) -> dict[str, str]:
         return {
