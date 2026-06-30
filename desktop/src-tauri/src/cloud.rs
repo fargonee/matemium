@@ -41,6 +41,11 @@ pub struct ChatCompletionRequest {
     pub project_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scenes_excerpt: Option<String>,
+    // New fields for LLM selection (BYO personal keys or platform pool)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub llm_provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub use_personal_llm: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,6 +112,45 @@ pub async fn login(
     Ok(extract_access_token(&token))
 }
 
+// For production Supabase Google sign-in: exchange web access_token
+pub async fn login_with_session(
+    settings: &Settings,
+    access_token: &str,
+) -> Result<String, String> {
+    let base = settings.server_url.trim_end_matches('/');
+    let url = format!("{base}/v1/auth/session");
+
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("http client: {e}"))?;
+
+    #[derive(Serialize)]
+    struct SessionBody {
+        access_token: String,
+    }
+
+    let response = client
+        .post(url)
+        .json(&SessionBody { access_token: access_token.to_string() })
+        .send()
+        .await
+        .map_err(|e| format!("session auth failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("session HTTP {status}: {body}"));
+    }
+
+    let token = response
+        .json::<TokenResponse>()
+        .await
+        .map_err(|e| format!("parse session response: {e}"))?;
+
+    Ok(extract_access_token(&token))
+}
+
 pub async fn chat(
     settings: &Settings,
     request: ChatCompletionRequest,
@@ -150,6 +194,91 @@ pub async fn chat_raw(
 ) -> Result<Value, String> {
     let response = chat(settings, request).await?;
     serde_json::to_value(response).map_err(|e| format!("serialize chat response: {e}"))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioSpeechRequest {
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voice: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tts_provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub use_personal_llm: Option<bool>,
+}
+
+pub async fn generate_audio(
+    settings: &Settings,
+    request: AudioSpeechRequest,
+) -> Result<Vec<u8>, String> {
+    let base = settings.server_url.trim_end_matches('/');
+    let url = format!("{base}/v1/audio/speech");
+
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .map_err(|e| format!("http client: {e}"))?;
+
+    let mut req = client.post(url).json(&request);
+    if let Some(token) = &settings.api_token {
+        req = req.header("Authorization", format!("Bearer {token}"));
+    }
+
+    let response = req
+        .send()
+        .await
+        .map_err(|e| format!("audio request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "<empty body>".to_string());
+        return Err(format!("audio HTTP {status}: {body}"));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("read audio bytes: {e}"))?;
+    Ok(bytes.to_vec())
+}
+
+pub async fn get_profile(settings: &Settings) -> Result<Value, String> {
+    let base = settings.server_url.trim_end_matches('/');
+    let url = format!("{base}/v1/me");
+
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("http client: {e}"))?;
+
+    let mut req = client.get(url);
+    if let Some(token) = &settings.api_token {
+        req = req.header("Authorization", format!("Bearer {token}"));
+    }
+
+    let response = req
+        .send()
+        .await
+        .map_err(|e| format!("profile request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "<empty body>".to_string());
+        return Err(format!("profile HTTP {status}: {body}"));
+    }
+
+    response
+        .json::<Value>()
+        .await
+        .map_err(|e| format!("parse profile response: {e}"))
 }
 
 #[cfg(test)]

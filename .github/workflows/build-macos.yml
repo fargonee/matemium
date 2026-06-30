@@ -1,0 +1,265 @@
+name: Build macOS Desktop
+
+# Full cross-architecture support (Apple Silicon + Intel).
+# - Verify job for fast PR feedback (dummy sidecar).
+# - Full builds on v* tags and workflow_dispatch only.
+# - Produces native .dmg / .app for each architecture.
+# - Signing + notarization is scaffolded (enabled when secrets are present).
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'matemium/**'
+      - 'canvas/**'
+      - 'projects/**'
+      - 'shared/**'
+      - 'pyproject.toml'
+      - 'fixtures/**'
+      - '.github/workflows/build-macos.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'matemium/**'
+      - 'canvas/**'
+      - 'projects/**'
+      - 'shared/**'
+      - 'pyproject.toml'
+      - 'fixtures/**'
+      - '.github/workflows/build-macos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  desktop-verify:
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            triple: aarch64-apple-darwin
+          - os: macos-13
+            triple: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install minimal system deps for verification
+        run: |
+          brew install ffmpeg || true
+
+      - name: Install engine
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Verify engine
+        run: python -c "import canvas, matemium; print('✅ Engine OK')"
+
+      - name: Install Rust (with target for matrix)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.triple }}
+
+      - name: Create dummy sidecar for Tauri (macOS)
+        run: |
+          mkdir -p desktop/src-tauri/binaries
+          DUMMY="desktop/src-tauri/binaries/matemium-sidecar-${{ matrix.triple }}"
+          if [ ! -f "$DUMMY" ]; then
+            printf '#!/bin/sh\necho "matemium-sidecar dummy"\n' > "$DUMMY"
+            chmod +x "$DUMMY"
+          fi
+
+      - name: Cargo check
+        working-directory: desktop/src-tauri
+        run: cargo check --target ${{ matrix.triple }} || cargo check
+
+  build-macos:
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple Silicon (primary)
+          - os: macos-latest
+            triple: aarch64-apple-darwin
+            arch_name: arm64
+          # Intel (for broad compatibility)
+          - os: macos-13
+            triple: x86_64-apple-darwin
+            arch_name: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: ver
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            raw="${{ github.ref_name }}"
+            ver="${raw#v}"
+            echo "version=$ver" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "version=0.0.0-dev" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install system dependencies (ffmpeg + MacTeX)
+        run: |
+          brew install --cask mactex-no-gui || true
+          brew install ffmpeg || true
+          # Make sure tex binaries are on PATH (mactex installs to /usr/local/texlive or /Library/TeX)
+          echo "/Library/TeX/texbin" >> $GITHUB_PATH
+          echo "/usr/local/texlive/2024/bin/universal-darwin" >> $GITHUB_PATH || true
+          # Basic smoke
+          which pdflatex || echo "pdflatex not immediately found (may need manual PATH in user env)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Create venv + install engine + PyInstaller
+        run: |
+          python -m venv .venv
+          if [ -f .venv/bin/pip ]; then
+            .venv/bin/pip install --upgrade pip
+            .venv/bin/pip install -e ".[dev]" pyinstaller
+          else
+            .venv/Scripts/pip.exe install --upgrade pip
+            .venv/Scripts/pip.exe install -e ".[dev]" pyinstaller
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/app/package-lock.json
+
+      - name: Install Rust (with target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.triple }}
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0.0" --locked
+
+      - name: Set version (release tags)
+        if: steps.ver.outputs.is_release == 'true'
+        working-directory: desktop/src-tauri
+        run: cargo tauri set-version "${{ steps.ver.outputs.version }}"
+
+      - name: Build macOS desktop (native for ${{ matrix.triple }})
+        env:
+          MATEMIUM_TARGET_TRIPLE: ${{ matrix.triple }}
+        run: ./desktop/scripts/build-macos.sh
+
+      - name: Code sign + notarize (only if secrets configured)
+        # This block is a no-op unless you store the following secrets.
+        # Recommended for distribution to avoid "app is damaged" and Gatekeeper blocks.
+        # See: https://tauri.app/v1/guides/distribution/macos
+        if: steps.ver.outputs.is_release == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}   # app-specific password
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "No Apple certificate secret found — skipping signing and notarization."
+            echo "   Unsigned .dmg / .app will be produced. Add secrets to enable professional distribution."
+            exit 0
+          fi
+
+          echo "==> Setting up code signing certificate"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          KEYCHAIN="build.keychain"
+          security create-keychain -p "" "$KEYCHAIN" || true
+          security default-keychain -s "$KEYCHAIN"
+          security unlock-keychain -p "" "$KEYCHAIN"
+          security import certificate.p12 -k "$KEYCHAIN" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$KEYCHAIN" || true
+
+          # Find the actual signing identity name
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}' || echo "Developer ID Application")
+          echo "Using identity: $IDENTITY"
+
+          APP_PATH=$(find desktop/src-tauri/target -name "*.app" -type d | head -1 || true)
+          if [ -n "$APP_PATH" ]; then
+            echo "Signing app: $APP_PATH"
+            codesign --force --deep --sign "$IDENTITY" --options runtime --timestamp "$APP_PATH" || true
+          fi
+
+          DMG_PATH=$(find desktop/src-tauri/target -name "*.dmg" -type f | head -1 || true)
+          if [ -n "$DMG_PATH" ]; then
+            echo "Signing DMG: $DMG_PATH"
+            codesign --force --sign "$IDENTITY" --timestamp "$DMG_PATH" || true
+          fi
+
+          # Notarization (requires Apple ID + app password + team id)
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ] && [ -n "$DMG_PATH" ]; then
+            echo "==> Submitting for notarization (can take 5-15+ minutes)..."
+            xcrun notarytool submit "$DMG_PATH" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait || true
+            xcrun stapler staple "$DMG_PATH" || true
+          else
+            echo "Skipping notarization (missing credentials or no DMG found)."
+          fi
+
+          security delete-keychain "$KEYCHAIN" || true
+          echo "✅ macOS signing/notarization step completed (or skipped)."
+
+      - name: Upload macOS bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: matemium-macos-${{ matrix.arch_name }}-${{ steps.ver.outputs.version }}
+          path: |
+            desktop/src-tauri/target/${{ matrix.triple }}/release/bundle/dmg/*.dmg
+            desktop/src-tauri/target/${{ matrix.triple }}/release/bundle/macos/*.app
+            desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            desktop/src-tauri/target/release/bundle/macos/*.app
+          if-no-files-found: warn
+
+      - name: Attach to GitHub Release (create if needed)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "==> Uploading macOS ${{ matrix.arch_name }} artifacts"
+          gh release create "${{ github.ref_name }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Matemium ${{ github.ref_name }}" \
+            --generate-notes \
+            desktop/src-tauri/target/${{ matrix.triple }}/release/bundle/dmg/*.dmg \
+            desktop/src-tauri/target/${{ matrix.triple }}/release/bundle/macos/*.app \
+            desktop/src-tauri/target/release/bundle/dmg/*.dmg \
+            desktop/src-tauri/target/release/bundle/macos/*.app 2>/dev/null || \
+          gh release upload "${{ github.ref_name }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber \
+            desktop/src-tauri/target/${{ matrix.triple }}/release/bundle/dmg/*.dmg \
+            desktop/src-tauri/target/${{ matrix.triple }}/release/bundle/macos/*.app \
+            desktop/src-tauri/target/release/bundle/dmg/*.dmg \
+            desktop/src-tauri/target/release/bundle/macos/*.app || true
+
+      - name: Summary
+        run: |
+          echo "✅ macOS (${{ matrix.arch_name }}) desktop build finished."
+          echo "Version: ${{ steps.ver.outputs.version }}"

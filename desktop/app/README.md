@@ -17,11 +17,26 @@ Vite + React + Monaco editor for the Tauri shell.
 
 ## Dev
 
+First install dependencies (once):
+
 ```bash
-cd desktop/app && npm install && npm run dev
-# or full desktop loop:
-cd desktop/src-tauri && cargo tauri dev
+cd desktop/app && npm install
 ```
+
+Then either:
+
+```bash
+# Standalone frontend only
+cd desktop/app && npm run dev
+```
+
+or (recommended for full app):
+
+```bash
+cd desktop && cargo tauri dev
+```
+
+(The `cargo tauri dev` command will automatically start Vite for you via `beforeDevCommand`.)
 
 ## Build
 

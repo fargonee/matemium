@@ -42,6 +42,7 @@ from .dsl import (
     CameraFocus,
     CameraInspect,
     CameraMove,
+    CameraKeyframe,  # Phase 3
     CanvasElement,
     CanvasSettings,
     PlotTrace,
@@ -50,6 +51,9 @@ from .dsl import (
     SolidRotate,
     TimelineItem,
     TransformElement,
+    TapeObject,
+    WorldObject,
+    WorldTransform,
 )
 from .solids import place_solid_on_tape
 from .focus import FocusEngine
@@ -86,6 +90,10 @@ class CanvasScene(ThreeDScene):
         self.settings: CanvasSettings = dsl.canvas_settings
         self.registry = MobjectRegistry(viewport_margin=3.0)
         self.camera_ctl: CameraController | None = None
+        # Phase 3
+        self.root_tape = getattr(dsl, "root_tape", None)
+        # Phase 8
+        self._world_objects: dict[str, Mobject] = {}
 
         # Store specs for all revealed elements (needed for static export with pre-defined static states)
         self._element_specs: dict[str, CanvasElement] = {}
@@ -100,7 +108,37 @@ class CanvasScene(ThreeDScene):
             existing_camera=self.camera,   # critical: reuse the one provided by the scene
         )
 
-        # IMPORTANT: No pre-instantiation of elements.
+        # Phase 8/10: build world object graph if using new 3D model.
+        # Default identity root_tape keeps classic lazy reveal + play() counts for narrative "writing".
+        # Only pre-build tape contents when tape has explicit pose or mixed with free root_objects.
+        has_root_objs = bool(getattr(self.dsl, 'root_objects', None))
+        tape = getattr(self, 'root_tape', None)
+        tape_non_default = False
+        if tape:
+            wt = tape.world_transform or WorldTransform()
+            tape_non_default = (
+                any(abs(float(c)) > 1e-9 for c in wt.position.as_tuple()) or
+                any(abs(float(c)) > 1e-9 for c in wt.rotation.as_tuple()) or
+                abs(float(wt.scale) - 1.0) > 1e-9
+            )
+
+        do_3d_prebuild = has_root_objs or tape_non_default
+        if do_3d_prebuild:
+            if has_root_objs:
+                for wo in self.dsl.root_objects:
+                    self._build_world_object(wo)
+            if tape and tape_non_default:
+                self._build_tape_at_transform(tape)
+
+            # 3D camera for non-default world content
+            self.camera_ctl._view_mode = "inspect"
+            self.camera.use_orthographic_projection = False
+        # else: default tape at identity -> full legacy lazy path (play counts, reveals preserved)
+
+        # For 3D model: objects pre-built with transforms.
+        # Execute full timeline; element reveals will skip build if pre-added (only for the prebuilt ones)
+
+        # IMPORTANT: No pre-instantiation of elements. (legacy sheet path)
         # Elements are LAZILY created and added only when their entry appears in the timeline.
         # This is a core feature of Matemium:
         #   - Content materializes ("is written") as the narrative/camera reaches it.
@@ -115,6 +153,8 @@ class CanvasScene(ThreeDScene):
                 self._handle_flex_group_reveal(payload)
             elif isinstance(payload, CameraMove):
                 self._handle_camera_move(payload)
+            elif isinstance(payload, CameraKeyframe):
+                self._handle_camera_keyframe(payload)
             elif isinstance(payload, CanvasElement):
                 self._handle_element_reveal(payload)
             elif isinstance(payload, TransformElement):
@@ -256,6 +296,20 @@ class CanvasScene(ThreeDScene):
             # After arrival, resume relevant updaters
             self.registry.pause_far_updaters(target_y, buffer=3.5)
 
+    def _handle_camera_keyframe(self, kf: CameraKeyframe):
+        """Phase 3: handle generalized CameraKeyframe / observation.
+        Resolves target (world point / object / tape scroll) and delegates
+        to camera_ctl.observe_target, passing tape if available (root_tape).
+        """
+        target = kf.target
+        if self.camera_ctl:
+            self.camera_ctl.observe_target(
+                target,
+                run_time=getattr(kf, "duration", getattr(kf, "run_time", 2.0)),
+                rate_func=self._get_rate_func(getattr(kf, "rate_func", "smooth")),
+                tape=self.root_tape,
+            )
+
     def _should_auto_focus(self, elem: CanvasElement) -> bool:
         """Overlays (e.g. grid marks) stay on an already-framed board — no re-pan."""
         return elem.auto_focus and elem.type != "GridMark"
@@ -294,20 +348,31 @@ class CanvasScene(ThreeDScene):
         pos = None
         if first_time:
             # Lazy instantiation - the key "not pre-written" behavior
+            # Phase 8: in 3D prebuilt path, may already exist
             mob = self._build_mobject(elem)
             if mob is None:
                 return
-            pos = np.array(elem.canvas_position, dtype=float)
+            # Phase 8: prefer world_transform position for 3D world model
+            wt = getattr(elem, 'world_transform', None)
+            if wt and hasattr(wt, 'position'):
+                p = wt.position
+                pos = np.array(p.as_tuple() if hasattr(p, 'as_tuple') else p, dtype=float)
+            else:
+                pos = np.array(elem.canvas_position, dtype=float)
             if elem.type == "Solid3D":
                 place_solid_on_tape(mob, tuple(pos), elem.content)
                 pos = mob.get_center()
             else:
                 mob.move_to(pos)
-            # Register early so the element is known in the model (for visibility, re-use, etc.)
-            # even during its entry animation. State behavior (updaters) attached after
-            # introduction so idle animations (e.g. 3D rotation) start cleanly right after
-            # the element has appeared, without delay or concurrent with FadeIn/Write.
-            self.registry.register(elem.id, mob, pos[1], elem.canvas_position)
+            # Register early ...
+            self.registry.register(elem.id, mob, pos[1] if len(pos)>1 else 0, tuple(pos))
+
+        # Phase 8: if prebuilt in 3D world graph, skip re-reveal/add/anim
+        if getattr(self, '_world_objects', None) and elem.id in self._world_objects:
+            if first_time:
+                self._setup_state_behavior(elem, mob)
+                self._apply_billboard_labels(elem, mob)
+            return
 
         if not play_animation:
             # Static path (exports etc.): add in final rendered state, no entry anims played,
@@ -322,7 +387,10 @@ class CanvasScene(ThreeDScene):
 
         # === Animated reveal path (the main video "as it scrolls" case) ===
         # Scroll so new content appears at the viewport center (not drifting to the bottom).
-        if first_time:
+        # Phase 8: skip sheet focus for elements with explicit world position
+        wt = getattr(elem, 'world_transform', None)
+        has_world_pos = wt and getattr(wt, 'position', None) and any(getattr(wt.position, 'x', 0) or getattr(wt.position, 'y', 0) or getattr(wt.position, 'z', 0) for _ in [1])
+        if first_time and not has_world_pos:
             self._focus_on_element(elem)
 
         # Sheet plane (z=0) is the default. Tilt only for 3D surfaces; return to sheet
@@ -369,10 +437,24 @@ class CanvasScene(ThreeDScene):
         final static state instantly with no entry animations. This is used for
         full sheet PNG/PDF exports so we get clean "after writing" screenshots
         without the Write/FadeIn sequences playing.
+        Phase 8: also populates from root_objects / tape if present.
         """
         if dsl is None:
             dsl = self.dsl
-        for item in dsl.timeline:
+        # Phase 8: 3D world objects
+        if getattr(dsl, 'root_objects', None):
+            for wo in dsl.root_objects:
+                # for export, build with play=False
+                if wo.element:
+                    self._handle_element_reveal(wo.element, play_animation=play_entries)
+                for child in wo.children:
+                    if child.element:
+                        self._handle_element_reveal(child.element, play_animation=play_entries)
+        if getattr(dsl, 'root_tape', None) and getattr(dsl.root_tape, 'local_elements', None):
+            for elem in dsl.root_tape.local_elements:
+                self._handle_element_reveal(elem, play_animation=play_entries)
+        # legacy
+        for item in getattr(dsl, 'timeline', []):
             if isinstance(item, CanvasElement):
                 self._handle_element_reveal(item, play_animation=play_entries)
 
@@ -498,6 +580,53 @@ class CanvasScene(ThreeDScene):
         """Create the Manim mobject via the shared measure/build pipeline."""
         return build_mobject(elem, surface_factory=self._make_default_surface)
 
+    def _build_world_object(self, wo: WorldObject) -> None:
+        """Phase 8: build a WorldObject in world space."""
+        if wo.element:
+            if isinstance(wo.element, dict):
+                # from json, minimal support; full reconstruction later
+                return
+            mob = self._build_mobject(wo.element)
+            if mob:
+                wt = wo.transform or WorldTransform()
+                pos = wt.position.as_tuple() if hasattr(wt.position, 'as_tuple') else getattr(wt, 'position', (0,0,0))
+                mob.move_to(pos)
+                # apply rotation if 3D support
+                if hasattr(mob, 'rotate') and wt.rotation:
+                    # simple apply, manim 3d rotation
+                    pass  # extend as needed
+                self.add(mob)
+                self._world_objects[wo.id] = mob
+                self.registry.register(wo.id, mob, pos[1] if len(pos)>1 else 0, pos)
+                if wo.element:
+                    self._element_specs[wo.id] = wo.element
+        for child in wo.children:
+            self._build_world_object(child)
+
+    def _build_tape_at_transform(self, tape: TapeObject) -> None:
+        """Phase 8: build tape's local content as a group placed at tape's world transform."""
+        if not tape.local_elements:
+            return
+        tape_group = VGroup()
+        for elem in tape.local_elements:
+            mob = self._build_mobject(elem)
+            if mob:
+                # local position inside tape
+                local_pos = getattr(elem, 'canvas_position', (0,0,0))
+                mob.move_to(local_pos)
+                tape_group.add(mob)
+                # also register individual for actions on id
+                self.registry.register(elem.id, mob, local_pos[1] if len(local_pos)>1 else 0, local_pos)
+                self._element_specs[elem.id] = elem
+        # place group at tape world transform
+        wt = tape.world_transform or WorldTransform()
+        pos = wt.position.as_tuple() if hasattr(wt.position, 'as_tuple') else (0,0,0)
+        tape_group.move_to(pos)
+        # rotations would be applied here for 3D
+        self.add(tape_group)
+        self._world_objects[tape.id] = tape_group
+        self.registry.register(tape.id, tape_group, pos[1] if len(pos)>1 else 0, pos)
+
     def _make_default_surface(self, equation: str | None = None):
         """Render-quality 3D surface parsed from the element equation."""
         return make_render_surface(equation)
@@ -564,6 +693,11 @@ class CanvasScene(ThreeDScene):
             out_path = filename.with_suffix(".png")
 
         print(f"[export] Preparing full static sheet export ({format.upper()})...")
+
+        # Phase 8: 3D world support
+        is_3d = bool(getattr(self, '_world_objects', None) or getattr(self, 'root_tape', None))
+        if is_3d and camera_preset == "auto":
+            camera_preset = "isometric"
 
         # 1. Get all revealed mobjects + their specs
         entries = list(self.registry._store.values())

@@ -46,6 +46,7 @@ Events may arrive **between** the request write and the matching response line. 
 | `check_project` | `workspace`, (`scene`?) | `{ ok, errors[], warnings[], scene, timeline_length?, title? }` |
 | `list_scenes` | `workspace` | `{ scenes[], workspace }` |
 | `render_project` | `workspace`, (`scene`?, `quality`, `output_dir`) | `{ video, workspace, scene, duration_estimate }` |
+| `get_preview_data` | `{ projectId }` (maps to workspace + optional scene) | `{ elements: PreviewElement[], frame_width, frame_height, title?, orientation? }` — drives the manim-web live preview with authoritative layout |
 
 Optional: `path` — alternate scenes file relative to workspace (default `scenes.py`).
 

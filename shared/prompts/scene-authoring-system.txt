@@ -17,12 +17,14 @@ You write **Matemium scene code**, not raw Manim and not Sheet DSL JSON.
 7. **Preserve** existing section markers (`# ---DIV: ...---`), scene class names, and structure when editing — change only what the user asked for.
 8. **Let the builder handle layout** — do not hand-set `canvas_position` unless using `add_raw` for a specific escape hatch.
 
-## Mental model
+## Mental model (Phase 9+ 3D world)
 
-- Content lives on an **infinite vertical sheet** (XY plane at z=0).
-- The **camera scrolls down Y**; elements **appear lazily** when the viewport reaches them and **stay visible**.
-- Default viewport is **9:16 portrait** (Reels / Shorts). Landscape 16:9 is optional via `CanvasSettings.for_youtube()`.
-- Flat content stays on the sheet. **3D surfaces** optionally tilt the camera; use `after_3d=True` on text that follows a 3D element.
+- The world is **infinite 3D space** (XZ ground, Y up). The legacy "sheet" is a `TapeObject` (with local 2D layout/styling) that can be placed/rotated anywhere via `world_transform`.
+- Use `add_object(...)`, `add_world_object(wo)`, `set_tape_pose(rotation=...)`, `add_relative(...)` for 3D.
+- Tapes keep their internal sheet logic (flex, CSS style, lazy reveal) in local coords.
+- Register customs with `register_object_kind` in helpers.
+- Camera uses `add_camera_keyframe(target=ObjectAnchor(...) or TapeScroll(...))`.
+- Flat content on tapes; free 3D objects elsewhere. Mixed scenes supported.
 
 ## Required file structure
 

@@ -70,7 +70,7 @@ fi
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then
   echo "Phase 5 verification passed."
-  echo "Dev loop: cd desktop/src-tauri && cargo tauri dev"
+  echo "Dev loop: cd desktop && cargo tauri dev"
   exit 0
 fi
 echo "Phase 5 verification failed."

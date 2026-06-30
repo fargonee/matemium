@@ -49,7 +49,8 @@ class Settings(BaseSettings):
     cors_origins: str = (
         "http://localhost:5173,http://127.0.0.1:5173,"
         "http://localhost:4173,http://127.0.0.1:4173,"
-        "tauri://localhost,http://localhost,http://127.0.0.1"
+        "tauri://localhost,http://localhost,http://127.0.0.1,"
+        "https://p01--math--zjvwyx4fjqbn.code.run,https://*.code.run"
     )
 
     # Rate limiting (requests per minute). Applied primarily to chat.

@@ -87,15 +87,20 @@ Run it:
 - 3D graphs optionally **tilt** the camera; flat content does not force a “2D mode” switch each time
 - `add_camera_move(dy=...)` / `auto_camera()` — explicit scroll when needed
 
-**3D solids & inspection**
+**3D world model (Phase 10 — canonical)**
 
-- `add_solid(shape="cube"|"sphere", size=..., id=...)` — volumetric primitive on the tape (straddles `z = 0`)
-- `add_solid(..., parts=[{...}, {...}])` — multi-part group (e.g. cube + inscribed sphere)
-- `add_solid_lift(element_id, lift=...)` — raise a solid above the sheet for orbit inspection
-- `add_camera_inspect(element_id, path=[...])` — keyframe camera tour around a solid
-- `builder.inspect_shot(phi=..., theta=..., hold=..., run_time=...)` — one keyframe in an inspect path
+The "sheet" is a `TapeObject` inside infinite 3D space (XZ ground, Y height). Tapes can be placed/rotated arbitrarily; their internal content uses local 2D layout/styling.
+Old sheet authoring remains the default path for narrative videos (full compat).
 
-Topic compositions (e.g. inscribed cube+sphere pairs) belong in `projects/<name>/helpers.py`.
+- `add_object("Solid3D", position=(x,y,z), rotation=..., content=...)` or `add_world_object(wo)`
+- Relative placement: `add_relative("base_id", elem, (dx,dy,0), anchor="center")`; `place_relative_to(...)`; `set_tape_pose(rotation=(30,0,0))`
+- Context for sub-content: `with builder.in_object_space("tape42"): builder.add_text("local to tape")`
+- Register custom kinds (no core patches): `register_object_kind("MyDiagram", build=..., measure=..., observe=..., preview=...)`
+- Camera: `add_camera_keyframe(target=ObjectAnchor("obj", "center") or TapeScroll("tape", local_y=5))`
+
+Legacy `add_solid` etc. still work on default tape. Use `projects/.../helpers.py` for compositions.
+
+See 3D-model.md for full details.
 
 **Escape hatch**
 

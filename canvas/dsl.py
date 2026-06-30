@@ -10,6 +10,9 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Literal, Optional, Union, List, Dict
 
+# Phase 1: world transforms (forward import to avoid cycles)
+from .coords import WorldTransform, Vector3
+
 
 @dataclass
 class EntryAnimation:
@@ -61,17 +64,35 @@ class LayoutBox:
 
 @dataclass
 class CanvasElement:
-    """A structural element anchored at an explicit (x, y, z) canvas coordinate."""
+    """A structural element anchored at an explicit (x, y, z) canvas coordinate.
+
+    The `type` is intentionally a plain string (not a closed Literal) to keep the
+    core engine granular and abstract.
+
+    Core primitives (handled generically by layout + scene + preview):
+      Text, MathTex, VGroup, Axes, NumberPlane, ParametricFunction, Dot, Arrow,
+      Image, SVG, ...
+
+    Everything else (QuadraticPlot, Solid3D, GridBoard, lesson-specific diagrams,
+    etc.) should ideally be expressed via composition (VGroups + styling) or
+    registered as custom kinds so that the engine does not grow object/lesson
+    specific knowledge.
+
+    This is the main reason we have the CSS-like `style={}` + flex + LayoutEngine.
+    """
     id: str
-    type: Literal[
-        "MathTex", "Text", "ThreeDGraph", "Surface", "Solid3D", "Axes",
-        "NumberPlane", "ParametricFunction", "VGroup", "Dot", "Arrow",
-        "Image", "SVG", "GridBoard", "GridMark", "QuadraticPlot",
-        "QuadraticPlotPair",
-    ]
+    type: str  # was a closed Literal; kept open for abstraction + extensibility
     content: Optional[Union[str, Dict[str, Any]]] = None
-    # (x, y, z) — tape lives on the XY plane; default z=0 (see canvas/coords.py).
+    # (x, y, z) — legacy for sheet/tape local position (backward compat)
     canvas_position: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+    # Phase 1: World 3D transform for the unified space model.
+    # The tape (legacy sheet) is implicitly a TapeObject at identity for now.
+    world_transform: WorldTransform = field(default_factory=WorldTransform)
+
+    # Optional: which parent object this lives under (for relative positioning later)
+    parent_object_id: Optional[str] = None
+
     layout: Optional[LayoutBox] = None
     entry_animation: Optional[EntryAnimation] = None
     state_behavior: Optional[StateBehavior] = None
@@ -92,6 +113,27 @@ class CanvasElement:
     # Consecutive timeline items sharing a flex_group reveal together (one scroll, one play).
     flex_group: Optional[str] = None
 
+    def get_anchor(self, anchor: str = "center") -> Vector3:
+        """Simple anchor for CanvasElement (local to its space)."""
+        if anchor == "center":
+            return Vector3(0, 0, 0)
+        if anchor.startswith("local:"):
+            try:
+                p = [float(x) for x in anchor[6:].split(",")]
+                return Vector3(p[0], p[1], p[2] if len(p)>2 else 0)
+            except:
+                pass
+        # use canvas_position as local
+        if hasattr(self, 'canvas_position'):
+            return Vector3.from_tuple(self.canvas_position)
+        return Vector3(0, 0, 0)
+
+    def __post_init__(self):
+        # Phase 1 compat: if world_transform not set but canvas_position has data, seed it.
+        if self.canvas_position != (0.0, 0.0, 0.0):
+            if self.world_transform.position.x == 0.0 and self.world_transform.position.y == 0.0 and self.world_transform.position.z == 0.0:
+                self.world_transform.position = Vector3.from_tuple(self.canvas_position)
+
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
         if self.layout is None:
@@ -100,12 +142,16 @@ class CanvasElement:
             d.pop("entry_animation", None)
         if self.state_behavior is None:
             d.pop("state_behavior", None)
+        # Include world_transform explicitly (it uses its own to_dict inside asdict? but ensure)
+        d["world_transform"] = self.world_transform.to_dict()
         return d
 
 
 @dataclass
 class CameraMove:
-    """Viewport movement along the infinite Y (scroll) axis."""
+    """Viewport movement along the infinite Y (scroll) axis.
+    Kept for backward compat. Phase 3 generalizes to CameraObservation / keyframes.
+    """
     id: str
     type: Literal["CameraMove"] = "CameraMove"
     target_position: tuple[float, float, float] = (0.0, 0.0, 0.0)
@@ -114,6 +160,52 @@ class CameraMove:
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+
+# Phase 3: Generalized camera observation system (per 3D world model docs)
+# Keyframes target world points, objects, or tape-specific scroll.
+# When targeting TapeObject, uses special local framing + scroll+reveal protocol.
+@dataclass
+class WorldPoint:
+    position: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+@dataclass
+class ObjectAnchor:
+    object_id: str
+    anchor: str = "center"  # "center", "top", "local_y:xx" etc.
+
+@dataclass
+class TapeScroll:
+    tape_id: str
+    local_y: float
+    framing_mode: str = "sheet"  # "sheet", "zoomed", etc.
+
+ObservationTarget = Union[WorldPoint, ObjectAnchor, TapeScroll]
+
+@dataclass
+class CameraKeyframe:
+    """General camera keyframe / observation in 3D space.
+    target can be absolute world point or relative to object (with special tape handling).
+    """
+    id: str
+    time: float = 0.0
+    target: ObservationTarget = field(default_factory=WorldPoint)
+    duration: float = 2.0
+    rate_func: str = "smooth"
+    # optional params like look_at_offset, distance, etc.
+    params: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = asdict(self)
+        d["type"] = "CameraKeyframe"  # ensure from_dict roundtrips
+        # simplify target for serialization
+        if isinstance(self.target, WorldPoint):
+            d["target"] = {"kind": "world_point", "position": self.target.position}
+        elif isinstance(self.target, ObjectAnchor):
+            d["target"] = {"kind": "object_anchor", "object_id": self.target.object_id, "anchor": self.target.anchor}
+        elif isinstance(self.target, TapeScroll):
+            d["target"] = {"kind": "tape_scroll", "tape_id": self.target.tape_id, "local_y": self.target.local_y, "framing_mode": self.target.framing_mode}
+        return d
 
 
 @dataclass
@@ -241,10 +333,119 @@ class CameraFocus:
         return asdict(self)
 
 
+# Phase 1: Minimal WorldObject / scene graph concept.
+# This is the foundation for treating the tape as one object among many in 3D space.
+# Existing CanvasElement can be wrapped; full TapeObject comes in later phases.
+@dataclass
+class WorldObject:
+    """An object in the unified 3D world space.
+
+    - id: stable identifier
+    - element: the visual payload (for Phase 1 mostly CanvasElement)
+    - transform: position/orientation/scale in world space
+    - children: nested objects (allows composition, future nested tapes)
+    """
+    id: str
+    element: Optional[CanvasElement] = None
+    transform: WorldTransform = field(default_factory=WorldTransform)
+    children: List["WorldObject"] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "element": self.element.to_dict() if self.element and hasattr(self.element, "to_dict") else (self.element if self.element else None),
+            "transform": self.transform.to_dict(),
+            "children": [c.to_dict() for c in self.children],
+        }
+
+    def get_anchor(self, anchor: str = "center") -> Vector3:
+        """Basic anchor for general WorldObject (delegate to element if possible, else center)."""
+        if self.element and hasattr(self.element, 'get_anchor'):
+            return self.element.get_anchor(anchor)
+        if anchor == "center":
+            return Vector3(0, 0, 0)
+        # simple local parse
+        if anchor.startswith("local:"):
+            try:
+                parts = anchor[6:].split(",")
+                return Vector3(float(parts[0]), float(parts[1]), float(parts[2]) if len(parts)>2 else 0)
+            except:
+                pass
+        return Vector3(0, 0, 0)
+
+    def get_surface_info(self) -> dict:
+        if self.element and hasattr(self.element, 'get_surface_info'):
+            return self.element.get_surface_info()
+        return {"is_planar": False}
+
+
+@dataclass
+class TapeObject:
+    """TapeObject represents the legacy infinite 'sheet' or 'tape' as a first-class
+    object inside the 3D world.
+
+    It has a world_transform (so the tape plane can be positioned/rotated in 3D space),
+    but its content (local_elements) lives in a local 2D coordinate system where the
+    existing LayoutEngine, CSS-like styling, flex, lazy reveal etc. apply.
+
+    In Phase 2, the builder's content is conceptually the local content of a root TapeObject.
+    """
+    id: str
+    world_transform: WorldTransform = field(default_factory=WorldTransform)
+    local_elements: List[CanvasElement] = field(default_factory=list)
+    local_canvas_settings: Optional[CanvasSettings] = None
+    # Future: local size, surface for 3D rendering, etc.
+
+    def get_anchor(self, anchor: str = "center") -> Vector3:
+        """Return local position for a named anchor on the tape.
+        Supports 'center', 'top_edge', 'bottom_edge', 'content_center', etc.
+        """
+        if anchor == "center":
+            return Vector3(0, 0, 0)
+        if anchor == "top_edge":
+            h = self.local_canvas_settings.frame_height if self.local_canvas_settings else 16.0
+            return Vector3(0, h/2, 0)
+        if anchor == "bottom_edge":
+            h = self.local_canvas_settings.frame_height if self.local_canvas_settings else 16.0
+            return Vector3(0, -h/2, 0)
+        if anchor == "content_center":
+            # simplistic: average of element positions, or 0
+            if self.local_elements:
+                ys = [getattr(e, 'canvas_position', (0,0,0))[1] for e in self.local_elements if hasattr(e, 'canvas_position')]
+                avg_y = sum(ys)/len(ys) if ys else 0
+                return Vector3(0, avg_y, 0)
+            return Vector3(0, 0, 0)
+        # custom local offset like "local:0,1.5"
+        if anchor.startswith("local:"):
+            try:
+                parts = anchor[6:].split(",")
+                return Vector3(float(parts[0]), float(parts[1]), float(parts[2]) if len(parts)>2 else 0)
+            except:
+                pass
+        return Vector3(0, 0, 0)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "world_transform": self.world_transform.to_dict(),
+            "local_elements": [e.to_dict() if hasattr(e, 'to_dict') else e for e in self.local_elements],
+            # omit settings for brevity
+        }
+
+    def get_local_frame(self) -> tuple[float, float]:
+        s = self.local_canvas_settings
+        return (s.frame_width if s else 9.0, s.frame_height if s else 16.0)
+
+    def get_surface_info(self) -> dict:
+        w, h = self.get_local_frame()
+        return {"width": w, "height": h, "is_planar": True, "local_space": "2d"}
+
+
 # Union of all timeline item types
 TimelineItem = Union[
     CanvasElement,
     CameraMove,
+    CameraKeyframe,  # Phase 3 generalized
     TransformElement,
     PlotTrace,
     SolidLift,
@@ -290,6 +491,11 @@ class CanvasSettings:
     # Optional metadata
     title: str = "Matemium"
     version: str = "matemium-0.1"
+
+    # Phase 1: coordinate system mode for the emerging 3D world model.
+    # "sheet" = legacy tape at z=0 (default for full backward compat)
+    # "space" = full 3D world (future)
+    coordinate_system: str = "sheet"
 
     def __post_init__(self):
         # Auto-correct frame and pixel sizes when orientation is explicitly set
@@ -357,9 +563,16 @@ class CanvasSettings:
 
 @dataclass
 class SheetDSL:
-    """The complete sheet specification. The source of truth for the canvas."""
+    """The complete sheet specification. The source of truth for the canvas.
+
+    Phase 2+: may represent local content of a TapeObject.
+    Phase 5: evolved to support root_objects for 3D world (WorldObject graph).
+    timeline kept for backward compat and tape sugar.
+    """
     canvas_settings: CanvasSettings = field(default_factory=CanvasSettings)
     timeline: List[TimelineItem] = field(default_factory=list)
+    root_tape: Optional["TapeObject"] = None  # Phase 2
+    root_objects: List["WorldObject"] = field(default_factory=list)  # Phase 5
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SheetDSL":
@@ -403,6 +616,8 @@ class SheetDSL:
                     type=t,  # type: ignore
                     content=item.get("content"),
                     canvas_position=tuple(item.get("canvas_position", (0, 0, 0))),
+                    # Phase 1
+                    world_transform=WorldTransform.from_dict(item.get("world_transform")) if item.get("world_transform") else WorldTransform(),
                     layout=layout,
                     entry_animation=entry,
                     state_behavior=behavior,
@@ -424,6 +639,27 @@ class SheetDSL:
                     rate_func=item.get("rate_func", "smooth"),
                 )
                 timeline.append(cm)
+            elif t == "CameraKeyframe":
+                # Phase 3
+                target_data = item.get("target", {})
+                kind = target_data.get("kind")
+                if kind == "world_point":
+                    tgt = WorldPoint(position=tuple(target_data.get("position", (0,0,0))))
+                elif kind == "object_anchor":
+                    tgt = ObjectAnchor(object_id=target_data.get("object_id", ""), anchor=target_data.get("anchor", "center"))
+                elif kind == "tape_scroll":
+                    tgt = TapeScroll(tape_id=target_data.get("tape_id", ""), local_y=float(target_data.get("local_y", 0)), framing_mode=target_data.get("framing_mode", "sheet"))
+                else:
+                    tgt = WorldPoint()
+                ck = CameraKeyframe(
+                    id=item["id"],
+                    time=float(item.get("time", 0)),
+                    target=tgt,
+                    duration=float(item.get("duration", item.get("run_time", 2.0))),
+                    rate_func=item.get("rate_func", "smooth"),
+                    params=dict(item.get("params") or {}),
+                )
+                timeline.append(ck)
             elif t == "TransformElement":
                 te = TransformElement(
                     id=item["id"],
@@ -502,7 +738,25 @@ class SheetDSL:
                 # Unknown type - skip or raise in strict mode
                 continue
 
-        return cls(canvas_settings=settings, timeline=timeline)
+        dsl = cls(canvas_settings=settings, timeline=timeline)
+        # Phase 2: attach conceptual root tape
+        dsl.root_tape = TapeObject(
+            id="root_tape",
+            world_transform=WorldTransform(),
+            local_elements=[e for e in timeline if isinstance(e, CanvasElement)],
+            local_canvas_settings=settings,
+        )
+
+        # Phase 5: support root_objects for general 3D
+        root_objs_data = data.get("root_objects", [])
+        for obj_data in root_objs_data:
+            wo = WorldObject(
+                id=obj_data["id"],
+                transform=WorldTransform.from_dict(obj_data.get("transform", {})),
+                # element and children would be reconstructed if needed
+            )
+            dsl.root_objects.append(wo)
+        return dsl
 
     @classmethod
     def from_file(cls, path: Union[str, Path]) -> "SheetDSL":
@@ -511,10 +765,14 @@ class SheetDSL:
         return cls.from_dict(data)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "canvas_settings": asdict(self.canvas_settings),
             "timeline": [item.to_dict() if hasattr(item, "to_dict") else asdict(item) for item in self.timeline],
+            "root_tape": self.root_tape.to_dict() if self.root_tape else None,
         }
+        if self.root_objects:
+            d["root_objects"] = [o.to_dict() for o in self.root_objects]
+        return d
 
     def to_json(self, path: Union[str, Path] | None = None, indent: int = 2) -> str:
         s = json.dumps(self.to_dict(), indent=indent)

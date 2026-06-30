@@ -4,9 +4,10 @@ interface ResizeHandleProps {
   orientation: "horizontal" | "vertical";
   onDrag?: (delta: number) => void;
   onDragPosition?: (position: number) => void;
+  onDoubleClick?: () => void;
 }
 
-export function ResizeHandle({ orientation, onDrag, onDragPosition }: ResizeHandleProps) {
+export function ResizeHandle({ orientation, onDrag, onDragPosition, onDoubleClick }: ResizeHandleProps) {
   const dragging = useRef(false);
   const lastPos = useRef(0);
   const onDragRef = useRef(onDrag);
@@ -63,6 +64,7 @@ export function ResizeHandle({ orientation, onDrag, onDragPosition }: ResizeHand
     <div
       className={`resize-handle resize-handle-${orientation}`}
       onMouseDown={handleMouseDown}
+      onDoubleClick={onDoubleClick}
       role="separator"
       aria-orientation={orientation}
       aria-label="Resize panel"

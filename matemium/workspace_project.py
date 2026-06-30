@@ -123,6 +123,10 @@ def load_scene_class(
     *,
     path: str | None = None,
 ) -> Type[CanvasScene]:
+    if not isinstance(scene_name, str):
+        raise TypeError(
+            f"scene_name must be str, got {type(scene_name).__name__} ({scene_name!r})"
+        )
     module = load_scenes_module(workspace, path=path)
     try:
         cls = getattr(module, scene_name)
@@ -132,6 +136,14 @@ def load_scene_class(
             f"Scene {scene_name!r} not found in {scenes_file(workspace, path=path)}. "
             f"Available: {available}"
         ) from exc
+    except TypeError as exc:
+        # e.g. if scene_name was None or non-string
+        if "attribute name must be string" in str(exc):
+            raise TypeError(
+                f"scene_name must be str, got {type(scene_name).__name__} ({scene_name!r}) "
+                f"when loading from {scenes_file(workspace, path=path)}"
+            ) from exc
+        raise
     if not inspect.isclass(cls) or not issubclass(cls, CanvasScene):
         raise TypeError(f"{scene_name} is not a CanvasScene subclass")
     return cls

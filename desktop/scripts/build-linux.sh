@@ -1,24 +1,37 @@
 #!/usr/bin/env bash
-# Full Linux production build — see COMPLETE_LINUX_UBUNTU_APP_TODO.md Phase 7
+# Full Linux production build.
+# Respects MATEMIUM_TARGET_TRIPLE (defaults to x86_64-unknown-linux-gnu).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 VENV="${VENV:-$ROOT/.venv}"
-TRIPLE="x86_64-unknown-linux-gnu"
+TRIPLE="${MATEMIUM_TARGET_TRIPLE:-x86_64-unknown-linux-gnu}"
 
-if [[ ! -x "$VENV/bin/python" ]]; then
-  echo "Missing venv at $VENV — run: python3 -m venv .venv && pip install -e '.[dev]' pyinstaller"
+# Portable discovery (used by build-sidecar.sh too)
+if [[ -x "$VENV/bin/python" ]]; then
+  PIP="$VENV/bin/pip"
+elif [[ -x "$VENV/Scripts/pip.exe" ]]; then
+  PIP="$VENV/Scripts/pip.exe"
+else
+  PIP="pip"
+fi
+
+if [[ ! -x "$VENV/bin/python" && ! -x "$VENV/Scripts/python.exe" ]]; then
+  echo "Missing venv at $VENV"
   exit 1
 fi
 
 echo "==> Building matemium-sidecar"
-"$VENV/bin/pip" install pyinstaller -q
+"$PIP" install pyinstaller -q
 "$ROOT/desktop/scripts/build-sidecar.sh"
 
 mkdir -p "$ROOT/desktop/src-tauri/binaries"
-cp "$ROOT/dist/matemium-sidecar" \
-  "$ROOT/desktop/src-tauri/binaries/matemium-sidecar-${TRIPLE}"
-chmod +x "$ROOT/desktop/src-tauri/binaries/matemium-sidecar-${TRIPLE}"
+# build-sidecar.sh already copies using the triple when MATEMIUM_TARGET_TRIPLE is set.
+# This ensures the file is present with the expected name for this run.
+SRC="$ROOT/dist/matemium-sidecar"
+if [[ -f "${SRC}.exe" ]]; then SRC="${SRC}.exe"; fi
+cp "$SRC" "$ROOT/desktop/src-tauri/binaries/matemium-sidecar-${TRIPLE}" 2>/dev/null || true
+chmod +x "$ROOT/desktop/src-tauri/binaries/matemium-sidecar-${TRIPLE}" || true
 
 if [[ ! -f "$ROOT/desktop/app/package.json" ]]; then
   echo "Frontend not scaffolded yet — skip npm build (see COMPLETE_LINUX_UBUNTU_APP_TODO.md Phase 5)"

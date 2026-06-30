@@ -23,10 +23,16 @@ from manim import (
 )
 from manim.utils.rate_functions import RateFunction
 
-from typing import Literal, Optional
+from typing import Literal, Optional, Union, TYPE_CHECKING
 
-from .coords import frame_center_for_inspect, frame_center_for_scroll
+from .coords import frame_center_for_inspect, frame_center_for_scroll, WorldTransform, Vector3, SHEET_PLANE_Z
 from .inspect_path import CameraPose
+
+if TYPE_CHECKING:
+    from .dsl import ObservationTarget, TapeScroll, WorldPoint, ObjectAnchor, TapeObject
+
+# For runtime in observe_target (avoid full circular at module load)
+from .dsl import WorldPoint, TapeScroll, TapeObject, ObjectAnchor
 
 ViewMode = Literal["sheet", "tilt", "inspect"]
 
@@ -321,5 +327,62 @@ class CameraController:
         self._zoom.set_value(1.0)
         self._view_mode = "sheet"
         self._apply_sheet_camera_settings()
+
+    # === Phase 3 additions: generalized 3D observation (per world model docs) ===
+    def observe_target(
+        self,
+        target: Union["ObservationTarget", dict],
+        run_time: float = 2.0,
+        rate_func: RateFunction = smooth,
+        tape: Optional["TapeObject"] = None,
+    ) -> None:
+        """Observe a target (world point, object, or tape scroll).
+
+        For TapeScroll targets: reuse local sheet pan_to + reveal logic in the
+        tape's *local* coordinate system, while the outer camera frame is offset
+        by the tape's world_transform (so tilted/moved tapes work correctly).
+
+        This replaces pure sheet-centric panning with object-aware observation.
+        """
+        if isinstance(target, dict):
+            kind = target.get("kind", "world_point")
+            if kind == "tape_scroll":
+                target = type("T", (), {
+                    "local_y": float(target.get("local_y", 0)),
+                    "framing_mode": target.get("framing_mode", "sheet")
+                })()
+            else:
+                target = WorldPoint(position=tuple(target.get("position", (0., 0., 0.))))
+
+        if hasattr(target, "local_y"):  # looks like TapeScroll
+            local_y = float(getattr(target, "local_y", 0.0))
+            if tape is not None and getattr(tape, "world_transform", None):
+                tw = tape.world_transform
+                # outer camera sees tape's world position + local scroll on its plane
+                # for simplicity in phase 3: adjust the y tracker with tape offset
+                effective_y = local_y + getattr(tw.position, "y", 0)
+                # TODO in later: apply full rotation of tape to camera
+                self.pan_to(effective_y, run_time=run_time, rate_func=rate_func)
+            else:
+                self.pan_to(local_y, run_time=run_time, rate_func=rate_func)
+        else:
+            # world point or anchor - basic 3D support
+            if hasattr(target, "position"):
+                pos = target.position
+            elif isinstance(target, ObjectAnchor):
+                # Phase 4: resolve anchor using placed or tape
+                # simplistic: use 0 for now, full would lookup
+                pos = (0., 0., 0.)
+            else:
+                pos = (0., 0., 0.)
+            x = float(pos[0])
+            y = float(pos[1])
+            z = float(pos[2]) if len(pos) > 2 else 0.0
+            self._x.set_value(x)
+            self._y.set_value(y)
+            if abs(z) > 1e-6:
+                self._inspect_z.set_value(z)
+                self._view_mode = "inspect"
+            self.camera.frame_center = np.array([x, y, z or SHEET_PLANE_Z])
 
 

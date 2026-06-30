@@ -5,7 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-06-26
+## [Unreleased] - 2026-06-30
+
+### Added
+- Phase 10 complete: 3D world model is now the canonical architecture (TapeObject + WorldObject graph in infinite space).
+- Auto-registration of all built-in object kinds; registry dispatch is primary path (no more core if/elif patching for new viz).
+- Enhanced Space3DDemo showcasing rotated tape, add_object, relative anchors, mixed camera keyframes (ObjectAnchor/TapeScroll/WorldPoint).
+- Comprehensive Phase 10 tests for registration, resolution, DSL roundtrips, mixed builder, dispatch parity.
+- Exports for Vector3/World* / Observation* in canvas top-level for easy authoring.
+
+### Changed
+- measure.py: extracted builders + _auto_register_builtins; measure_element delegates to kind "measure" when present.
+- Builder, scene, DSL keep full backward compat (old add_* populate root_tape; legacy projects unaffected).
+- Docs and shared templates reflect unified 3D + tape model as default.
+
+### Fixed / Polished
+- Existing sheet videos continue to author and render identically; 3D features are opt-in extensions.
+- Registry cutover ensures extensibility for future custom object kinds in both sheet and 3D contexts.
+
+## Phase 10: Full Migration, Examples, Tests & Cutover
+- 3D world model (XZ ground / Y up) declared canonical.
+- Projects/demos continue to work via shims; Space3DDemo and shared template demonstrate mixed authoring.
+- All core types auto-registered; legacy direct type chains minimized.
+- Comprehensive tests + docs + changelog updated.
+
+## [0.2.0] - 2026-06-30
 
 ### Added
 

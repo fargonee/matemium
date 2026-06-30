@@ -261,3 +261,86 @@ class TicTacToeTutorial(CanvasScene):
 
 # Backward-compatible alias (short flex demo name)
 FlexTicTacToeDemo = TicTacToeTutorial
+# Backward-compatible alias (short flex demo name)
+FlexTicTacToeDemo = TicTacToeTutorial
+
+
+# --- Phase 10: 3D Space Demo ---
+from canvas.dsl import WorldObject, WorldTransform, Vector3, CanvasElement, ObjectAnchor, TapeScroll, WorldPoint
+
+
+class Space3DDemo(CanvasScene):
+    """Phase 10 demo: mixed 3D world with rotated TapeObject, floating 3D solids,
+    relative positioning, and camera keyframes moving between them.
+
+    Showcases the unified 3D space where the "tape" is just one object.
+    """
+
+    def __init__(self, **kwargs):
+        builder = CanvasBuilder(title="3D Space Demo")
+
+        # Tape content in its local space (old sheet ergonomics preserved)
+        builder.add_heading("3D World Demo", style={"align": "center"})
+        builder.add_body(
+            "The infinite tape is now a TapeObject inside 3D space. "
+            "It can be rotated and positioned arbitrarily.",
+            style={"margin-bottom": 0.8},
+        )
+        builder.add_math(r"\vec{r} = (x, y, z)", style={"margin-bottom": 0.5})
+
+        # Rotate the root tape in 3D (XZ ground, Y up)
+        builder.set_tape_pose(rotation=(35, 15, 0))  # pitch ~35°, yaw 15°
+
+        builder.add_body(
+            "Content inside the tape still uses familiar flex, styling, and lazy reveal — "
+            "but the whole plane lives in 3D.",
+            style={"margin-top": 0.4, "margin-bottom": 0.8},
+        )
+
+        # Floating 3D solid outside the tape (using high-level add_object + registry dispatch)
+        builder.add_object(
+            "Solid3D",
+            id="cube1",
+            position=(4.5, 1.5, 3.0),
+            content={"shape": "cube", "size": 1.2},
+        )
+
+        # Another object positioned relative to the cube (using Phase 4 APIs)
+        label_solid = CanvasElement(
+            id="label_on_cube",
+            type="Text",
+            content="3D object in world space",
+        )
+        builder.add_relative(
+            "cube1",
+            label_solid,
+            local_offset=(0, 2.0, 0),
+            anchor="top",
+        )
+
+        # Another free object: axes as example of registered kind in world space
+        builder.add_object(
+            "Axes",
+            position=(0, 0.5, -4.0),
+            scale=0.7,
+        )
+
+        # Camera keyframe: look at the floating cube
+        builder.add_camera_keyframe(
+            target=ObjectAnchor(object_id="cube1", anchor="center"),
+            duration=3.0,
+        )
+
+        # Camera keyframe: scroll along the (rotated) tape
+        builder.add_camera_keyframe(
+            target=TapeScroll(tape_id="root_tape", local_y=4.0, framing_mode="sheet"),
+            duration=4.0,
+        )
+
+        # Back to world point
+        builder.add_camera_keyframe(
+            target=WorldPoint(position=(2.0, 3.0, 4.0)),
+            duration=2.5,
+        )
+
+        super().__init__(dsl=builder.build(), **kwargs)

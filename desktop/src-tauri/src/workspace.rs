@@ -22,10 +22,15 @@ pub struct Settings {
     pub api_token: Option<String>,
     #[serde(default = "default_bottom_dock_default")]
     pub bottom_dock_default: String,
+    // LLM mode: personal (BYO keys from web profile) vs platform credits
+    #[serde(default)]
+    pub use_personal_llm: Option<bool>,
+    #[serde(default)]
+    pub llm_provider: Option<String>,
 }
 
 fn default_server_url() -> String {
-    "http://127.0.0.1:8080".to_string()
+    "https://p01--math--zjvwyx4fjqbn.code.run".to_string()
 }
 
 fn default_bottom_dock_default() -> String {
@@ -38,6 +43,8 @@ impl Default for Settings {
             server_url: default_server_url(),
             api_token: None,
             bottom_dock_default: default_bottom_dock_default(),
+            use_personal_llm: Some(false),
+            llm_provider: Some("openai".to_string()),
         }
     }
 }

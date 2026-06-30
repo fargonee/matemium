@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use base64;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::State;
@@ -82,10 +83,19 @@ pub struct AuthLoginParams {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AuthSessionParams {
+    pub access_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CloudChatParams {
     pub messages: Vec<ChatMessage>,
     pub project_id: Option<String>,
     pub scenes_excerpt: Option<String>,
+    // LLM selection flags (passed through to server for BYO vs platform)
+    pub llm_provider: Option<String>,
+    pub use_personal_llm: Option<bool>,
 }
 
 #[tauri::command]
@@ -219,6 +229,21 @@ pub async fn sidecar_cancel(state: State<'_, AppState>) -> Result<(), String> {
     state.sidecar.cancel_active().await
 }
 
+#[tauri::command]
+pub async fn sidecar_get_preview_data(
+    state: State<'_, AppState>,
+    params: ProjectIdParams,
+) -> Result<Value, String> {
+    let workspace = workspace_path(&state.paths, &params.project_id)?;
+    state
+        .sidecar
+        .request(
+            "get_preview_data",
+            json!({ "workspace": workspace }),
+        )
+        .await
+}
+
 /// Shared body for the `auth_login` Tauri command (testable without the runtime).
 pub async fn auth_login_inner(
     paths: &crate::workspace::AppPaths,
@@ -240,6 +265,17 @@ pub async fn auth_login(
 }
 
 #[tauri::command]
+pub async fn auth_session(
+    state: State<'_, AppState>,
+    params: AuthSessionParams,
+) -> Result<Value, String> {
+    let settings = state.paths.load_settings()?;
+    let token = crate::cloud::login_with_session(&settings, &params.access_token).await?;
+    serde_json::to_value(serde_json::json!({ "accessToken": token }))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn cloud_chat(
     state: State<'_, AppState>,
     params: CloudChatParams,
@@ -249,6 +285,8 @@ pub async fn cloud_chat(
         messages: params.messages,
         project_id: params.project_id,
         scenes_excerpt: params.scenes_excerpt,
+        llm_provider: params.llm_provider,
+        use_personal_llm: params.use_personal_llm,
     };
     crate::cloud::chat_raw(&settings, request).await
 }
@@ -285,6 +323,52 @@ pub struct OutputPathParams {
 pub struct ClearCacheParams {
     pub project_id: String,
     pub kind: String,
+}
+
+// Commands for new LLM features (profile for credits, audio support)
+// These use the secure server-side key resolution
+
+#[tauri::command]
+pub async fn cloud_get_profile(
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let settings = state.paths.load_settings()?;
+    crate::cloud::get_profile(&settings).await
+}
+
+#[tauri::command]
+pub async fn cloud_generate_audio(
+    state: State<'_, AppState>,
+    params: CloudAudioParams,
+) -> Result<Value, String> {
+    let settings = state.paths.load_settings()?;
+    let request = crate::cloud::AudioSpeechRequest {
+        text: params.text,
+        voice: params.voice,
+        model: None,
+        tts_provider: params.tts_provider,
+        use_personal_llm: params.use_personal_llm,
+    };
+    let bytes = crate::cloud::generate_audio(&settings, request).await?;
+    // Return base64 for easy frontend handling (consistent with previews)
+    // Using base64 crate compat
+    let encoded = base64::encode(bytes);
+    Ok(serde_json::json!({ "dataBase64": encoded, "mimeType": "audio/mpeg" }))
+}
+
+// New for LLM profile fetch (credits, key status)
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmptyParams {}
+
+// New for audio generation (TTS)
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudAudioParams {
+    pub text: String,
+    pub voice: Option<String>,
+    pub tts_provider: Option<String>,
+    pub use_personal_llm: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

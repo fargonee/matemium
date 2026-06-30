@@ -24,21 +24,37 @@ class ReelCutter:
         self.segment_duration = segment_duration
 
     def generate_manifest_from_dsl(self, dsl: "SheetDSL") -> List[Dict[str, Any]]:
-        """Walk the timeline and accumulate time only at CameraMove events.
+        """Walk the timeline and accumulate time at CameraMove or CameraKeyframe events.
 
         These become the chapter / reel boundary points.
+        Phase 8: supports new generalized keyframes for 3D world model.
         """
-        from .dsl import CameraMove
+        from .dsl import CameraMove, CameraKeyframe
 
         manifest: List[Dict[str, Any]] = []
         cumulative = 0.0
-        for item in dsl.timeline:
+        for item in getattr(dsl, "timeline", []):
             if isinstance(item, CameraMove):
                 cumulative += item.run_time
                 manifest.append({
                     "time": round(cumulative, 3),
                     "label": item.id,
-                    "target_y": item.target_position[1],
+                    "target_y": item.target_position[1] if hasattr(item, 'target_position') else 0,
+                })
+            elif isinstance(item, CameraKeyframe):
+                # For tape scrolls, use local_y as target_y; for world, 0 or extract
+                dur = getattr(item, 'duration', getattr(item, 'run_time', 0))
+                cumulative += dur
+                tgt = getattr(item, 'target', None)
+                ty = 0
+                if tgt and hasattr(tgt, 'local_y'):
+                    ty = tgt.local_y
+                elif tgt and isinstance(tgt, dict) and 'local_y' in tgt:
+                    ty = tgt['local_y']
+                manifest.append({
+                    "time": round(cumulative, 3),
+                    "label": item.id,
+                    "target_y": ty,
                 })
         return manifest
 

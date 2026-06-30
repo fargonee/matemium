@@ -1,0 +1,199 @@
+name: Build Windows Desktop
+
+# Mirrors the proven Linux strategy for robustness and cost control.
+# - Cheap verification (cargo check + dummy sidecar) on PRs and main.
+# - Full production builds (.nsis + .msi) ONLY on version tags (v*) and manual dispatch.
+# - Sidecar **must** be built natively on Windows (PyInstaller).
+#
+# Expected outputs on release:
+#   - Matemium_*.exe (NSIS installer)
+#   - Matemium_*.msi
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'matemium/**'
+      - 'canvas/**'
+      - 'projects/**'
+      - 'shared/**'
+      - 'pyproject.toml'
+      - 'fixtures/**'
+      - '.github/workflows/build-windows.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'matemium/**'
+      - 'canvas/**'
+      - 'projects/**'
+      - 'shared/**'
+      - 'pyproject.toml'
+      - 'fixtures/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # Fast verification job — no heavy TeX or real sidecar.
+  desktop-verify:
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install minimal Python deps (engine only)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Verify engine imports
+        run: python -c "import canvas, matemium; print('✅ Engine imports OK')"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Create dummy sidecar for Tauri validation (Windows)
+        shell: bash
+        run: |
+          mkdir -p desktop/src-tauri/binaries
+          DUMMY="desktop/src-tauri/binaries/matemium-sidecar-x86_64-pc-windows-msvc.exe"
+          if [ ! -f "$DUMMY" ]; then
+            printf '#!/bin/sh\necho "matemium-sidecar (dummy for cargo check)"\n' > "$DUMMY"
+            # On Windows the dummy can be a .exe shell script or just a marker.
+            # Tauri mainly checks that the declared externalBin exists at build time.
+            chmod +x "$DUMMY" || true
+            echo "Created Windows dummy sidecar"
+          fi
+
+      - name: Cargo check (Rust side)
+        working-directory: desktop/src-tauri
+        run: cargo check
+
+  # Full production build — expensive (PyInstaller + full deps).
+  build-windows:
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            raw="${{ github.ref_name }}"
+            ver="${raw#v}"
+            echo "version=$ver" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "version=0.0.0-dev" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies (ffmpeg + MiKTeX for runtime in sidecar)
+        shell: powershell
+        run: |
+          choco install ffmpeg -y --no-progress
+          # MiKTeX is large and slow. Install portable/basic for build-time + runtime support.
+          # If this step is too slow/unreliable in future, consider documenting user-installed TeX.
+          choco install miktex -y --params="'/NoDesktopShortcuts /NoStartMenuShortcuts'" --no-progress || echo "MiKTeX install attempted (may require PATH refresh)"
+          # Ensure common paths
+          echo "C:\Program Files\MiKTeX\miktex\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "C:\Program Files\ffmpeg\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Create venv and install engine + PyInstaller
+        shell: bash
+        run: |
+          python -m venv .venv
+          if [ -f .venv/bin/pip ]; then
+            .venv/bin/pip install --upgrade pip
+            .venv/bin/pip install -e ".[dev]" pyinstaller
+          else
+            .venv/Scripts/pip.exe install --upgrade pip
+            .venv/Scripts/pip.exe install -e ".[dev]" pyinstaller
+          fi
+          echo "Venv ready"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/app/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0.0" --locked
+
+      - name: Set desktop version (tags only)
+        if: steps.ver.outputs.is_release == 'true'
+        working-directory: desktop/src-tauri
+        shell: bash
+        run: |
+          cargo tauri set-version "${{ steps.ver.outputs.version }}"
+
+      - name: Build Windows desktop artifacts
+        shell: bash
+        env:
+          MATEMIUM_TARGET_TRIPLE: x86_64-pc-windows-msvc
+        run: |
+          export PATH="/c/Program Files/MiKTeX/miktex/bin/x64:/c/Program Files/ffmpeg/bin:$PATH"
+          ./desktop/scripts/build-windows.sh
+
+      - name: Upload desktop bundles (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: matemium-windows-desktop-${{ steps.ver.outputs.version }}
+          path: |
+            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+            desktop/src-tauri/target/release/bundle/nsis/*.exe
+            desktop/src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: warn
+
+      - name: Attach to GitHub Release (create if needed)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          echo "==> Attaching Windows artifacts to ${{ github.ref_name }}"
+          gh release create "${{ github.ref_name }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Matemium ${{ github.ref_name }}" \
+            --generate-notes \
+            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe \
+            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi \
+            desktop/src-tauri/target/release/bundle/nsis/*.exe \
+            desktop/src-tauri/target/release/bundle/msi/*.msi 2>/dev/null || \
+          gh release upload "${{ github.ref_name }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber \
+            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe \
+            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi \
+            desktop/src-tauri/target/release/bundle/nsis/*.exe \
+            desktop/src-tauri/target/release/bundle/msi/*.msi || true
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo "✅ Windows desktop build finished."
+          echo "Version: ${{ steps.ver.outputs.version }}"

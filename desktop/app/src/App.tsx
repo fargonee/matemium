@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   CodeEdit,
   LintDiagnostic,
+  LLMConfig,
   ProjectOpen,
   ProjectSummary,
   Settings,
@@ -55,6 +56,7 @@ export default function App() {
   const inTauri = api.runningInTauri();
   const editorRef = useRef<CodeEditorHandle>(null);
   const appBodyRef = useRef<HTMLDivElement>(null);
+  const editorBottomRef = useRef<HTMLDivElement>(null);
   const renderCancelledRef = useRef(false);
 
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -86,10 +88,13 @@ export default function App() {
   const [pendingEdit, setPendingEdit] = useState<CodeEdit | null>(null);
 
   const [settings, setSettings] = useState<Settings>({
-    serverUrl: "http://127.0.0.1:8080",
+    serverUrl: "https://p01--math--zjvwyx4fjqbn.code.run",
     apiToken: null,
     bottomDockDefault: "progress",
+    usePersonalLlm: false,
+    llmProvider: "openai",
   });
+  const [llmProfile, setLlmProfile] = useState<LLMConfig | null>(null);
   const [pipeline, setPipeline] = useState<RenderPipelineState>(INITIAL_PIPELINE_STATE);
   const { tab: bottomDockTab, selectTab: selectBottomDockTab, focusProgress } =
     useBottomDockTab(resolveBottomDockDefault(settings));
@@ -101,9 +106,11 @@ export default function App() {
     layout,
     setBottomPanelOpen,
     setContainerWidth,
+    setEditorRegionHeight,
     setChatWidthFromPointer,
     setSidebarWidthFromPointer,
     resizeBottom,
+    maximizeBottom,
   } = usePanelLayout();
 
   useEffect(() => {
@@ -122,6 +129,40 @@ export default function App() {
     };
   }, [setContainerWidth, project]);
 
+  // Track editor-bottom-region height to allow bottom dock to resize up to full available space
+  useEffect(() => {
+    const syncHeight = () => {
+      const el = editorBottomRef.current;
+      if (el) {
+        setEditorRegionHeight(el.getBoundingClientRect().height);
+      }
+    };
+
+    syncHeight();
+
+    const ro = new ResizeObserver(syncHeight);
+    const observeIfPresent = () => {
+      const el = editorBottomRef.current;
+      if (el) ro.observe(el);
+    };
+    observeIfPresent();
+
+    window.addEventListener("resize", syncHeight);
+
+    // Catch ref attachment on first project mount
+    const t1 = setTimeout(syncHeight, 0);
+    const t2 = setTimeout(syncHeight, 80);
+    const t3 = setTimeout(observeIfPresent, 0);
+
+    return () => {
+      window.removeEventListener("resize", syncHeight);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      ro.disconnect();
+    };
+  }, [setEditorRegionHeight, project?.id]);
+
   const resizeSidebarFromPointer = useCallback(
     (clientX: number) => {
       const body = appBodyRef.current;
@@ -139,6 +180,26 @@ export default function App() {
     },
     [setChatWidthFromPointer],
   );
+
+  const handleBottomResize = useCallback(
+    (delta: number) => {
+      // Refresh measured region height right before applying resize so max is up-to-date
+      const el = editorBottomRef.current;
+      if (el) {
+        setEditorRegionHeight(el.getBoundingClientRect().height);
+      }
+      resizeBottom(delta);
+    },
+    [resizeBottom, setEditorRegionHeight],
+  );
+
+  const handleMaximizeBottom = useCallback(() => {
+    const el = editorBottomRef.current;
+    if (el) {
+      setEditorRegionHeight(el.getBoundingClientRect().height);
+    }
+    maximizeBottom();
+  }, [maximizeBottom, setEditorRegionHeight]);
 
   const appendLog = useCallback((line: string) => {
     setLog((prev) => [...prev.slice(-199), line]);
@@ -371,6 +432,9 @@ export default function App() {
         await refreshProjects();
         const loadedSettings = await api.settingsGet();
         setSettings(loadedSettings);
+        if (loadedSettings.apiToken) {
+          void refreshLlmProfile();
+        }
         const ping = await api.sidecarPing();
         appendLog(`[ping] ${JSON.stringify(ping)}`);
         if (
@@ -485,6 +549,13 @@ export default function App() {
           orientation,
         }),
       );
+      const el = editorBottomRef.current;
+      if (el) {
+        setEditorRegionHeight(el.getBoundingClientRect().height);
+      } else {
+        // Safe default so bottom panel open doesn't squash the viewport to empty
+        setEditorRegionHeight(700);
+      }
       setBottomPanelOpen(true);
       focusProgress();
       appendLog(`[render] starting (${quality}, ${orientation})`);
@@ -531,6 +602,42 @@ export default function App() {
     }
   };
 
+  const handleGenerateAudio = async () => {
+    const text = chatInput.trim() || chatMessages[chatMessages.length - 1]?.content || "";
+    if (!text) {
+      setStatusMessage("Enter text or have a chat message for audio", "error");
+      return;
+    }
+    try {
+      setBusy(true);
+      const llmConfig = settings.usePersonalLlm
+        ? { tts_provider: settings.llmProvider, use_personal_llm: true }
+        : undefined;
+      const res = await api.cloudGenerateAudio(text, "alloy", llmConfig);
+      if (res.dataBase64) {
+        appendLog(`[audio] generated ${text.length} chars`);
+        setStatusMessage("Audio generated (base64 in log for now - integrate with media preview)", "ok");
+        // For live preview parallel safety, just log; future can save via project
+      } else {
+        setStatusMessage("Audio generation failed", "error");
+      }
+    } catch (error) {
+      setStatusMessage(formatError(error), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const getLlmConfigForCall = () => {
+    if (settings.usePersonalLlm && settings.llmProvider) {
+      return {
+        llm_provider: settings.llmProvider,
+        use_personal_llm: true,
+      };
+    }
+    return undefined;
+  };
+
   const handleChatSend = async () => {
     if (!chatInput.trim()) return;
     const userMessage: ChatMessage = { role: "user", content: chatInput.trim() };
@@ -539,19 +646,30 @@ export default function App() {
     setChatInput("");
     try {
       setBusy(true);
+      const llmConfig = getLlmConfigForCall();
       const response = await api.cloudChat(
         nextMessages,
         project?.id,
         fileContents.scenes,
+        llmConfig,
       );
       setChatMessages((prev) => [...prev, response.message]);
       if (response.code_edit) {
         setPendingEdit(response.code_edit);
       }
-      appendLog(`[chat] model=${response.model} stub=${response.stub ?? false}`);
+      appendLog(`[chat] model=${response.model} stub=${response.stub ?? false} personal=${!!llmConfig}`);
+      // Refresh credits/profile after platform use
+      if (!llmConfig && settings.apiToken) {
+        void refreshLlmProfile();
+      }
     } catch (error) {
-      setStatusMessage(formatError(error), "error");
-      appendLog(`[chat-error] ${formatError(error)}`);
+      const errMsg = formatError(error);
+      setStatusMessage(errMsg, "error");
+      appendLog(`[chat-error] ${errMsg}`);
+      // Handle insufficient credits nicely (402 from server)
+      if (errMsg.includes("402") || errMsg.toLowerCase().includes("credit")) {
+        setStatusMessage("Insufficient platform credits. Buy more on the web dashboard.", "error");
+      }
     } finally {
       setBusy(false);
     }
@@ -577,6 +695,10 @@ export default function App() {
       setSettings(nextSettings);
       setSettingsOpen(false);
       setStatusMessage("Settings saved", "ok");
+      // Refresh LLM profile/credits when token or prefs saved
+      if (nextSettings.apiToken) {
+        void refreshLlmProfile();
+      }
     } catch (error) {
       setStatusMessage(formatError(error), "error");
       throw error;
@@ -594,7 +716,7 @@ export default function App() {
       <div className="empty-state">
         <div>
           <p>Matemium Canvas runs inside the Tauri desktop shell.</p>
-          <p>Start with: <code>cd desktop/src-tauri && cargo tauri dev</code></p>
+          <p>Start with: <code>cd desktop &amp;&amp; cargo tauri dev</code></p>
         </div>
       </div>
     );
@@ -603,15 +725,29 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Matemium Canvas</h1>
+        <h1>Matemium</h1>
         {project ? (
           <>
             <button type="button" className="btn btn-ghost" onClick={() => void closeProject()}>
-              All projects
+              Projects
             </button>
             <span className="project-name">{project.name}</span>
           </>
         ) : null}
+
+        {/* Modern LLM status for easy visibility of credits and mode */}
+        {llmProfile && (
+          <span 
+            className="llm-status" 
+            title="Click to refresh credits. Platform uses our tokens (margin priced). Personal = your keys from web."
+            onClick={() => void refreshLlmProfile()}
+            style={{ cursor: 'pointer' }}
+          >
+            {settings.usePersonalLlm ? '🔑 Personal' : `💳 Platform • ${llmProfile.llm_credits ?? '—'} credits`}
+            {llmProfile.llm_provider && ` (${llmProfile.llm_provider})`}
+          </span>
+        )}
+
         <button type="button" className="btn btn-ghost" onClick={() => setSettingsOpen(true)}>
           Settings
         </button>
@@ -699,8 +835,11 @@ export default function App() {
                 </span>
               </div>
 
-              <div className="editor-bottom-region">
-                <div className="editor-stage">
+              <div className="editor-bottom-region" ref={editorBottomRef}>
+                <div
+                  className="editor-stage"
+                  style={layout.bottomPanelOpen ? { minHeight: 140 } : undefined}
+                >
                   <CodeEditor
                     ref={editorRef}
                     value={activeCode}
@@ -715,7 +854,11 @@ export default function App() {
                 {layout.bottomPanelOpen ? (
                   <>
                     <div className="bottom-dock-chrome">
-                      <ResizeHandle orientation="horizontal" onDrag={resizeBottom} />
+                      <ResizeHandle
+                        orientation="horizontal"
+                        onDrag={handleBottomResize}
+                        onDoubleClick={handleMaximizeBottom}
+                      />
                     </div>
                     <div className="bottom-panels" style={{ height: layout.bottomHeight }}>
                       <BottomDock
@@ -725,6 +868,8 @@ export default function App() {
                         pipeline={pipeline}
                         renderActive={isRenderActive(pipeline)}
                         onCancelRender={() => void handleCancelRender()}
+                        projectId={project?.id}
+                        onMaximize={handleMaximizeBottom}
                       />
                     </div>
                   </>
@@ -733,7 +878,11 @@ export default function App() {
                     type="button"
                     className="bottom-panel-bump"
                     title="Show bottom panel"
-                    onClick={() => setBottomPanelOpen(true)}
+                    onClick={() => {
+                      const el = editorBottomRef.current;
+                      if (el) setEditorRegionHeight(el.getBoundingClientRect().height);
+                      setBottomPanelOpen(true);
+                    }}
                   >
                     <span className="bottom-panel-bump-tab">
                       <span className="bottom-panel-bump-icon" aria-hidden>
@@ -773,6 +922,14 @@ export default function App() {
                 onInputChange={setChatInput}
                 onSend={() => void handleChatSend()}
                 onApplyEdit={handleApplyEdit}
+                llmStatus={
+                  llmProfile
+                    ? settings.usePersonalLlm
+                      ? `Personal (${settings.llmProvider || "BYO"})`
+                      : `Platform (${llmProfile.llm_credits ?? "?"} credits)`
+                    : undefined
+                }
+                onGenerateAudio={() => void handleGenerateAudio()}
               />
             </aside>
           </>

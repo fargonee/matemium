@@ -139,12 +139,14 @@ impl SidecarManager {
         let matemium_root = self.paths.data_root.to_string_lossy().to_string();
         let (mut rx, child) = if let Some(python) = dev_python_sidecar() {
             log::info!("sidecar: using repo .venv python (dev)");
+            let source_root = python.parent().and_then(|p| p.parent()).map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
             self.app
                 .shell()
                 .command(python)
                 .args(["-u", "-m", "matemium.sidecar"])
                 .current_dir(&self.paths.data_root)
                 .env("MATEMIUM_ROOT", matemium_root)
+                .env("PYTHONPATH", source_root)
                 .env("PYTHONUNBUFFERED", "1")
                 .spawn()
                 .map_err(|e| format!("spawn python sidecar: {e}"))?
@@ -219,8 +221,15 @@ fn dev_python_sidecar() -> Option<PathBuf> {
     if !cfg!(debug_assertions) {
         return None;
     }
-    let python = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.venv/bin/python");
-    python.is_file().then_some(python)
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // Support normal layout and worktrees (math / math-preview)
+    for levels in 1..=6u32 {
+        let p = manifest.join("../".repeat(levels as usize)).join(".venv/bin/python");
+        if p.is_file() {
+            return Some(p);
+        }
+    }
+    None
 }
 
 fn take_complete_stdout_lines(buffer: &mut String, chunk: &str) -> Vec<String> {

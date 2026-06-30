@@ -42,7 +42,7 @@ See [`desktop-architecture.md`](../desktop-architecture.md).
 | P5 — UI shell | **done** | Vite + React + Monaco MVP |
 | P6 — Cloud client + auth | **done** | `auth_login` + `cloud_chat` → [`server/`](../server/) |
 | P7 — Linux ship | **done** | `build-linux.sh` → `.deb` / `.AppImage`; CI in [`.github/workflows/build-linux.yml`](../.github/workflows/build-linux.yml) |
-| P8 — CI matrix (Win/Mac) | pending | Windows + macOS GitHub Actions workflows (Linux done) |
+| P8 — CI matrix (Win/Mac) | done | Windows + macOS GitHub Actions workflows + native sidecars for all platforms (see `.github/workflows/build-*.yml`) |
 
 ## Phase 0 — Ubuntu dev setup (do this first)
 
@@ -58,6 +58,23 @@ See [`COMPLETE_LINUX_UBUNTU_APP_TODO.md`](../COMPLETE_LINUX_UBUNTU_APP_TODO.md) 
 ```bash
 echo '{"type":"request","id":"1","command":"ping","params":{}}' | python -m matemium.sidecar
 ```
+
+## Running the desktop app in dev mode
+
+**Important:** `cargo tauri dev` must be started while your shell is in the `desktop/` folder (your prompt should end in `/desktop$`, **not** `/desktop/app$`).
+
+```bash
+cd desktop
+cargo tauri dev
+```
+
+If you are deep inside `app/` or elsewhere, you can also do:
+
+```bash
+cargo tauri dev --manifest-path desktop/src-tauri/Cargo.toml
+```
+
+(You only need to `npm install` inside `desktop/app` once.)
 
 ## Ship on Ubuntu
 

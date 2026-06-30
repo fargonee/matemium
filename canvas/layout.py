@@ -10,11 +10,17 @@ Future: optional layout tree before coordinate resolution.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from .dsl import TapeObject
 
 from .coords import z_for_element
 from .dsl import CanvasElement, LayoutBox
-from .measure import measure_element, strip_layout_from_content
+from .measure import measure_element, strip_layout_from_content, get_measurement_backend, _OBJECT_KINDS
+# The measurement backend (see canvas/measurement/) allows swapping the sizing
+# implementation. For manim-web preview we can eventually supply a KaTeX one
+# so that layout decisions made here match exactly what the browser will render.
 
 EXTRA_MARGIN_AFTER_3D = 1.6
 # Default vertical gap between stacked block elements (Manim units).
@@ -90,17 +96,53 @@ class MeasuredItem:
 
 
 class LayoutEngine:
-    """Resolves element sizes and positions on the canvas tape."""
+    """Resolves element sizes and positions within a specific object's local space.
 
-    def __init__(self, frame_width: float, frame_height: float = 16.0):
+    Phase 6: Always scoped to an object's local space.
+    - For TapeObject: full CSS-like flex, vertical flow, styling.
+    - For other 3D objects: may use identity layout or simple rules (explicit positions).
+    The engine is instantiated per-object during build.
+    """
+
+    def __init__(self, frame_width: float, frame_height: float = 16.0, scope: Optional[Any] = None):
+        self.scope = scope  # Phase 6: the owning object (TapeObject, etc.)
+        if scope and hasattr(scope, 'local_canvas_settings') and scope.local_canvas_settings:
+            frame_width = scope.local_canvas_settings.frame_width
+            frame_height = scope.local_canvas_settings.frame_height
+        elif scope and hasattr(scope, 'get_local_frame'):
+            fw, fh = scope.get_local_frame()
+            frame_width, frame_height = fw, fh
         self.frame_width = frame_width
         self.frame_height = frame_height
         self.flow = FlowState()
+        self.scope = scope
+        self.is_tape_like = bool(scope and hasattr(scope, 'local_elements'))  # Phase 6
+        self.tape = scope if self.is_tape_like else None  # compat
 
     def usable_width(self, style: Style) -> float:
         return max(0.5, self.frame_width - style.margin_left - style.margin_right)
 
     def measure(self, elem: CanvasElement, style: Style) -> MeasuredItem:
+        # Phase 9: check registered kind measure first
+        if elem.type in _OBJECT_KINDS and _OBJECT_KINDS[elem.type].get("measure"):
+            try:
+                ms = _OBJECT_KINDS[elem.type]["measure"](elem, style=style, usable_width=self.usable_width(style))
+                if isinstance(ms, MeasuredSize):
+                    return MeasuredItem(elem, style, ms.width, ms.height, False)
+            except Exception:
+                pass
+
+        backend = get_measurement_backend()
+        if backend is not None:
+            # Renderer-agnostic path: delegate sizing to the injected backend.
+            # When the desktop preview provides a KaTeXMeasurementBackend, layout
+            # sizes will match what manim-web will display → true WYSIWYG.
+            try:
+                ms = backend.measure_element(elem, usable_width=self.usable_width(style))
+                return MeasuredItem(elem, style, ms.width, ms.height, False)
+            except Exception:
+                pass  # fall through to default
+
         tw, th, wrap = measure_element(
             elem,
             usable_width=self.usable_width(style),
@@ -163,7 +205,17 @@ class LayoutEngine:
         elem: CanvasElement,
         style_dict: Optional[Dict[str, Any]] = None,
     ) -> CanvasElement:
-        """Place a single element in the vertical flow."""
+        """Place a single element in the vertical flow.
+        Phase 6: for non-tape scopes, skip auto-flow and use explicit pos.
+        """
+        if not getattr(self, 'is_tape_like', True):
+            style = Style.from_dict(style_dict)
+            measured = self.measure(elem, style)
+            x = getattr(elem, 'canvas_position', (0,0,0))[0] or 0
+            y = getattr(elem, 'canvas_position', (0,0,0))[1] or 0
+            return self._finalize_element(
+                elem, style, measured.width, measured.height, measured.wrap, x, y
+            )
         style = Style.from_dict(style_dict)
         if style.margin_bottom == 0.0:
             style.margin_bottom = DEFAULT_ROW_MARGIN_BOTTOM
@@ -197,6 +249,9 @@ class LayoutEngine:
         align_items: str,
         container_style: Style,
     ) -> List[CanvasElement]:
+        if not getattr(self, 'is_tape_like', True):
+            # non-tape: return as-is with positions
+            return [m.element for m in items]
         n = len(items)
         if n == 0:
             return []
@@ -292,6 +347,8 @@ class LayoutEngine:
         align_items: str,
         container_style: Style,
     ) -> List[CanvasElement]:
+        if not getattr(self, 'is_tape_like', True):
+            return [m.element for m in items]
         n = len(items)
         if n == 0:
             return []

@@ -6,7 +6,8 @@ measurement and rendering share ``measure.py``.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
+import contextlib
+from typing import Any, Dict, List, Optional, Tuple, Union, Iterator
 
 from manim import WHITE
 
@@ -16,13 +17,18 @@ from .dsl import (
     CanvasElement,
     CanvasSettings,
     CameraMove,
+    CameraKeyframe,  # Phase 3
     EntryAnimation,
     PlotTrace,
     SheetDSL,
     SolidLift,
     SolidRotate,
     StateBehavior,
+    TapeObject,
+    WorldObject,  # Phase 5
 )
+from .coords import WorldTransform, Vector3, resolve_world_position  # Phase 4
+from .measure import _OBJECT_KINDS  # for add_object
 from .diagrams import grid_cell_center, parse_grid_content
 from .layout import LayoutEngine, Style
 from .plots import format_quadratic_tex
@@ -39,20 +45,49 @@ class CanvasBuilder:
         else:
             self.settings = CanvasSettings.for_reels(title=title, **settings_kwargs)
         self.dsl = SheetDSL(canvas_settings=self.settings)
+        # Phase 2: the builder's content conceptually lives inside an implicit root TapeObject.
+        # This makes the tape a first-class object in the 3D world model, while
+        # preserving 100% backward compat for existing code (timeline == local_elements).
+        self.root_tape = TapeObject(
+            id="root_tape",
+            world_transform=WorldTransform(),
+            local_elements=[],  # populated in _add (only CanvasElements)
+            local_canvas_settings=self.settings,
+        )
+        self.dsl.root_tape = self.root_tape  # Phase 2
         self._layout = LayoutEngine(
             frame_width=self.settings.frame_width,
             frame_height=self.settings.frame_height,
+            scope=self.root_tape,  # Phase 6: scoped to the tape object
         )
         self._counter = 0
         self._boards: Dict[str, CanvasElement] = {}
         self._last_flex_ids: List[str] = []
+        self._placed_transforms: Dict[str, WorldTransform] = {}  # for relative resolution Phase 4
+        self._placed_objects: Dict[str, Any] = {}  # for anchor lookup
 
     def _get_id(self, prefix: str = "el") -> str:
         self._counter += 1
         return f"{prefix}_{self._counter}"
 
     def _add(self, el: CanvasElement) -> "CanvasBuilder":
+        # Phase 2: elements conceptually live in root_tape.local_elements
+        # We also keep dsl.timeline populated for full backward compat (timeline
+        # mixes elements + camera/action items).
+        if getattr(self, "root_tape", None):
+            self.root_tape.local_elements.append(el)
+            # Phase 4: compose element world with tape world for content inside angled tape
+            tape_wt = self.root_tape.world_transform
+            el_wt = getattr(el, 'world_transform', None) or WorldTransform()
+            # local pos from canvas or el world
+            local = Vector3.from_tuple(getattr(el, 'canvas_position', (0,0,0))) if not (el_wt.position.x or el_wt.position.y) else el_wt.position
+            composed = resolve_world_position(local.as_tuple(), relative_to=tape_wt)
+            el.world_transform = WorldTransform(position=composed, rotation=tape_wt.rotation, scale=tape_wt.scale)
         self.dsl.add_element(el)
+        # Phase 4: record for relative/anchor resolution
+        wt = getattr(el, 'world_transform', None) or WorldTransform()
+        self._placed_transforms[el.id] = wt
+        self._placed_objects[el.id] = el
         return self
 
     def _track_board(self, el: CanvasElement) -> None:
@@ -762,7 +797,12 @@ class CanvasBuilder:
         style: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> str:
-        """Single 2D quadratic graph with formula and trace dot."""
+        """Single 2D quadratic graph with formula and trace dot.
+
+        NOTE: This is legacy convenience. For a more abstract engine, prefer
+        defining such helpers in your project's helpers.py (or using
+        composition of lower-level primitives + styling). See USAGE.md.
+        """
         eid = id or self._get_id("qplot")
         el = CanvasElement(
             id=eid,
@@ -868,6 +908,113 @@ class CanvasBuilder:
         self._layout.flow.y = target_y
         return self
 
+    def add_camera_keyframe(
+        self,
+        *,
+        target: Any,
+        time: float = 0.0,
+        duration: float = 2.0,
+        rate_func: str = "smooth",
+        params: Optional[Dict[str, Any]] = None,
+    ) -> "CanvasBuilder":
+        """Phase 3: add CameraKeyframe for generalized 3D observation (world point, object, tape scroll)."""
+        kf = CameraKeyframe(
+            id=self._get_id("kf"),
+            time=time,
+            target=target,
+            duration=duration,
+            rate_func=rate_func,
+            params=params or {},
+        )
+        self.dsl.timeline.append(kf)
+        return self
+
+    def add_world_object(self, wo: WorldObject) -> str:
+        """Phase 5/6: place a top-level WorldObject in the 3D world (outside default tape).
+        For objects with local content (e.g. another tape), use scoped layout.
+        """
+        if wo.element and getattr(wo.element, 'type', None) in ('Tape', 'tape'):
+            # for sub-tape, scope layout
+            sub_layout = LayoutEngine(
+                frame_width=9.0, frame_height=16.0,
+                scope=wo.element  # if it has
+            )
+            # etc, but for now just place
+        self.dsl.root_objects.append(wo)
+        return wo.id
+
+    def add_object(
+        self,
+        type: str,
+        *,
+        position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        scale: float = 1.0,
+        relative_to: Optional[str] = None,
+        anchor: str = "center",
+        content: Optional[Any] = None,
+        style: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> str:
+        """Phase 9 high-level API: add a (possibly registered) object in world or relative to another.
+
+        If type is registered, uses its builder.
+        Otherwise, creates a CanvasElement or WorldObject with the given transform.
+        """
+        wt = WorldTransform(
+            position=Vector3(*position),
+            rotation=Vector3(*rotation),
+            scale=scale,
+        )
+        if relative_to:
+            base = self._placed_transforms.get(relative_to, WorldTransform())
+            other = self._placed_objects.get(relative_to)
+            if other and hasattr(other, 'get_anchor'):
+                anchor_pos = other.get_anchor(anchor)
+                wt.position = Vector3(
+                    wt.position.x + base.position.x + anchor_pos.x,
+                    wt.position.y + base.position.y + anchor_pos.y,
+                    wt.position.z + base.position.z + anchor_pos.z,
+                )
+            else:
+                wt.position = resolve_world_position(wt.position.as_tuple(), relative_to=base)
+
+        if type in _OBJECT_KINDS and _OBJECT_KINDS[type].get("build"):
+            # use registered build to create element
+            fake_elem = CanvasElement(id=self._get_id(type.lower()), type=type, content=content or {}, world_transform=wt)
+            # the build will be used later in render
+            elem = fake_elem
+        else:
+            elem = CanvasElement(
+                id=self._get_id(type.lower()),
+                type=type,
+                content=content,
+                world_transform=wt,
+            )
+        # place as world object
+        wo = WorldObject(id=elem.id, element=elem, transform=wt)
+        self.dsl.root_objects.append(wo)
+        self._placed_transforms[elem.id] = wt
+        self._placed_objects[elem.id] = wo
+        return elem.id
+
+    @contextlib.contextmanager
+    def in_object_space(self, obj_id: str) -> Iterator[None]:
+        """Phase 9: temporarily scope layout/positioning to a specific object's local space (e.g. inside a sub-tape).
+
+        Usage:
+            with builder.in_object_space("my_tape"):
+                builder.add_text("inside the tape")
+        """
+        prev_tape = getattr(self, '_current_tape', None)
+        obj = self._placed_objects.get(obj_id) or self.root_tape
+        if obj and hasattr(obj, 'local_elements'):
+            self._current_tape = obj
+        try:
+            yield
+        finally:
+            self._current_tape = prev_tape
+
     def auto_camera(
         self,
         *,
@@ -884,9 +1031,84 @@ class CanvasBuilder:
             self.add_camera_move(dy=dy, run_time=run_time)
         return self
 
+    # Phase 4: relative/absolute positioning for 3D world + tape objects
+    def place_relative_to(
+        self,
+        other_id: str,
+        local_offset: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        *,
+        anchor: str = "center",
+        style: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> CanvasElement:
+        """Phase 4: compute a CanvasElement with world pos relative to other_id's anchor + offset.
+        Uses placed transforms and object anchors (enhanced in TapeObject etc).
+        """
+        base = self._placed_transforms.get(other_id, WorldTransform())
+        other = self._placed_objects.get(other_id)
+        anchor_pos = Vector3(0, 0, 0)
+        if other and hasattr(other, 'get_anchor'):
+            anchor_pos = other.get_anchor(anchor)
+        rel = resolve_world_position(
+            tuple(a + b for a, b in zip(local_offset, anchor_pos.as_tuple())),
+            relative_to=base,
+        )
+        el = CanvasElement(
+            id=self._get_id("rel"),
+            type="rel",
+            world_transform=WorldTransform(position=rel),
+        )
+        return el
+
+    def add_relative(
+        self,
+        other_id: str,
+        element: CanvasElement,
+        local_offset: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        anchor: str = "center",
+        style: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> str:
+        """Add element positioned relative to other placed id's anchor."""
+        base = self._placed_transforms.get(other_id, WorldTransform())
+        other = self._placed_objects.get(other_id)
+        anchor_pos = Vector3(0, 0, 0)
+        if other and hasattr(other, 'get_anchor'):
+            anchor_pos = other.get_anchor(anchor)
+        rel = resolve_world_position(
+            tuple(a + b for a, b in zip(local_offset, anchor_pos.as_tuple())),
+            relative_to=base,
+        )
+        element.world_transform = WorldTransform(position=rel)
+        if style:
+            # apply layout style if needed
+            pass
+        self._add(element)
+        self._placed_transforms[element.id] = element.world_transform
+        return element.id
+
+    def set_tape_pose(
+        self,
+        position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        scale: float = 1.0,
+    ) -> "CanvasBuilder":
+        """Phase 4: position/rotate the root tape in world 3D space (e.g. tilted tape)."""
+        if self.root_tape:
+            self.root_tape.world_transform = WorldTransform(
+                position=Vector3(*position),
+                rotation=Vector3(*rotation),
+                scale=scale,
+            )
+        return self
+
     # ---------------- Escape hatches ----------------
 
-    def add_raw(self, el: CanvasElement) -> "CanvasBuilder":
+    def add_raw(self, el: Union[CanvasElement, "WorldObject"]) -> "CanvasBuilder":
+        """Phase 5: support low-level 3D objects (WorldObject) or elements."""
+        if isinstance(el, WorldObject):
+            self.dsl.root_objects.append(el)
+            return self
         if el.canvas_position[1] == 0.0 and el.layout is None:
             self._layout.flow.last_bottom -= 1.5
             el.canvas_position = (

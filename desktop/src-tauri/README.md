@@ -70,15 +70,15 @@ Events: listen for `sidecar-event` (`{ event, data }`).
 
 ```bash
 ./desktop/scripts/verify-phase4.sh
-cd desktop/src-tauri
-cargo tauri dev   # placeholder UI in ../app/dist
+cd desktop
+cargo tauri dev   # starts Vite via beforeDevCommand + Rust shell
 ```
 
 ## Production build
 
 ```bash
 ./desktop/scripts/verify-phase3.sh
-cd desktop/src-tauri && cargo tauri build
+cd desktop && cargo tauri build
 ```
 
 Artifacts: `target/release/bundle/deb/*.deb`, `target/release/bundle/appimage/*.AppImage`

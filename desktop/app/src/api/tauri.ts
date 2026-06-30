@@ -10,6 +10,7 @@ import type {
   ListScenesResult,
   MediaPreviewResult,
   OutputListResult,
+  PreviewData,
   ProjectOpen,
   ProjectSummary,
   RenderResult,
@@ -99,18 +100,45 @@ export async function cloudChat(
   messages: ChatMessage[],
   projectId?: string,
   scenesExcerpt?: string,
+  llmConfig?: { llm_provider?: string; use_personal_llm?: boolean },
 ): Promise<ChatCompletionResponse> {
   return invoke<ChatCompletionResponse>("cloud_chat", {
     params: {
       messages,
       projectId: projectId ?? null,
       scenesExcerpt: scenesExcerpt ?? null,
+      llm_provider: llmConfig?.llm_provider ?? null,
+      use_personal_llm: llmConfig?.use_personal_llm ?? null,
+    },
+  });
+}
+
+export async function cloudGetProfile(): Promise<any> {
+  // Fetches /v1/me for credits, LLM config status (has_own keys, etc.)
+  return invoke("cloud_get_profile");
+}
+
+export async function cloudGenerateAudio(
+  text: string,
+  voice?: string,
+  llmConfig?: { tts_provider?: string; use_personal_llm?: boolean },
+): Promise<{ audioBase64?: string; error?: string }> {
+  return invoke("cloud_generate_audio", {
+    params: {
+      text,
+      voice: voice ?? null,
+      tts_provider: llmConfig?.tts_provider ?? null,
+      use_personal_llm: llmConfig?.use_personal_llm ?? null,
     },
   });
 }
 
 export async function authLogin(email: string, password: string): Promise<TokenResponse> {
   return invoke<TokenResponse>("auth_login", { params: { email, password } });
+}
+
+export async function authSession(accessToken: string): Promise<TokenResponse> {
+  return invoke<TokenResponse>("auth_session", { params: { accessToken } });
 }
 
 export async function settingsGet(): Promise<Settings> {
@@ -174,4 +202,8 @@ export async function projectOpenOutput(projectId: string, path: string): Promis
   return invoke("project_open_output", {
     params: { projectId, path },
   });
+}
+
+export async function sidecarGetPreviewData(projectId: string): Promise<PreviewData> {
+  return invoke<PreviewData>("sidecar_get_preview_data", { params: { projectId } });
 }

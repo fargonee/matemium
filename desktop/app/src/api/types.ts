@@ -83,12 +83,41 @@ export interface ChatCompletionResponse {
   stub?: boolean;
 }
 
-export type BottomDockTab = "progress" | "output";
+// Extended for new LLM-agnostic server features (BYO keys + platform credits)
+export interface LLMConfig {
+  llm_provider?: string | null;
+  has_own_llm_key?: boolean;
+  tts_provider?: string | null;
+  has_own_tts_key?: boolean;
+  llm_credits?: number;
+}
+
+export interface ChatCompletionRequest {
+  messages: ChatMessage[];
+  project_id?: string;
+  scenes_excerpt?: string;
+  // Flags to select personal (BYO) or platform LLM (keys resolved server-side)
+  llm_provider?: string;
+  use_personal_llm?: boolean;
+}
+
+export interface AudioSpeechRequest {
+  text: string;
+  voice?: string;
+  model?: string;
+  tts_provider?: string;
+  use_personal_llm?: boolean;
+}
+
+export type BottomDockTab = "progress" | "output" | "preview";
 
 export interface Settings {
   serverUrl: string;
   apiToken?: string | null;
   bottomDockDefault?: BottomDockTab;
+  // LLM preferences - user chooses personal keys (BYO via web dashboard) or platform credits
+  usePersonalLlm?: boolean;
+  llmProvider?: string;
 }
 
 export interface TokenResponse {
@@ -160,4 +189,64 @@ export interface MediaFileInfo {
   playbackPath: string;
   sizeBytes: number;
   mimeType: string;
+}
+
+export interface PreviewElement {
+  id: string;
+  type: string;
+  content: string;
+  spec?: any;                 // full spec for custom types (QuadraticPlot etc)
+  raw_content?: any;
+  x: number;
+  y: number;
+  z?: number;
+  canvas_position?: [number, number, number];
+  width: number;
+  height: number;
+  layout?: {
+    width: number; height: number; wrap?: boolean; align?: string;
+    margin_top?: number; margin_bottom?: number; margin_left?: number; margin_right?: number;
+  };
+  margin_top?: number;
+  margin_bottom?: number;
+  align?: string;
+  is_math?: boolean;
+  is_3d?: boolean;
+  pitch?: number | null;
+  yaw?: number | null;
+  static_phi?: number | null;
+  static_theta?: number | null;
+  static_scale?: number;
+  static_opacity?: number;
+  auto_focus?: boolean;
+  flex_group?: string | null;
+  runs?: Array<{ text: string; style?: Record<string, any> }>;
+  entry_animation?: { type: string; run_time: number; kwargs?: Record<string, any> };
+  state_behavior?: { type: string; params?: Record<string, any> };
+}
+
+export interface TimelineAction extends PreviewElement {
+  kind: string; // "element" | "CameraMove" | "TransformElement" | "CameraFocus" | ...
+  target_position?: [number, number, number];
+  run_time?: number;
+  rate_func?: string;
+  // other fields from special actions (element_id, etc.)
+  [key: string]: any;
+}
+
+export interface PreviewData {
+  elements: PreviewElement[];
+  timeline?: TimelineAction[];   // full ordered script for manim-web replay (preferred for 1-1)
+  frame_width: number;
+  frame_height: number;
+  title?: string;
+  orientation?: string;
+  background_color?: string;
+  // Phase 1/7: 3D world model
+  coordinate_system?: string;
+  world_transform?: { position: [number,number,number]; rotation?: [number,number,number]; scale?: number } | null;
+  // Phase 5/7: object graph + observations for full 3D preview
+  root_objects?: any[];
+  root_tape?: any;
+  observations?: any[];  // list of camera keyframes/observations for replay
 }

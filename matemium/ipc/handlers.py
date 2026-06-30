@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from canvas import CanvasScene, ReelCutter, SheetDSL
-from canvas.dsl import CanvasElement
+from canvas.dsl import CanvasElement, CameraKeyframe  # Phase 3
 
 from ..__version__ import __version__
 from ..render import (
@@ -32,6 +32,7 @@ from ..workspace_project import (
     load_scene_class,
     resolve_scene_name,
     resolve_workspace,
+    workspace_context,
 )
 from .duration import estimate_timeline_duration
 from .events import EventEmitter
@@ -164,7 +165,8 @@ def handle_render(params: dict[str, Any], events: EventEmitter) -> dict[str, Any
     quality = str(params.get("quality", "low"))
     output_name = params.get("output_name") or "CanvasScene"
 
-    events.compile_started(element_count=len(dsl.timeline))
+    element_count = len(getattr(dsl, "timeline", [])) + len(getattr(dsl, "root_objects", []))
+    events.compile_started(element_count=element_count)
     animation_count = resolve_animation_count(dsl)
     events.layout_done(
         duration_estimate=estimate_timeline_duration(dsl),
@@ -335,7 +337,8 @@ def handle_export_sheet(params: dict[str, Any], events: EventEmitter) -> dict[st
     full_tape = bool(params.get("full_tape", True))
     title = params.get("title")
 
-    events.compile_started(element_count=len(dsl.timeline))
+    element_count = len(getattr(dsl, "timeline", [])) + len(getattr(dsl, "root_objects", []))
+    events.compile_started(element_count=element_count)
     path = _export_static_sheet(
         dsl,
         exports / str(stem),
@@ -415,6 +418,154 @@ def _export_static_sheet(
         )
 
 
+def _serialize_preview_element(el: CanvasElement) -> dict[str, Any]:
+    """Rich serialization for manim-web preview (1-1 as possible)."""
+    raw_content = el.content
+    runs = None
+    plain = ""
+    content_for_preview: Any = None
+
+    if isinstance(raw_content, dict):
+        if "runs" in raw_content:
+            runs = raw_content.get("runs", [])
+            plain = "".join(str(r.get("text", "")) for r in runs)
+            content_for_preview = raw_content
+        elif "text" in raw_content:
+            plain = raw_content.get("text", "")
+            content_for_preview = raw_content
+        elif "equation" in raw_content:
+            plain = raw_content.get("equation", "")
+            content_for_preview = raw_content
+        else:
+            # Complex custom element (QuadraticPlot, GridBoard, Solid3D, etc.)
+            # Keep the full spec dict for the preview renderer to interpret
+            content_for_preview = raw_content
+            # For display / fallback use formula or a short label if present
+            plain = raw_content.get("formula") or raw_content.get("text") or str(el.type)
+    elif isinstance(raw_content, list):
+        plain = "".join(str(x) for x in raw_content)
+        content_for_preview = raw_content
+    elif raw_content is not None:
+        plain = str(raw_content)
+        content_for_preview = raw_content
+
+    # Always keep the original spec available under "spec" for custom types
+    if content_for_preview is None:
+        content_for_preview = raw_content
+
+    layout = el.layout
+    layout_dict = layout.to_dict() if layout is not None else {
+        "width": 0.0, "height": 0.0, "wrap": False, "align": "center",
+        "margin_top": 0.0, "margin_bottom": 0.0, "margin_left": 0.0, "margin_right": 0.0,
+    }
+
+    item: dict[str, Any] = {
+        "id": el.id,
+        "type": el.type,
+        "content": plain,
+        "spec": content_for_preview,   # full spec for custom types (QuadraticPlot etc.)
+        "x": float(el.canvas_position[0]),
+        "y": float(el.canvas_position[1]),
+        "z": float(el.canvas_position[2]),
+        "canvas_position": list(el.canvas_position),
+        # Phase 1: include world transform for the 3D space model (backward compat)
+        "world_transform": getattr(el, "world_transform", None) and el.world_transform.to_dict() or None,
+        "width": float(layout_dict.get("width", 0)),
+        "height": float(layout_dict.get("height", 0)),
+        "layout": layout_dict,
+        "align": layout_dict.get("align", "center"),
+        "margin_top": float(layout_dict.get("margin_top", 0)),
+        "margin_bottom": float(layout_dict.get("margin_bottom", 0)),
+        "is_math": el.type == "MathTex",
+        "is_3d": el.type in ("ThreeDGraph", "Surface", "Solid3D"),
+        "pitch": getattr(el, "pitch", None),
+        "yaw": getattr(el, "yaw", None),
+        "static_phi": getattr(el, "static_phi", None),
+        "static_theta": getattr(el, "static_theta", None),
+        "static_scale": getattr(el, "static_scale", 1.0),
+        "static_opacity": getattr(el, "static_opacity", 1.0),
+        "auto_focus": getattr(el, "auto_focus", True),
+        "flex_group": getattr(el, "flex_group", None),
+    }
+    if runs:
+        item["runs"] = runs
+    if content_for_preview and not isinstance(content_for_preview, (str, list)):
+        # also keep raw content object for preview renderers
+        item["raw_content"] = content_for_preview
+    if el.entry_animation:
+        item["entry_animation"] = {
+            "type": el.entry_animation.type,
+            "run_time": el.entry_animation.run_time,
+            "kwargs": el.entry_animation.kwargs or {},
+        }
+    if el.state_behavior:
+        item["state_behavior"] = {
+            "type": el.state_behavior.type,
+            "params": el.state_behavior.params or {},
+        }
+    return item
+
+
+def _serialize_timeline_action(item: Any) -> dict[str, Any]:
+    """Serialize any TimelineItem for the manim-web replay engine. Phase 3 support."""
+    if isinstance(item, CanvasElement):
+        base = _serialize_preview_element(item)
+        base["kind"] = "element"
+        return base
+    if isinstance(item, CameraKeyframe):
+        d = item.to_dict()
+        d["kind"] = "CameraKeyframe"
+        return d
+    # Special commands
+    if hasattr(item, "to_dict"):
+        d = item.to_dict()
+        # Normalize kind
+        kind = d.get("type", type(item).__name__)
+        d = dict(d)
+        d["kind"] = kind
+        return d
+    return {"kind": "unknown", "raw": str(item)}
+
+
+def handle_get_preview_data(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+    if params.get("workspace"):
+        workspace = resolve_workspace(params)
+        attempted_scene = params.get("scene")
+        try:
+            scene_name = _resolve_scene_or_error(workspace, attempted_scene)
+            with workspace_context(workspace):
+                inst = instantiate_scene(workspace, scene_name, path=params.get("path"))
+            dsl = inst.dsl
+        except Exception as e:
+            # Do not fall back to _require_dsl if this was a workspace call
+            raise ProtocolError(
+                "PREVIEW_LOAD_FAILED",
+                f"Failed to load scene for preview (workspace={workspace}, scene={attempted_scene}): {e}"
+            ) from e
+    else:
+        dsl = _require_dsl(params)
+    # Rich data for sophisticated manim-web 1-1 preview
+    full_timeline = [_serialize_timeline_action(it) for it in getattr(dsl, "timeline", [])]
+    elements = [a for a in full_timeline if a.get("kind") == "element"]
+
+    settings = dsl.canvas_settings
+    return {
+        "elements": elements,
+        "timeline": full_timeline,           # ordered actions (elements + CameraMove + flex etc.)
+        "frame_width": settings.frame_width,
+        "frame_height": settings.frame_height,
+        "title": getattr(settings, "title", None),
+        "orientation": getattr(settings, "orientation", "portrait"),
+        "background_color": getattr(settings, "background_color", "#111111"),
+        # Phase 1
+        "coordinate_system": getattr(settings, "coordinate_system", "sheet"),
+        # Phase 5/7: object graph + observations for full 3D preview
+        "root_objects": [o.to_dict() for o in getattr(dsl, "root_objects", [])],
+        "root_tape": dsl.root_tape.to_dict() if getattr(dsl, "root_tape", None) else None,
+        "observations": [a for a in full_timeline if a.get("kind") in ("CameraMove", "CameraKeyframe", "CameraFocus", "CameraInspect")],
+    }
+
+
 COMMANDS: dict[str, HandlerFn] = {
     "ping": handle_ping,
     "list_scenes": handle_list_scenes,
@@ -423,6 +574,7 @@ COMMANDS: dict[str, HandlerFn] = {
     "render_project": handle_render_project,
     "validate_dsl": handle_validate_dsl,
     "estimate_duration": handle_estimate_duration,
+    "get_preview_data": handle_get_preview_data,
     "compile_preview": handle_compile_preview,
     "render": handle_render,
     "export_sheet": handle_export_sheet,

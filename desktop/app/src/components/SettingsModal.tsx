@@ -43,81 +43,89 @@ export function SettingsModal({
     }
   };
 
+  const handleSessionLogin = async (supabaseToken: string) => {
+    if (!supabaseToken) return;
+    setAuthError(null);
+    setAuthBusy(true);
+    try {
+      const result = await api.authSession(supabaseToken);
+      const next = { ...settings, apiToken: result.accessToken };
+      onChange(next);
+      await onSave(next);
+    } catch (error) {
+      setAuthError(formatError(error));
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Settings</h2>
-        <label htmlFor="server-url">Server base URL</label>
-        <input
-          id="server-url"
-          value={settings.serverUrl}
-          onChange={(e) => onChange({ ...settings, serverUrl: e.target.value })}
-        />
-        <label htmlFor="bottom-dock-default">Default bottom panel</label>
-        <select
-          id="bottom-dock-default"
-          value={settings.bottomDockDefault ?? "progress"}
-          onChange={(e) =>
-            onChange({
-              ...settings,
-              bottomDockDefault: e.target.value === "output" ? "output" : "progress",
-            })
-          }
-        >
-          <option value="progress">Progress indicators</option>
-          <option value="output">Terminal output</option>
-        </select>
-        <label htmlFor="api-token">API token</label>
-        <input
-          id="api-token"
-          type="password"
-          value={settings.apiToken ?? ""}
-          onChange={(e) =>
-            onChange({
-              ...settings,
-              apiToken: e.target.value || null,
-            })
-          }
-        />
-        {!settings.apiToken ? (
-          <>
-            <label htmlFor="auth-email">Dev login email</label>
-            <input
-              id="auth-email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <label htmlFor="auth-password">Dev login password</label>
-            <input
-              id="auth-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <button
-              type="button"
-              className="btn"
-              disabled={busy || authBusy}
-              onClick={() => void handleGetToken()}
-            >
-              Get dev token
-            </button>
-            {authError ? (
-              <p style={{ color: "#ff8a8a", fontSize: "0.78rem" }}>{authError}</p>
-            ) : null}
-          </>
-        ) : null}
-        <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose}>
-            Cancel
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+        <h2 style={{ marginBottom: 14 }}>Settings</h2>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: '0.78rem', color: '#9aa0a6', display: 'block', marginBottom: 3 }}>Server URL</label>
+          <input id="server-url" value={settings.serverUrl} onChange={(e) => onChange({ ...settings, serverUrl: e.target.value })} />
+          <div style={{ fontSize: '0.7rem', color: '#7c8595', marginTop: 2 }}>Live server: https://p01--math--zjvwyx4fjqbn.code.run</div>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: '0.78rem', color: '#9aa0a6', display: 'block', marginBottom: 3 }}>API Token</label>
+          <input id="api-token" type="password" value={settings.apiToken ?? ''} onChange={(e) => onChange({ ...settings, apiToken: e.target.value || null })} placeholder="Paste token from web or dev" />
+        </div>
+
+        {!settings.apiToken && (
+          <div style={{ background: '#1a1f2a', padding: '10px 12px', borderRadius: 8, marginBottom: 14, fontSize: '0.82rem' }}>
+            <div style={{ color: '#f5c542', marginBottom: 6 }}>Quick sign in</div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+              <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="email" style={{ flex: 1 }} />
+              <input value={password} type="password" onChange={e=>setPassword(e.target.value)} placeholder="pass" style={{ flex: 1 }} />
+            </div>
+            <button type="button" className="btn" disabled={busy || authBusy} onClick={() => void handleGetToken()} style={{ width: '100%', marginBottom: 6 }}>Get dev token</button>
+
+            <div style={{ fontSize: '0.7rem', color: '#9aa0a6' }}>Live server (sign in on web with Google first):</div>
+            <button type="button" className="btn" disabled={busy || authBusy} onClick={() => {
+              const t = prompt('Paste your Supabase access_token (from web after login)');
+              if (t) void handleSessionLogin(t);
+            }} style={{ width: '100%' }}>Exchange Supabase token (for live)</button>
+            {authError && <p style={{ color: '#ff8a8a', fontSize: '0.7rem', marginTop: 4 }}>{authError}</p>}
+          </div>
+        )}
+
+        {/* LLM section - beautiful and central to experience */}
+        <div style={{ background: '#1a1f2a', padding: '10px 12px', borderRadius: 8, marginBottom: 14 }}>
+          <div style={{ fontWeight: 600, marginBottom: 6, fontSize: '0.85rem' }}>🤖 LLM Mode</div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', marginBottom: 6 }}>
+            <input type="checkbox" checked={!!settings.usePersonalLlm} onChange={e => onChange({ ...settings, usePersonalLlm: e.target.checked })} />
+            Use my personal keys (BYO)
+          </label>
+          <select value={settings.llmProvider || 'openai'} onChange={e => onChange({ ...settings, llmProvider: e.target.value })} style={{ width: '100%', marginBottom: 6 }}>
+            <option value="openai">OpenAI / Compatible</option>
+            <option value="groq">Groq</option>
+            <option value="xai">xAI</option>
+            <option value="openrouter">OpenRouter</option>
+          </select>
+          <div style={{ fontSize: '0.7rem', color: '#9aa0a6' }}>
+            Manage keys &amp; buy credits in the web dashboard. Desktop just picks the mode.
+          </div>
+          <button type="button" className="btn" style={{ marginTop: 6, fontSize: '0.75rem' }} onClick={() => window.open('https://p01--math--zjvwyx4fjqbn.code.run/dashboard', '_blank')}>
+            Open web dashboard →
           </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={busy || authBusy}
-            onClick={() => void onSave(settings)}
-          >
-            Save
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ fontSize: '0.78rem', color: '#9aa0a6', display: 'block', marginBottom: 3 }}>Bottom panel</label>
+          <select value={settings.bottomDockDefault ?? 'progress'} onChange={e => onChange({ ...settings, bottomDockDefault: e.target.value === 'output' ? 'output' : 'progress' })}>
+            <option value="progress">Progress</option>
+            <option value="output">Terminal</option>
+          </select>
+        </div>
+
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn-primary" disabled={busy || authBusy} onClick={() => void onSave(settings)}>
+            Save &amp; Connect
           </button>
         </div>
       </div>

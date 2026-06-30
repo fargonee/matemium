@@ -5,7 +5,7 @@ import type { BottomDockTab, Settings } from "../api/types";
 const STORAGE_KEY = "matemium-bottom-dock-tab";
 
 function isBottomDockTab(value: string): value is BottomDockTab {
-  return value === "progress" || value === "output";
+  return value === "progress" || value === "output" || value === "preview";
 }
 
 function loadTab(defaultTab: BottomDockTab): BottomDockTab {
@@ -37,5 +37,7 @@ export function useBottomDockTab(settingsDefault: BottomDockTab = "progress") {
 }
 
 export function resolveBottomDockDefault(settings: Settings): BottomDockTab {
-  return settings.bottomDockDefault === "output" ? "output" : "progress";
+  if (settings.bottomDockDefault === "output") return "output";
+  if (settings.bottomDockDefault === "preview") return "preview";
+  return "progress";
 }

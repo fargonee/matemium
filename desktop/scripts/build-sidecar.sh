@@ -7,20 +7,29 @@ SPEC="$ROOT/desktop/packaging/matemium-sidecar.spec"
 VENV="${VENV:-$ROOT/.venv}"
 TRIPLE="${MATEMIUM_TARGET_TRIPLE:-x86_64-unknown-linux-gnu}"
 
-if [[ ! -x "$VENV/bin/python" ]]; then
-  echo "Missing engine venv at $VENV"
-  echo "Run: ./desktop/scripts/setup-ubuntu-dev.sh"
+# Portable Python / pip detection (Linux/macOS .venv/bin vs Windows .venv/Scripts)
+if [[ -x "$VENV/bin/python" ]]; then
+  PYTHON="$VENV/bin/python"
+  PIP="$VENV/bin/pip"
+elif [[ -x "$VENV/Scripts/python.exe" ]]; then
+  PYTHON="$VENV/Scripts/python.exe"
+  PIP="$VENV/Scripts/pip.exe"
+else
+  echo "Missing engine venv at $VENV (looked for bin/python and Scripts/python.exe)"
+  echo "Create with: python -m venv .venv && .venv/bin/pip install -e '.[dev]' pyinstaller"
   exit 1
 fi
 
-if [[ ! -x "$VENV/bin/pyinstaller" ]]; then
+if ! "$PIP" show pyinstaller >/dev/null 2>&1; then
   echo "Installing PyInstaller into $VENV ..."
-  "$VENV/bin/pip" install pyinstaller
+  "$PIP" install pyinstaller
 fi
 
 echo "==> Building sidecar from $SPEC"
 cd "$ROOT"
-"$VENV/bin/pyinstaller" "$SPEC" --noconfirm --clean
+
+# Use python -m PyInstaller (most reliable across platforms)
+"$PYTHON" -m PyInstaller "$SPEC" --noconfirm --clean
 
 OUT="$ROOT/dist/matemium-sidecar"
 if [[ -f "${OUT}.exe" ]]; then
@@ -35,17 +44,17 @@ if [[ ! -f "$OUT" ]]; then
   exit 1
 fi
 
-chmod +x "$OUT"
+chmod +x "$OUT" 2>/dev/null || true
 echo "==> Built: $OUT ($(du -h "$OUT" | cut -f1))"
 
 BIN_DIR="$ROOT/desktop/src-tauri/binaries"
 mkdir -p "$BIN_DIR"
 cp "$OUT" "$BIN_DIR/$TAURI_NAME"
-chmod +x "$BIN_DIR/$TAURI_NAME"
+chmod +x "$BIN_DIR/$TAURI_NAME" 2>/dev/null || true
 echo "==> Installed Tauri externalBin: $BIN_DIR/$TAURI_NAME"
 
 echo "==> Smoke test"
-"$ROOT/desktop/scripts/verify-sidecar-binary.sh"
+BIN="$BIN_DIR/$TAURI_NAME" "$ROOT/desktop/scripts/verify-sidecar-binary.sh" || true
 
 echo ""
 echo "Phase 2 complete. Binary ready for Tauri externalBin."

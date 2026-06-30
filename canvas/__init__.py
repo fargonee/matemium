@@ -19,12 +19,32 @@ from .dsl import (
     CanvasElement,
     LayoutBox,
     CameraMove,
+    CameraKeyframe,  # Phase 3 generalized observation
+    WorldPoint,
+    ObjectAnchor,
+    TapeScroll,
+    ObservationTarget,
     TransformElement,
     EntryAnimation,
     StateBehavior,
+    # Phase 1
+    WorldObject,
+    # Phase 2
+    TapeObject,
 )
+# Phase 1+: world coordinate primitives (exported for authors and tests)
+from .coords import Vector3, WorldTransform, resolve_world_position
 from .layout import LayoutEngine, Style
-from .measure import build_mobject, measure_element
+from .measure import (
+    build_mobject,
+    measure_element,
+    set_measurement_backend,
+    get_measurement_backend,
+    register_element_builder,
+    register_object_kind,  # Phase 9
+)
+from .measurement import MeasuredSize, MeasurementBackend, BoundingBox3D
+from .measurement.manim_backend import ManimMeasurementBackend
 from .scene import CanvasScene
 from .builder import CanvasBuilder
 
@@ -54,7 +74,16 @@ __all__ = [
     "Style",
     "build_mobject",
     "measure_element",
+    "set_measurement_backend",
+    "get_measurement_backend",
+    "register_element_builder",
+    "register_object_kind",  # Phase 9 / canonical
+    "MeasuredSize",
+    "MeasurementBackend",
+    "ManimMeasurementBackend",
+    "BoundingBox3D",
     "CameraMove",
+    "CameraKeyframe",
     "TransformElement",
     "EntryAnimation",
     "StateBehavior",
@@ -66,4 +95,14 @@ __all__ = [
     "FLASH_AND_SCALE",
     "ReelCutter",
     "CanvasBuilder",
+    # 3D world model (Phase 1-10 canonical)
+    "Vector3",
+    "WorldTransform",
+    "WorldObject",
+    "TapeObject",
+    "WorldPoint",
+    "ObjectAnchor",
+    "TapeScroll",
+    "ObservationTarget",
+    "resolve_world_position",
 ]

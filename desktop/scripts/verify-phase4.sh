@@ -66,7 +66,7 @@ fi
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then
   echo "Phase 4 verification passed."
-  echo "Manual dev check: cd desktop/src-tauri && cargo tauri dev"
+  echo "Manual dev check: cd desktop && cargo tauri dev"
   echo "  invoke('sidecar_ping') from the WebView console once Phase 5 UI exists."
   exit 0
 fi

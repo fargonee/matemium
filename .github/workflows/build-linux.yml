@@ -4,8 +4,9 @@ name: Build Linux Desktop
 # - Full production builds (.deb + .AppImage) ONLY on version tags (v*) and manual dispatch.
 # - Lightweight verification (engine smoke + cargo check) runs on PRs and main pushes
 #   that touch relevant paths.
+# - Full matrix: Linux + Windows + macOS (see build-windows.yml and build-macos.yml).
 # - Path filters avoid wasting minutes when only website/ or unrelated server code changes.
-# - On tags we publish a GitHub Release and attach the built bundles.
+# - On tags we publish a GitHub Release and attach the built bundles from all platforms.
 #
 # This aligns with the project documentation: release pipeline uses tags.
 
@@ -141,8 +142,13 @@ jobs:
       - name: Create venv and install engine + PyInstaller (matches build-linux.sh expectations)
         run: |
           python -m venv .venv
-          .venv/bin/pip install --upgrade pip
-          .venv/bin/pip install -e ".[dev]" pyinstaller
+          if [ -f .venv/bin/pip ]; then
+            .venv/bin/pip install --upgrade pip
+            .venv/bin/pip install -e ".[dev]" pyinstaller
+          else
+            .venv/Scripts/pip.exe install --upgrade pip
+            .venv/Scripts/pip.exe install -e ".[dev]" pyinstaller
+          fi
           echo "Venv ready at .venv"
 
       - name: Set up Node.js

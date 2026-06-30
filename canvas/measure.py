@@ -1,13 +1,18 @@
 """Unified measurement and mobject construction for Matemium.
 
-Single source of truth for element sizing: used by the layout engine (pre-layout)
-and by CanvasScene (final render). Keeps builder and scene in sync.
+Renderer-agnostic by design:
+- Layout decisions (positions + sizes) can be driven by any MeasurementBackend.
+- The default is Manim-backed (for final video fidelity).
+- The desktop preview can use (or request measurements via) a KaTeX / manim-web compatible backend
+  so that the manim-web player sees *exactly* the same metrics used for authoring layout.
+
+This is the foundation that lets us have a true 1-1 manim-web powered live preview.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 import numpy as np
 from manim import UP, MathTex, Mobject, Text, VGroup, WHITE
@@ -31,8 +36,97 @@ from .solid_labels import attach_labels_to_solid
 from .solids import make_solid, make_solid_group, parse_solid_content, solid_footprint_size
 from .surfaces import make_surface_from_equation
 
+if TYPE_CHECKING:
+    from .measurement import MeasurementBackend, MeasuredSize, BoundingBox3D
+from .measurement import BoundingBox3D
+
 DEFAULT_TEXT_FONT_SIZE = 36
 DEFAULT_MATH_SCALE = 0.9
+
+# Pluggable backend (renderer agnostic support)
+_CURRENT_BACKEND: Optional["MeasurementBackend"] = None
+
+# Extension point for custom / lesson-specific element types.
+# This is how we avoid constantly patching the core engine for every new
+# visualization pattern (plots, diagrams, solids, etc.).
+#
+# Preferred usage: register from project helpers or a small shared layer.
+# The goal is to keep canvas/ focused on the generic sheet + styling + layout
+# machinery.
+_CUSTOM_BUILDERS: dict[str, Callable[[CanvasElement, bool, Optional[float], SurfaceFactory], Optional[Mobject]]] = {}
+
+# Phase 9: full registration for object kinds to support extensibility in 3D world + sheet.
+# Allows registering new viz types without patching core.
+_OBJECT_KINDS: dict[str, dict] = {}
+
+
+def register_object_kind(
+    name: str,
+    *,
+    build: Optional[Callable] = None,
+    measure: Optional[Callable] = None,
+    observe: Optional[Callable] = None,
+    preview: Optional[Callable] = None,
+) -> None:
+    """Register a custom object kind for the 3D world / sheet model (Phase 9).
+
+    Example:
+        def build_my_viz(elem, ...): ...
+        def measure_my_viz(obj, ...): ...
+        def observe_my_viz(target, ...): ...
+        register_object_kind("MyDiagram", build=build_my_viz, measure=measure_my_viz, observe=observe_my_viz)
+
+    Then use: builder.add_object("MyDiagram", position=..., ...)
+    """
+    _OBJECT_KINDS[name] = {
+        "build": build,
+        "measure": measure,
+        "observe": observe,
+        "preview": preview,
+    }
+    if build:
+        _CUSTOM_BUILDERS[name] = build
+
+
+def register_element_builder(
+    type_name: str,
+    builder: Callable[[CanvasElement, bool, Optional[float], SurfaceFactory], Optional[Mobject]],
+) -> None:
+    """Register a builder for a custom CanvasElement type (legacy compat).
+
+    Example (in a project helpers.py):
+        def _build_my_viz(elem, wrap, tw, factory):
+            ...
+        register_element_builder("MySpecialPlot", _build_my_viz)
+    """
+    _CUSTOM_BUILDERS[type_name] = builder
+
+
+def set_measurement_backend(backend: "MeasurementBackend") -> None:
+    """Inject a different measurement backend (e.g. one using browser KaTeX metrics)."""
+    global _CURRENT_BACKEND
+    _CURRENT_BACKEND = backend
+
+
+def get_measurement_backend() -> Optional["MeasurementBackend"]:
+    return _CURRENT_BACKEND
+
+def measure_object_bounds(obj: Any, **kwargs: Any) -> BoundingBox3D:
+    """Phase 6: get 3D bounds using backend, fallback."""
+    if hasattr(obj, 'get_surface_info'):
+        surf = obj.get_surface_info()
+        if surf and surf.get('is_planar'):
+            w = surf.get('width', 9.0)
+            h = surf.get('height', 16.0)
+            return BoundingBox3D(min=(-w/2, -h/2, 0), max=(w/2, h/2, 0.01))
+    backend = get_measurement_backend()
+    if backend and hasattr(backend, 'measure_bounding_box'):
+        try:
+            return backend.measure_bounding_box(obj, **kwargs)
+        except:
+            pass
+    # fallback
+    return BoundingBox3D(min=(0,0,0), max=(1,1,1))
 
 # Legacy keys that used to live inside ``content`` before LayoutBox existed.
 _LEGACY_LAYOUT_KEYS = frozenset({"_target_width", "_target_height", "width"})
@@ -151,6 +245,138 @@ def make_render_surface(equation: Optional[str] = None) -> Mobject:
     return make_surface_from_equation(equation, preview=False)
 
 
+def _build_mathtex(elem: CanvasElement, wrap: bool, target_width: Optional[float], surface_factory: SurfaceFactory) -> Optional[Mobject]:
+    norm = normalize_content(elem)
+    tex = norm.text or r"\text{Math}"
+    mob = MathTex(tex, color=WHITE).scale(DEFAULT_MATH_SCALE)
+    if target_width and mob.get_width() > 0:
+        mob.set_width(float(target_width))
+    return mob
+
+
+def _build_text(elem: CanvasElement, wrap: bool, target_width: Optional[float], surface_factory: SurfaceFactory) -> Optional[Mobject]:
+    norm = normalize_content(elem)
+    return build_plain_or_rich_mobject(
+        elem.content if elem.content is not None else (norm.text or "Text"),
+        wrap=wrap,
+        target_width=float(target_width) if target_width else None,
+        font_size=DEFAULT_TEXT_FONT_SIZE,
+    )
+
+
+def _build_solid3d(elem: CanvasElement, wrap: bool, target_width: Optional[float], surface_factory: SurfaceFactory) -> Optional[Mobject]:
+    c = parse_solid_content(elem.content)
+    if isinstance(c.get("parts"), list):
+        body = make_solid_group(c["parts"], target_width=target_width)
+    else:
+        body = make_solid(c, target_width=target_width)
+    return attach_labels_to_solid(body, elem.content)
+
+
+def _build_surface_or_graph(elem: CanvasElement, wrap: bool, target_width: Optional[float], surface_factory: SurfaceFactory) -> Optional[Mobject]:
+    norm = normalize_content(elem)
+    eq = norm.equation
+    surf = surface_factory(eq)
+    label = None
+    if eq:
+        label = MathTex(eq, color="#aaccff").scale(0.6)
+    if target_width and surf.get_width() > 0:
+        surf.scale(float(target_width) / surf.get_width())
+    if label:
+        label.next_to(surf, UP, buff=0.3)
+        grp = VGroup(surf, label)
+        if target_width and grp.get_width() > 0:
+            grp.set_width(float(target_width))
+        return grp
+    return surf
+
+
+def _build_axes(elem: CanvasElement, wrap: bool, target_width: Optional[float], surface_factory: SurfaceFactory) -> Optional[Mobject]:
+    from manim import ThreeDAxes
+    ax = ThreeDAxes(
+        x_range=[-4, 4, 1],
+        y_range=[-4, 4, 1],
+        z_range=[-2, 2, 0.5],
+    )
+    ax.scale(0.6)
+    return ax
+
+
+def _build_number_plane(elem: CanvasElement, wrap: bool, target_width: Optional[float], surface_factory: SurfaceFactory) -> Optional[Mobject]:
+    from manim import NumberPlane
+    plane = NumberPlane(
+        x_range=[-6, 6, 1],
+        y_range=[-6, 6, 1],
+        background_line_style={"stroke_color": "#444444"},
+    )
+    plane.scale(0.55)
+    return plane
+
+
+def _build_grid_board(elem: CanvasElement, wrap: bool, target_width: Optional[float], surface_factory: SurfaceFactory) -> Optional[Mobject]:
+    c = parse_grid_content(elem.content)
+    mob = make_grid_board(
+        rows=int(c.get("rows", 3)),
+        cols=int(c.get("cols", 3)),
+        cell_size=float(c.get("cell_size", 1.0)),
+        stroke_color=str(c.get("stroke_color", "#888888")),
+        stroke_width=float(c.get("stroke_width", 4.0)),
+    )
+    if target_width and mob.get_width() > 0:
+        mob.set_width(float(target_width))
+    return mob
+
+
+def _build_grid_mark(elem: CanvasElement, wrap: bool, target_width: Optional[float], surface_factory: SurfaceFactory) -> Optional[Mobject]:
+    c = parse_grid_content(elem.content)
+    return make_grid_mark(
+        str(c.get("symbol", "X")),
+        float(c.get("cell_size", 1.0)),
+    )
+
+
+def _build_quadratic_plot(elem: CanvasElement, wrap: bool, target_width: Optional[float], surface_factory: SurfaceFactory) -> Optional[Mobject]:
+    c = parse_plot_spec(elem.content)
+    group, part = make_quadratic_plot(
+        float(c.get("a", 1)),
+        float(c.get("b", 0)),
+        float(c.get("c", 0)),
+        formula=c.get("formula"),
+        x_range=tuple(c.get("x_range", (-3.0, 3.0))),
+        plot_width=float(c.get("plot_width", 3.0)),
+        plot_height=float(c.get("plot_height", 2.2)),
+        x_start=float(c.get("x_start", 0)),
+        show_readout=bool(c.get("show_readout", True)),
+        stroke_color=str(c.get("color", "#5eb3ff")),
+    )
+    attach_plot_parts(group, [part])
+    if target_width and group.get_width() > 0:
+        group.set_width(float(target_width))
+    return group
+
+
+def _build_quadratic_plot_pair(elem: CanvasElement, wrap: bool, target_width: Optional[float], surface_factory: SurfaceFactory) -> Optional[Mobject]:
+    c = parse_plot_spec(elem.content)
+    left = c.get("left") or {}
+    right = c.get("right") or {}
+    gap = float(c.get("gap", 0.55))
+    pw = float(c.get("plot_width", 2.65))
+    ph = float(c.get("plot_height", 2.05))
+    pair, parts = make_quadratic_plot_pair(left, right, gap=gap, plot_width=pw, plot_height=ph)
+    attach_plot_parts(pair, parts)
+    if target_width and pair.get_width() > 0:
+        pair.set_width(float(target_width))
+    return pair
+
+
+def _build_unknown(elem: CanvasElement, wrap: bool, target_width: Optional[float], surface_factory: SurfaceFactory) -> Optional[Mobject]:
+    from manim import Dot, Square
+    return VGroup(
+        Dot(radius=0.12, color="#ffcc00"),
+        Square(side_length=0.6, color=WHITE, fill_opacity=0.15),
+    )
+
+
 def _build_raw_mobject(
     elem: CanvasElement,
     *,
@@ -158,128 +384,18 @@ def _build_raw_mobject(
     target_width: Optional[float],
     surface_factory: SurfaceFactory,
 ) -> Optional[Mobject]:
-    """Build an unscaled mobject for measurement or rendering."""
-    norm = normalize_content(elem)
+    """Build an unscaled mobject for measurement or rendering.
 
-    if elem.type == "MathTex":
-        tex = norm.text or r"\text{Math}"
-        mob = MathTex(tex, color=WHITE).scale(DEFAULT_MATH_SCALE)
-        if target_width and mob.get_width() > 0:
-            mob.set_width(float(target_width))
-        return mob
+    Phase 10: primary dispatch is via registered object kinds (builtins + custom).
+    Legacy _CUSTOM_BUILDERS bridged for compat.
+    """
+    if elem.type in _OBJECT_KINDS and _OBJECT_KINDS[elem.type].get("build"):
+        return _OBJECT_KINDS[elem.type]["build"](elem, wrap, target_width, surface_factory)
+    if elem.type in _CUSTOM_BUILDERS:
+        return _CUSTOM_BUILDERS[elem.type](elem, wrap, target_width, surface_factory)
 
-    if elem.type == "Text":
-        return build_plain_or_rich_mobject(
-            elem.content if elem.content is not None else (norm.text or "Text"),
-            wrap=wrap,
-            target_width=float(target_width) if target_width else None,
-            font_size=DEFAULT_TEXT_FONT_SIZE,
-        )
-
-    if elem.type == "Solid3D":
-        c = parse_solid_content(elem.content)
-        if isinstance(c.get("parts"), list):
-            body = make_solid_group(c["parts"], target_width=target_width)
-        else:
-            body = make_solid(c, target_width=target_width)
-        return attach_labels_to_solid(body, elem.content)
-
-    if elem.type in ("ThreeDGraph", "Surface"):
-        eq = norm.equation
-        surf = surface_factory(eq)
-        label = None
-        if eq:
-            label = MathTex(eq, color="#aaccff").scale(0.6)
-        if target_width and surf.get_width() > 0:
-            surf.scale(float(target_width) / surf.get_width())
-        if label:
-            label.next_to(surf, UP, buff=0.3)
-            grp = VGroup(surf, label)
-            if target_width and grp.get_width() > 0:
-                grp.set_width(float(target_width))
-            return grp
-        return surf
-
-    if elem.type == "Axes":
-        from manim import ThreeDAxes
-
-        ax = ThreeDAxes(
-            x_range=[-4, 4, 1],
-            y_range=[-4, 4, 1],
-            z_range=[-2, 2, 0.5],
-        )
-        ax.scale(0.6)
-        return ax
-
-    if elem.type == "NumberPlane":
-        from manim import NumberPlane
-
-        plane = NumberPlane(
-            x_range=[-6, 6, 1],
-            y_range=[-6, 6, 1],
-            background_line_style={"stroke_color": "#444444"},
-        )
-        plane.scale(0.55)
-        return plane
-
-    if elem.type == "GridBoard":
-        c = parse_grid_content(elem.content)
-        mob = make_grid_board(
-            rows=int(c.get("rows", 3)),
-            cols=int(c.get("cols", 3)),
-            cell_size=float(c.get("cell_size", 1.0)),
-            stroke_color=str(c.get("stroke_color", "#888888")),
-            stroke_width=float(c.get("stroke_width", 4.0)),
-        )
-        if target_width and mob.get_width() > 0:
-            mob.set_width(float(target_width))
-        return mob
-
-    if elem.type == "GridMark":
-        c = parse_grid_content(elem.content)
-        return make_grid_mark(
-            str(c.get("symbol", "X")),
-            float(c.get("cell_size", 1.0)),
-        )
-
-    if elem.type == "QuadraticPlot":
-        c = parse_plot_spec(elem.content)
-        group, part = make_quadratic_plot(
-            float(c.get("a", 1)),
-            float(c.get("b", 0)),
-            float(c.get("c", 0)),
-            formula=c.get("formula"),
-            x_range=tuple(c.get("x_range", (-3.0, 3.0))),
-            plot_width=float(c.get("plot_width", 3.0)),
-            plot_height=float(c.get("plot_height", 2.2)),
-            x_start=float(c.get("x_start", 0)),
-            show_readout=bool(c.get("show_readout", True)),
-            stroke_color=str(c.get("color", "#5eb3ff")),
-        )
-        attach_plot_parts(group, [part])
-        if target_width and group.get_width() > 0:
-            group.set_width(float(target_width))
-        return group
-
-    if elem.type == "QuadraticPlotPair":
-        c = parse_plot_spec(elem.content)
-        left = c.get("left") or {}
-        right = c.get("right") or {}
-        gap = float(c.get("gap", 0.55))
-        pw = float(c.get("plot_width", 2.65))
-        ph = float(c.get("plot_height", 2.05))
-        pair, parts = make_quadratic_plot_pair(left, right, gap=gap, plot_width=pw, plot_height=ph)
-        attach_plot_parts(pair, parts)
-        if target_width and pair.get_width() > 0:
-            pair.set_width(float(target_width))
-        return pair
-
-    from manim import Dot, Square
-
-    return VGroup(
-        Dot(radius=0.12, color="#ffcc00"),
-        Square(side_length=0.6, color=WHITE, fill_opacity=0.15),
-    )
+    # Fallback for any unregistered (should be rare after auto-reg)
+    return _build_unknown(elem, wrap, target_width, surface_factory)
 
 
 def measure_element(
@@ -291,11 +407,28 @@ def measure_element(
     wrap: Optional[bool] = None,
     surface_factory: SurfaceFactory = make_preview_surface,
 ) -> tuple[float, float, bool]:
+    """Main sizing entry point.
+
+    If a MeasurementBackend has been injected via set_measurement_backend(),
+    callers higher up (LayoutEngine) can choose to use the protocol for parity
+    with manim-web / KaTeX. The current implementation remains the authoritative
+    one for video rendering.
+    """
     """Compute border-box (width, height, wrap) for layout.
 
     Returns:
         (target_width, target_height, resolved_wrap)
     """
+    # Phase 10: delegate to registered kind measure if provided
+    k = _OBJECT_KINDS.get(elem.type)
+    if k and k.get("measure"):
+        try:
+            res = k["measure"](elem, usable_width=usable_width, style_width=style_width, style_height=style_height, wrap=wrap)
+            if res:
+                return res
+        except Exception:
+            pass
+
     if elem.type == "GridBoard":
         c = parse_grid_content(elem.content)
         rows, cols = int(c.get("rows", 3)), int(c.get("cols", 3))
@@ -425,3 +558,29 @@ def build_mobject(
         target_width=float(tw) if tw else None,
         surface_factory=factory,
     )
+
+
+# -------------------------------------------------------------------
+# Phase 10: Auto-register built-in object kinds at import time.
+# This makes registry dispatch the canonical path for core types too.
+# New kinds and custom viz register the same way (no if/elif patches).
+# -------------------------------------------------------------------
+
+def _auto_register_builtins():
+    register_object_kind("MathTex", build=_build_mathtex)
+    register_object_kind("Text", build=_build_text)
+    register_object_kind("Solid3D", build=_build_solid3d)
+    # "ThreeDGraph" and "Surface" share the surface builder
+    register_object_kind("ThreeDGraph", build=_build_surface_or_graph)
+    register_object_kind("Surface", build=_build_surface_or_graph)
+    register_object_kind("Axes", build=_build_axes)
+    register_object_kind("NumberPlane", build=_build_number_plane)
+    register_object_kind("GridBoard", build=_build_grid_board)
+    register_object_kind("GridMark", build=_build_grid_mark)
+    register_object_kind("QuadraticPlot", build=_build_quadratic_plot)
+    register_object_kind("QuadraticPlotPair", build=_build_quadratic_plot_pair)
+    # Unknown falls back inside _build_raw_mobject but is also registered for completeness
+    register_object_kind("Unknown", build=_build_unknown)
+
+
+_auto_register_builtins()

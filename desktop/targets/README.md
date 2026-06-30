@@ -57,20 +57,15 @@ Each job runs the same high-level steps:
 4. `cargo tauri build`
 5. Upload platform installer as a CI artifact (or attach to a GitHub Release)
 
-**Current CI:** [`.github/workflows/build-linux.yml`](../../.github/workflows/build-linux.yml) covers Linux only. Windows and macOS workflow files are **required** before multi-platform ship.
+**Current CI:** Full matrix implemented.
+- [`.github/workflows/build-linux.yml`](../../.github/workflows/build-linux.yml)
+- [`.github/workflows/build-windows.yml`](../../.github/workflows/build-windows.yml)
+- [`.github/workflows/build-macos.yml`](../../.github/workflows/build-macos.yml) (both Apple Silicon + Intel)
 
-Planned matrix shape:
+Implemented matrix (see workflows):
 
 ```yaml
-strategy:
-  matrix:
-    include:
-      - os: windows-latest
-        triple: x86_64-pc-windows-msvc
-      - os: macos-latest
-        triple: aarch64-apple-darwin   # add x86_64-apple-darwin for Intel-only if needed
-      - os: ubuntu-24.04
-        triple: x86_64-unknown-linux-gnu
+# Linux, Windows x64, macOS arm64 + x64
 ```
 
 **Local dev:** use `cargo tauri dev` on your host OS only — no cross-compile needed for day-to-day work.
@@ -160,3 +155,59 @@ Post-install validation checklist: [`COMPLETE_LINUX_UBUNTU_APP_TODO.md`](../../C
 Step-by-step checklist from dev machine setup through `.deb` / `.AppImage` on a clean VM:
 
 **[`COMPLETE_LINUX_UBUNTU_APP_TODO.md`](../../COMPLETE_LINUX_UBUNTU_APP_TODO.md)**
+
+---
+
+## Multi-platform CI (implemented)
+
+All three platforms now have dedicated workflows:
+- `build-linux.yml`
+- `build-windows.yml`
+- `build-macos.yml` (builds both `aarch64-apple-darwin` and `x86_64-apple-darwin`)
+
+**Release process (all platforms):**
+- Push a tag `vX.Y.Z` → all full builds run in parallel.
+- Artifacts are attached to the same GitHub Release.
+- Lightweight verification runs on every PR / main push that touches desktop/engine code.
+
+## Code signing & notarization (required for clean distribution)
+
+Unsigned builds are produced automatically. For professional "live" distribution:
+
+### macOS (strongly recommended)
+Store these GitHub repository secrets:
+- `APPLE_CERTIFICATE` — base64 of your `.p12` Developer ID Application certificate
+- `APPLE_CERTIFICATE_PASSWORD`
+- `APPLE_ID` (Apple ID email)
+- `APPLE_PASSWORD` (app-specific password)
+- `APPLE_TEAM_ID`
+
+The macOS workflow automatically attempts `codesign` + `notarytool submit` + `stapler` when the secrets exist.
+
+### Windows
+Optional but highly recommended to avoid SmartScreen warnings:
+- Use a code signing certificate.
+- Current Windows workflow produces unsigned `.exe`/`.msi`. You can extend the workflow with `signtool` using a secret-stored certificate (or switch to Azure Trusted Signing).
+
+Without signing you can still distribute, but users on macOS may see security prompts, and Windows users may see "Windows protected your PC".
+
+## Runtime dependencies on end-user machines
+
+The sidecar freezes the Python engine but **does not** bundle ffmpeg or a TeX distribution.
+
+| Platform | Required user install (first run or documented) |
+|----------|------------------------------------------------|
+| Linux    | Handled via `.deb` `Depends:` (apt will pull ~500MB–1GB) |
+| macOS    | MacTeX or BasicTeX + `ffmpeg` (via brew) |
+| Windows  | MiKTeX or TeX Live + `ffmpeg` |
+
+The app will guide users or fail gracefully on first render if missing.
+
+## Adding more architectures later
+
+Easy to extend:
+- Linux aarch64 → add `ubuntu-24.04-arm` runner + triple
+- Windows arm64 → emerging support
+- macOS universal → advanced (can be added on top of current native builds)
+
+The current matrix + per-platform sidecar approach is the robust, future-proof foundation.

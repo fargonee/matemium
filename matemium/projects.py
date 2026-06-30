@@ -54,6 +54,10 @@ def list_scenes(project_slug: str) -> list[str]:
 
 
 def load_scene_class(project_slug: str, scene_name: str) -> Type[CanvasScene]:
+    if not isinstance(scene_name, str):
+        raise TypeError(
+            f"scene_name must be str, got {type(scene_name).__name__} ({scene_name!r})"
+        )
     if not _valid_slug(project_slug):
         raise ValueError(f"Invalid project slug: {project_slug!r}")
     if not project_dir(project_slug).is_dir():
@@ -67,6 +71,13 @@ def load_scene_class(project_slug: str, scene_name: str) -> Type[CanvasScene]:
             f"Scene {scene_name!r} not found in projects/{project_slug}/scenes.py. "
             f"Available: {available}"
         ) from exc
+    except TypeError as exc:
+        if "attribute name must be string" in str(exc):
+            raise TypeError(
+                f"scene_name must be str, got {type(scene_name).__name__} ({scene_name!r}) "
+                f"when loading project {project_slug}"
+            ) from exc
+        raise
     if not inspect.isclass(cls) or not issubclass(cls, CanvasScene):
         raise TypeError(f"{scene_name} is not a CanvasScene subclass")
     return cls

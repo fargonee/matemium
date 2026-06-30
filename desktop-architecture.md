@@ -79,6 +79,10 @@ A desktop app where a user creates a **project**, edits **`scenes.py`** in a syn
 3. **AI chat canvas** — v1: user prompts; AI proposes edits to `scenes.py`; user reviews/applies diffs. **v2 agent:** autonomous tool loop (view/edit/compile + self-correction) — see [`ai-agent-architecture.md`](ai-agent-architecture.md).
 4. **Zero cloud rendering** — sidecar runs all Manim/LaTeX/FFmpeg work locally.
 5. **Preview-first UX** — lint/check before render; streamed progress during render; playback in-app.
+
+**Live Preview uses manim-web:** The "Live Preview" bottom tab is powered by [manim-web](https://github.com/maloyan/manim-web) (browser-native Manim port using WebGL/Three.js + KaTeX for MathTex). The Python engine still supplies authoritative layout via the `get_preview_data` IPC (positions/sizes computed by `LayoutEngine` + `CanvasBuilder` on the exact same `scenes.py`). This was the design goal from the beginning: accurate Python measurement + faithful animated preview in the desktop without requiring a full video render for every change. The custom DOM measurement renderer is superseded by the manim-web player.
+
+**Future direction (Phase 0+):** The preview will become a true 3D manim-web renderer. The sheet/tape will be treated as one special object (`TapeObject`) inside an infinite 3D world. When the camera targets a tape, the preview re-uses/enhances the high-fidelity sheet logic on that plane while still supporting full 3D camera motion and other objects. See `canvas/3D-model.md` and the 3D unification plan.
 6. **Cross-platform shipping** — Windows (MSI/EXE), macOS (DMG), Linux (AppImage/DEB). One shared TS/Rust codebase; **per-platform PyInstaller sidecars** via CI matrix (sidecars cannot be cross-compiled).
 7. **Freemium monetization** — cloud handles auth, entitlements, billing; meter chat (and optionally renders).
 
@@ -273,6 +277,7 @@ TypeScript  ──(Tauri invoke)──►  Rust  ──(IPC)──►  Python si
 | `export_sheet` | `{ workspace, scene?, format }` | `{ path, format }` |
 | `cut_reels` | `{ video, workspace, scene? }` | `{ reels[], manifest }` |
 | `compile_preview`, `estimate_duration` | ... | Progress + preview assets / timing |
+| `get_preview_data` | `{ projectId }` (via workspace) | `{ elements[], frame_width, frame_height, ... }` — layout snapshot for WYSIWYG + manim-web preview |
 
 **Legacy / dev commands** (inline DSL, not desktop authoring):
 

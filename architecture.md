@@ -5,13 +5,24 @@
 "Matemium" is a proprietary layout-to-animation compiler built on top of the Manim Community Edition (Python). It shifts the Manim paradigm from a "code-driven sequence of scenes" to an "infinite, vertically scrollable learning sheet." The output engine splits a single long-form canvas into micro-dose 9:16 vertical chunks suitable for social media short-form reels.
 
 ## 2. Core Architectural Paradigm
-Unlike traditional Manim where elements enter and fade out sequentially in one box, the Canvas is a **3D scene with a flat learning sheet** on the XY plane.
+
+The root is one **infinite 3D space** (XZ ground, Y up by convention). The legacy "infinite sheet" is a special `TapeObject` inside that space.
 
 - **The sheet:** The infinite tape is the **XY plane at `z = 0`**. Text, math, plots, and anchored 3D graphs live here by default.
 - **Z axis:** Depth — grid marks lifted slightly above the sheet, optional explicit `z` on elements, future camera dolly. Not a separate “2D mode.”
 - **The viewport:** A 9:16 frame whose center pans along `(x, y, 0)` down the sheet.
 - **The elements:** Stateless components anchored at `(x, y, z)` canvas coordinates.
 - **The engine:** Scrolls the camera on the sheet; zoom crops the frame on the plane; optional **tilt** only for 3D surface moments.
+
+**Canonical model (Phase 10 complete; see `canvas/3D-model.md` and the 3D world unification plan):**
+
+The root is one **infinite 3D space** (XZ ground / Y up). The legacy "tape/sheet" is a special `TapeObject` inside the world. All authoring, camera, measurement, and preview now operate under the unified 3D model with full backward compat for sheet-style videos.
+
+- Everything is an **Object** with a `WorldTransform`.
+- Objects have a **local space**. `TapeObject` carries the full 2D sheet layout/styling/lazy-reveal engine inside its local coordinates.
+- Camera uses generalized keyframes that target world points **or** objects (with object-specific **observation protocols** — tape observation does scroll+reveal; regular 3D objects do cinematic look-at/orbit).
+- This makes the engine more generic while preserving the excellent sheet ergonomics inside `TapeObject`s.
+- See `canvas/3D-model.md` for diagrams, terminology (`WorldTransform`, `ObservationTarget`, `TapeScroll`, etc.), and current-code audit.
 
 ## 3. Data Schema (The Sheet DSL)
 Claude, we will not write pure Manim scripts directly. We will build a JSON/YAML-based layout specification (or a lightweight Python DSL) that compiles into a Manim scene. 
