@@ -11,6 +11,8 @@ pub struct AppPaths {
     pub workspaces_root: PathBuf,
     pub config_dir: PathBuf,
     pub settings_path: PathBuf,
+    /// Root for first-run assets (TinyTeX, embeddings, etc.)
+    pub assets_root: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,16 +60,19 @@ impl AppPaths {
             .ok_or_else(|| "could not resolve config directory".to_string())?
             .join(APP_NAME);
 
+        let assets_root = data_root.join("assets");
+
         Ok(Self {
             workspaces_root: data_root.join("workspaces"),
             settings_path: config_dir.join("settings.json"),
             data_root,
             config_dir,
+            assets_root,
         })
     }
 
     pub fn ensure(&self) -> Result<(), String> {
-        for dir in [&self.data_root, &self.workspaces_root, &self.config_dir] {
+        for dir in [&self.data_root, &self.workspaces_root, &self.config_dir, &self.assets_root] {
             fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
         }
         if !self.settings_path.exists() {
@@ -100,6 +105,21 @@ impl AppPaths {
     /// Stable Manim cache root (``<workspace>/media``), separate from preview exports.
     pub fn project_media_dir(&self, project_id: &str) -> PathBuf {
         self.workspace_dir(project_id).join("media")
+    }
+
+    /// Base dir for downloaded/extracted assets (e.g. tinytex/)
+    pub fn assets_dir(&self) -> &PathBuf {
+        &self.assets_root
+    }
+
+    /// TinyTeX install location (extracted)
+    pub fn tinytex_dir(&self) -> PathBuf {
+        self.assets_root.join("tinytex")
+    }
+
+    /// Path to the local asset state file
+    pub fn assets_state_path(&self) -> PathBuf {
+        self.assets_root.join("assets.json")
     }
 
     pub fn load_settings(&self) -> Result<Settings, String> {

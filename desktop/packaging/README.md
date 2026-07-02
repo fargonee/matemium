@@ -2,6 +2,8 @@
 
 Freezes `matemium-sidecar` — the local Manim compilation engine for the desktop app.
 
+**Phase 10 update:** Asset manifest (`shared/assets/manifest.json`) is runtime data (downloaded/updated separate from binary). Sidecar binary remains minimal control-plane. See root `PRODUCT-ARCHITECTURE-IMPLEMENTATION.md` §11 for CI, size guards, feature flags (lite vs intelligence).
+
 ## Cross-compilation: not supported
 
 PyInstaller produces a **native binary for the OS it runs on**. You cannot build the Linux sidecar on Windows (or vice versa). Each release requires:
@@ -34,12 +36,20 @@ Verify:
 
 ## Runtime dependencies (not bundled in v1)
 
-The sidecar binary **does not** include FFmpeg or LaTeX. The host system (or `.deb` `Depends:`) must provide:
+**FFmpeg** is still required from the host (for final video encoding).
+
+**LaTeX**: Starting with the product architecture (PAD Phase 2), the sidecar prefers a **bundled TinyTeX** distribution unpacked on first run by the desktop app into the user data directory (see `matemium/paths.py:get_tinytex_bin_dir` + lazy injection). 
+
+The PATH is automatically prepended with TinyTeX's bin dir before the first Manim import (triggered lazily on engine load). 
+
+If no TinyTeX is present the sidecar will fall back to whatever `pdflatex` / `dvisvgm` is on the system PATH (for dev convenience).
+
+In final desktop installers the `.deb`/`.AppImage`/etc. should **not** declare heavy texlive as a hard dependency anymore (TinyTeX is delivered as a first-run asset).
 
 | Tool | Used for |
 |------|----------|
 | `ffmpeg` | Video encoding |
-| `pdflatex` + TeX Live packages | Math typesetting (`texlive-latex-extra`, `texlive-fonts-extra`, `texlive-science`, `cm-super`, `dvipng`, `dvisvgm`) |
+| `pdflatex` + dvisvgm (TinyTeX or system) | Math typesetting |
 
 `lint_project` optionally calls `ruff` if installed on PATH; otherwise syntax check via `py_compile` only.
 

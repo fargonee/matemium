@@ -250,3 +250,128 @@ def test_phase10_registry_measure_and_build_dispatch():
     # confirm Text kind present
     assert "Text" in _OBJECT_KINDS
     print("phase10 registry dispatch ok")
+
+
+# --- Phase 6: Backward Compatibility & Observation Mode Distinction Tests ---
+
+def test_phase6_object_anchor_on_tape_does_not_trigger_scroll():
+    """Phase 6: ObjectAnchor (even on a rotated tape) is normal 3D observation.
+    It must NOT activate internal tape scroll/reveal logic (TapeScroll does).
+    """
+    from canvas.builder import CanvasBuilder
+    from canvas.dsl import ObjectAnchor, TapeScroll
+
+    b = CanvasBuilder()
+    b.set_tape_pose(rotation=(35, 15, 0))
+    b.add_text("tape content that should not auto-scroll on 3D anchor")
+    b.add_camera_keyframe(target=ObjectAnchor(object_id="root_tape", anchor="center"), duration=2.0)
+
+    kfs = [x for x in b.dsl.timeline if hasattr(x, "target")]
+    last = kfs[-1]
+    assert isinstance(last.target, ObjectAnchor), "ObjectAnchor on tape must stay ObjectAnchor (not auto TapeScroll)"
+    assert not isinstance(last.target, TapeScroll)
+
+    # Contrast: explicit TapeScroll
+    b.add_camera_keyframe(target=TapeScroll(tape_id="root_tape", local_y=2.5))
+    kfs2 = [x for x in b.dsl.timeline if hasattr(x, "target")]
+    assert isinstance(kfs2[-1].target, TapeScroll)
+    print("phase6 ObjectAnchor on tape != tape-scroll-mode ok")
+
+
+def test_phase6_tapesroll_on_rotated_tape_and_mixed():
+    """Phase 6: TapeScroll on angled tape uses local + world transform.
+    Mixed 3D objects + tape switch cleanly.
+    """
+    from canvas.builder import CanvasBuilder
+    from canvas.dsl import ObjectAnchor, TapeScroll, WorldPoint
+
+    b = CanvasBuilder()
+    b.set_tape_pose(rotation=(30, 10, 0))
+    b.add_object("Solid3D", id="cube", position=(3, 0, 1))
+
+    # Normal 3D on world object
+    b.add_camera_keyframe(target=ObjectAnchor(object_id="cube"))
+    # Tape scroll on rotated tape
+    b.add_camera_keyframe(target=TapeScroll(tape_id="root_tape", local_y=3.0))
+    # Back to world
+    b.add_camera_keyframe(target=WorldPoint(position=(0, 5, 0)))
+
+    kfs = [x for x in b.dsl.timeline if hasattr(x, "target")]
+    assert isinstance(kfs[0].target, ObjectAnchor)
+    assert isinstance(kfs[1].target, TapeScroll)
+    assert isinstance(kfs[2].target, WorldPoint)
+    print("phase6 rotated TapeScroll + mixed mode switch ok")
+
+
+def test_phase6_classic_cameramove_still_works():
+    """Phase 6: Classic CameraMove on default tape continues to work for full backward compat."""
+    from canvas.builder import CanvasBuilder
+    from canvas.dsl import CameraMove
+
+    b = CanvasBuilder()
+    b.add_text("legacy style content")
+    b.add_camera_move(dy=4.0, run_time=1.5)  # classic
+
+    moves = [x for x in b.dsl.timeline if hasattr(x, "target_position")]
+    assert len(moves) == 1
+    assert moves[0].target_position[1] > 0
+    print("phase6 classic CameraMove compat ok")
+
+
+def test_phase6_scene_mode_flags_distinction():
+    """Phase 6: Scene correctly sets internal tape-scroll-mode flag only for TapeScroll / legacy moves."""
+    from canvas.scene import CanvasScene
+    from canvas.builder import CanvasBuilder
+    from canvas.dsl import ObjectAnchor, TapeScroll, CameraMove, CameraKeyframe
+
+    b = CanvasBuilder()
+    b.add_text("content")
+    b.add_camera_keyframe(target=ObjectAnchor(object_id="root_tape"))  # should NOT set scroll
+    b.add_camera_keyframe(target=TapeScroll(tape_id="root_tape", local_y=1.0))  # SHOULD set
+
+    dsl = b.build()
+    s = CanvasScene(dsl)  # init only; we will drive handlers
+
+    from canvas.dsl import CameraKeyframe, CameraMove, ObservationMode
+
+    # Provide minimal dummies so handlers don't explode
+    class _DummyCam:
+        def pan_to(self, *a, **k): pass
+        def observe_target(self, *a, **k): pass
+        def _phi(self): pass
+        def _theta(self): pass
+        def _gamma(self): pass
+        _phi = type("T", (), {"set_value": lambda s,v: None})()
+        _theta = type("T", (), {"set_value": lambda s,v: None})()
+        _gamma = type("T", (), {"set_value": lambda s,v: None})()
+        _x = type("T", (), {"set_value": lambda s,v: None})()
+        current_y = 0.0
+        view_mode = "sheet"
+        is_tilted = False
+        camera = type("C", (), {"use_orthographic_projection": True})()
+
+    s.camera_ctl = _DummyCam()
+
+    # Simulate what construct does for a couple keyframes (camera_ctl may be None, we only care about flags)
+    s._observation_mode = ObservationMode.NORMAL_3D
+    s._active_scroll_tape = None
+    # find the kfs
+    kfs = [item for item in dsl.timeline if isinstance(item, CameraKeyframe)]
+    assert len(kfs) >= 2
+
+    # Simulate first (ObjectAnchor) -> should not activate
+    s._handle_camera_keyframe(kfs[0])
+    assert s._observation_mode == ObservationMode.NORMAL_3D
+
+    # Simulate TapeScroll -> activates
+    s._handle_camera_keyframe(kfs[1])
+    assert s._observation_mode == ObservationMode.TAPE_SCROLL
+    assert s._active_scroll_tape is not None
+
+    # Legacy move also activates (compat)
+    s._observation_mode = ObservationMode.NORMAL_3D
+    move = CameraMove(id="m1", target_position=(0, 5, 0), run_time=1.0)
+    s._handle_camera_move(move)
+    assert s._observation_mode == ObservationMode.TAPE_SCROLL
+
+    print("phase6 scene internal mode flag distinction (ObjectAnchor vs TapeScroll vs legacy) ok")

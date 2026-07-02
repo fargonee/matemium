@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from canvas.dsl import SheetDSL
-
+# Deferred to support lazy control-plane (imported inside validate functions)
 from .protocol import ELEMENT_TYPES, KNOWN_TIMELINE_TYPES, LEGACY_TYPES
 
 
@@ -25,7 +24,7 @@ class ValidationResult:
     valid: bool
     errors: list[ValidationIssue]
     warnings: list[ValidationIssue]
-    dsl: SheetDSL | None = None
+    dsl: Any | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -45,6 +44,8 @@ def validate_dsl_payload(
     strict: bool = True,
 ) -> ValidationResult:
     """Validate raw JSON-compatible DSL before any render spend."""
+    from canvas.dsl import SheetDSL
+
     errors: list[ValidationIssue] = []
     warnings: list[ValidationIssue] = []
 

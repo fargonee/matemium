@@ -1,9 +1,13 @@
 # Matemium Desktop — Product Architecture & Goals
 
-**Status:** Authoritative (2026-06-26)  
+**Status:** Core desktop model (2026-06-26). **Latest product decisions** (lazy sidecar, first-run downloads, UX gating, YouTube publishing, vector intelligence) are in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).  
 **Audience:** All contributors — engine, desktop shell, cloud middleware, and AI integration authors.
 
-This document records the **strategic pivot** to a **commercial/freemium desktop application** where users author animations as **Python project code** assisted by an **AI chat** — not as cloud-generated JSON specs. Engine internals remain in [`architecture.md`](architecture.md); feature status in [`project-spec.md`](project-spec.md).
+**Phase 10 status:** Packaging/CI/cross-platform + docs refresh implemented. See [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](../PRODUCT-ARCHITECTURE-IMPLEMENTATION.md) §11 and phased roadmap.
+
+This document records the **strategic pivot** to a **commercial/freemium desktop application** where users author animations as **Python project code** assisted by an **AI chat** — not as cloud-generated JSON specs. 
+
+Engine internals remain in [`architecture.md`](architecture.md); feature status in [`project-spec.md`](project-spec.md). Product-level architecture decisions (sidecar lazy loading, intelligence engine, publishing, user gating) live in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
 ---
 
@@ -46,6 +50,8 @@ These are non-negotiable product rules. All new desktop, cloud, and engine work 
 - **Visual multi-section UI** on top of the single file (see §5) — prettier editing without multi-file complexity.
 - **v2 agent mode:** strict **two-file boundary** — `scenes.py` (visual timeline) + `assets.py` (computations and data). See [`ai-agent-architecture.md`](ai-agent-architecture.md) §7.
 - Agent mode unlocks the **tool loop** (view/edit/compile), Search/Replace patches, and autonomous self-correction — not optional multi-file sprawl.
+
+**Note:** Later product decisions on sidecar bootstrapping, lazy loading of Manim/embeddings, first-run model downloads, and strict UX gating are documented in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
 ### 2.4 Local render only
 

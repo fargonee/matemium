@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from canvas import CanvasScene
 from canvas.builder import CanvasBuilder
+from canvas.dsl import WorldPoint
 
 
 class EmWaves(CanvasScene):
@@ -16,6 +17,10 @@ class EmWaves(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Electromagnetic Waves")
+
+        # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
+        # mode will automatically look straight down the local normal (from above).
+        builder.set_tape_pose(rotation=(28, 18, 0))
 
         # ---- Intro ----
         builder.add_heading("Electromagnetic waves", style={"align": "center", "margin-bottom": 0.5})
@@ -171,5 +176,38 @@ class EmWaves(CanvasScene):
             r"\text{light}",
             style={"align": "center", "margin-bottom": 0.8},
         )
+
+        # Add a 3D representation (axes + a simple solid for the wave concept)
+        # (main tape pose already set early at top of __init__)
+        builder.add_object("Axes", id="em_axes", position=(0, -1, 4), scale=0.7)
+        builder.add_object(
+            "Solid3D",
+            id="em_wave_3d",
+            position=(1.5, 0.5, 5),
+            content={"shape": "cylinder", "size": 0.8},
+        )
+
+        # Create a secondary "key formulas" tape floating at an angle
+        key_tape = builder.add_tape(
+            "key_formulas",
+            position=(4, 2, -2),
+            rotation=(10, 40, 5),
+        )
+        with builder.in_object_space(key_tape):
+            builder.add_math(r"\nabla \times \vec{E} = -\frac{\partial \vec{B}}{\partial t}")
+            builder.add_math(r"c = \frac{1}{\sqrt{\mu_0 \varepsilon_0}}")
+
+        # Camera sequence using new observation modes to "animate" the content
+        # Normal 3D view of the wave concept object
+        builder.observe_object("em_wave_3d", run_time=3.0)
+
+        # Enter tape-scroll mode on the main tilted tape
+        builder.scroll_tape(local_y=8.0, run_time=4.0)
+
+        # Look at the secondary formulas panel in 3D
+        builder.observe_object(key_tape, run_time=2.5)
+
+        # Pure 3D fly-around
+        builder.add_camera_keyframe(target=WorldPoint(position=(2, 3, 10)), duration=2.5)
 
         super().__init__(dsl=builder.build(), **kwargs)

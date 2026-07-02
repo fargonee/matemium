@@ -1,3 +1,4 @@
+pub mod assets;
 pub mod cloud;
 pub mod commands;
 mod media_preview;
@@ -34,7 +35,8 @@ pub fn run() {
             })?;
 
             let sidecar = sidecar::SidecarManager::new(app.handle().clone(), paths.clone());
-            app.manage(state::AppState { paths, sidecar });
+            let assets = crate::assets::AssetManager::new(paths.clone());
+            app.manage(state::AppState { paths, sidecar, assets });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -45,6 +47,13 @@ pub fn run() {
             commands::project_save_assets,
             commands::project_delete,
             commands::sidecar_ping,
+            commands::sidecar_configure_assets,
+            commands::get_asset_status,
+            commands::start_asset_download,
+            commands::get_readiness,
+            commands::sidecar_retrieve,
+            commands::publish_animation,
+            commands::list_gallery,
             commands::sidecar_lint,
             commands::sidecar_check,
             commands::sidecar_list_scenes,

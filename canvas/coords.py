@@ -126,11 +126,10 @@ def resolve_world_position(
         )
 
     if relative_to:
-        pos = Vector3(
-            pos.x + relative_to.position.x,
-            pos.y + relative_to.position.y,
-            pos.z + relative_to.position.z,
-        )
+        # Full transform: treat the accumulated 'pos' as a local offset on the relative_to's plane
+        # (applies its rotation + scale + translation). This makes rotated tapes work for in_object_space content.
+        full = local_to_world_point((pos.x, pos.y, pos.z), relative_to)
+        pos = Vector3.from_tuple(full)
 
     return pos
 
@@ -192,3 +191,78 @@ def inspect_target_from_mob(mob, elem: CanvasElement) -> tuple[float, float, flo
     """World-space point the camera should look at during inspect/orbit."""
     center = mob.get_center()
     return (float(center[0]), float(center[1]), float(center[2]))
+
+
+# --- 3D world helpers (added for clarified observation model, phase 1) ---
+
+def _rotation_matrix_from_euler_deg(rx: float, ry: float, rz: float) -> "np.ndarray":
+    """Basic Euler rotation matrix (degrees, xyz order). Used for local -> world on rotated TapeObjects etc."""
+    import numpy as np
+    rx, ry, rz = np.deg2rad([rx, ry, rz])
+    cx, cy, cz = np.cos([rx, ry, rz])
+    sx, sy, sz = np.sin([rx, ry, rz])
+    Rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
+    Ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
+    Rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
+    return Rz @ Ry @ Rx
+
+
+def local_to_world_point(local_pos: tuple[float, float, float], wt: "WorldTransform") -> tuple[float, float, float]:
+    """Transform a local-space point through a WorldTransform (scale + rotation + translation).
+
+    Useful for TapeObject anchors in normal 3D observation and for tape-scroll positioning.
+    """
+    import numpy as np
+    x, y, z = local_pos
+    s = float(getattr(wt, "scale", 1.0) or 1.0)
+    vec = np.array([x * s, y * s, z * s])
+    rot = getattr(wt, "rotation", Vector3())
+    R = _rotation_matrix_from_euler_deg(float(rot.x), float(rot.y), float(rot.z))
+    rotated = R @ vec
+    pos = getattr(wt, "position", Vector3())
+    return (
+        rotated[0] + float(pos.x),
+        rotated[1] + float(pos.y),
+        rotated[2] + float(pos.z),
+    )
+
+
+def get_tape_scroll_camera_pose(wt: "WorldTransform") -> tuple[float, float]:
+    """Return (phi, theta) so that in TAPE_SCROLL mode the camera looks straight down
+    onto the tape surface (angle 0 relative to the tape), i.e. from directly "above" the tape
+    along its local normal.
+
+    This replicates the classic sheet behavior (phi=0, theta=-90 for identity) but in the
+    tape's local coordinate system. The tape's world_transform is respected for positioning
+    the center point, but the viewing direction is always perpendicular to the tape's XY plane
+    (from above, Z positive towards the viewer per the tape model).
+
+    Only when observing pulled-up 3D objects (via observe_object / non-tape keyframes, or
+    after lifting solids) do we switch to full cinematic angled/perspective views.
+    """
+    if wt is None:
+        return 0.0, -90.0
+    rot = getattr(wt, "rotation", Vector3())
+    rx = float(getattr(rot, "x", 0.0))
+    ry = float(getattr(rot, "y", 0.0))
+    # "Angle 0" in tape space: use the classic sheet angles compensated by the tape's rotation.
+    # This makes camera look straight from above the (possibly rotated) tape plane.
+    # phi matches -rx (or rx with sign), theta = -ry + sheet base.
+    phi = -rx
+    theta = -ry - 90.0
+    # Allow full range but clamp extremes to avoid gimbal oddities
+    phi = max(-85.0, min(85.0, phi))
+    theta = max(-180.0, min(180.0, theta))
+    return phi, theta
+
+
+def get_rotation_matrix(wt: "WorldTransform") -> "np.ndarray":
+    """The 3x3 rotation matrix corresponding to the WorldTransform (Rz @ Ry @ Rx order).
+    Used to lock camera orientation for straight-above tape scroll view.
+    """
+    rot = getattr(wt, "rotation", Vector3())
+    return _rotation_matrix_from_euler_deg(
+        float(getattr(rot, "x", 0.0)),
+        float(getattr(rot, "y", 0.0)),
+        float(getattr(rot, "z", 0.0)),
+    )

@@ -9,7 +9,7 @@ on:
   push:
     branches: [main]
     paths:
-      # Core matemium engine + canvas + shared
+      # Core matemium engine + canvas + shared + PAD intelligence/MCP (phase 6/9)
       - 'matemium/**'
       - 'canvas/**'
       - 'projects/**'
@@ -17,6 +17,8 @@ on:
       - 'shared/**'
       - 'pyproject.toml'
       - 'fixtures/**'
+      - 'matemium/intelligence/**'
+      - 'matemium/mcp_server.py'
       # Workflow itself
       - '.github/workflows/ci.yml'
   pull_request:

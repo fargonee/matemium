@@ -10,6 +10,7 @@ interface ProjectsLandingProps {
   onCreate: () => void;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
+  readinessMessage?: string;
 }
 
 function ProjectThumbnail({ previewVideo, sceneClass }: { previewVideo?: string | null; sceneClass: string }) {
@@ -49,15 +50,16 @@ export function ProjectsLanding({
   onCreate,
   onOpen,
   onDelete,
+  readinessMessage,
 }: ProjectsLandingProps) {
   return (
     <div className="projects-landing-page">
       <div className="projects-landing-hero">
         <div>
-          <p className="projects-landing-eyebrow">Matemium Canvas</p>
-          <h2 className="projects-landing-heading">Your math animation projects</h2>
+          <p className="projects-landing-eyebrow">Professional Math Animation Studio</p>
+          <h2 className="projects-landing-heading">Your projects</h2>
           <p className="projects-landing-lead">
-            Pick up where you left off, or start a new reel-ready lesson.
+            Create sophisticated math visualizations with AI-assisted authoring. All computation runs locally.
           </p>
         </div>
         <div className="projects-landing-create">
@@ -68,11 +70,17 @@ export function ProjectsLanding({
             onKeyDown={(e) => {
               if (e.key === "Enter") onCreate();
             }}
+            disabled={!!readinessMessage}
           />
           <button type="button" className="btn btn-primary" disabled={busy} onClick={onCreate}>
             New project
           </button>
         </div>
+        {readinessMessage && (
+          <div className="readiness-banner" style={{ marginTop: 12, padding: 8, background: "#222", color: "#0ff", fontSize: 13 }}>
+            {readinessMessage}
+          </div>
+        )}
       </div>
 
       {projects.length === 0 ? (

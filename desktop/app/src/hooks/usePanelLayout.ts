@@ -3,15 +3,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const STORAGE_KEY = "matemium-panel-layout";
 
 export const BOTTOM_COLLAPSE_THRESHOLD = 48;
-export const RESIZE_HANDLE_SIZE = 4;
+export const RESIZE_HANDLE_SIZE = 8;
 export const MIN_MAIN_COLUMN_WIDTH = 240;
 export const MIN_EDITOR_STAGE_HEIGHT = 0;
+export const EDITOR_COLLAPSE_THRESHOLD = 20;  // when dragging up, auto-collapse editor below this
 
 export interface PanelLayout {
   sidebarWidth: number;
   chatWidth: number;
   bottomHeight: number;
   bottomPanelOpen: boolean;
+  editorOpen: boolean;
 }
 
 const DEFAULT_LAYOUT: PanelLayout = {
@@ -19,9 +21,10 @@ const DEFAULT_LAYOUT: PanelLayout = {
   chatWidth: 320,
   bottomHeight: 200,
   bottomPanelOpen: true,
+  editorOpen: true,
 };
 
-type NumericLayoutKey = Exclude<keyof PanelLayout, "bottomPanelOpen">;
+type NumericLayoutKey = Exclude<keyof PanelLayout, "bottomPanelOpen" | "editorOpen">;
 
 const LIMITS: Record<NumericLayoutKey, { min: number; max: number }> = {
   sidebarWidth: { min: 180, max: 480 },
@@ -56,6 +59,7 @@ function loadLayout(): PanelLayout {
       ),
       bottomPanelOpen:
         parsed.bottomPanelOpen ?? parsed.logPanelOpen ?? DEFAULT_LAYOUT.bottomPanelOpen,
+      editorOpen: parsed.editorOpen ?? DEFAULT_LAYOUT.editorOpen,
     };
   } catch {
     return DEFAULT_LAYOUT;
@@ -110,8 +114,10 @@ function bottomHeightLimits(regionHeight: number): { min: number; max: number } 
   if (regionHeight <= 0) {
     return { min: BOTTOM_COLLAPSE_THRESHOLD, max: 2000 };
   }
-  // Allow the bottom dock panels to take the full available height (minus the resize handle bar itself).
-  const max = Math.max(BOTTOM_COLLAPSE_THRESHOLD, regionHeight - RESIZE_HANDLE_SIZE);
+  // Allow the bottom panel to take the full height (editor can be collapsed to 0).
+  // The caller decides whether to enforce editor space.
+  const BOTTOM_HANDLE_HEIGHT = 10;
+  const max = Math.max(BOTTOM_COLLAPSE_THRESHOLD, regionHeight - BOTTOM_HANDLE_HEIGHT);
   return { min: BOTTOM_COLLAPSE_THRESHOLD, max };
 }
 
@@ -151,14 +157,20 @@ export function usePanelLayout() {
       const { min, max } = bottomHeightLimits(height);
       const clamped = clamp(prev.bottomHeight, min, max);
       if (clamped !== prev.bottomHeight) {
-        return { ...prev, bottomHeight: clamped };
+        // If clamped to (near) max, treat as editor collapsed
+        const atFullMax = clamped >= max - EDITOR_COLLAPSE_THRESHOLD;
+        return {
+          ...prev,
+          bottomHeight: clamped,
+          editorOpen: atFullMax ? false : prev.editorOpen,
+        };
       }
       return prev;
     });
   }, []);
 
   const setChatWidthFromPointer = useCallback((clientX: number, containerRight: number) => {
-    // Pointer is on the 4px gutter column; chat column is everything to its right.
+    // Pointer is on the gutter column; chat column is everything to its right.
     const width = containerRight - clientX - RESIZE_HANDLE_SIZE;
     setLayout((prev) => {
       const { min, max } = chatWidthLimits(containerWidthRef.current, prev.sidebarWidth);
@@ -177,17 +189,38 @@ export function usePanelLayout() {
   const resizeBottom = useCallback((delta: number) => {
     setLayout((prev) => {
       const regionH = editorRegionHeightRef.current;
+      if (regionH <= 0) {
+        return prev;
+      }
       const { max } = bottomHeightLimits(regionH);
       const nextHeight = prev.bottomHeight - delta;
+
+      const impliedEditorSpace = regionH - 10 - nextHeight;
+
+      // Allow dragging all the way up to collapse the editor (bottom takes full height)
+      // Also auto-collapse when editor sliver would be too small
+      if (nextHeight >= max || (prev.editorOpen && impliedEditorSpace < EDITOR_COLLAPSE_THRESHOLD)) {
+        return {
+          ...prev,
+          bottomPanelOpen: true,
+          editorOpen: false,
+          bottomHeight: max,
+        };
+      }
+
       if (nextHeight < BOTTOM_COLLAPSE_THRESHOLD) {
         return {
           ...prev,
           bottomPanelOpen: false,
           bottomHeight: DEFAULT_LAYOUT.bottomHeight,
+          editorOpen: true,
         };
       }
+
       return {
         ...prev,
+        bottomPanelOpen: true,
+        editorOpen: true,
         bottomHeight: clamp(nextHeight, BOTTOM_COLLAPSE_THRESHOLD, max),
       };
     });
@@ -195,7 +228,7 @@ export function usePanelLayout() {
 
   const setBottomPanelOpen = useCallback((open: boolean) => {
     setLayout((prev) => {
-      if (!open) return { ...prev, bottomPanelOpen: false };
+      if (!open) return { ...prev, bottomPanelOpen: false, editorOpen: true };
       const { min, max } = bottomHeightLimits(editorRegionHeightRef.current);
       // When opening (especially on Render to show progress), force a
       // reasonable fixed height so the main editor + viewport don't get
@@ -203,12 +236,13 @@ export function usePanelLayout() {
       const wasClosed = !prev.bottomPanelOpen;
       let h = prev.bottomHeight;
       if (wasClosed || h < 220) {
-        h = 320; // sensible size for progress panel + logs
+        h = 300; // sensible size for progress panel + logs
       }
-      // Never let the dock eat the entire (or most of) the viewport on render start
-      const reasonableMax = Math.min(max, 420);
+      // Never let the dock eat the entire (or most of) the viewport
+      const safeMax = Math.max(min, Math.min(max, editorRegionHeightRef.current - 200 || max));
+      const reasonableMax = Math.min(safeMax, 420);
       h = clamp(h, min, reasonableMax);
-      return { ...prev, bottomPanelOpen: true, bottomHeight: h };
+      return { ...prev, bottomPanelOpen: true, editorOpen: true, bottomHeight: h };
     });
   }, []);
 
@@ -218,7 +252,58 @@ export function usePanelLayout() {
       return {
         ...prev,
         bottomPanelOpen: true,
+        editorOpen: false,
         bottomHeight: max,
+      };
+    });
+  }, []);
+
+  const setEditorOpen = useCallback((open: boolean) => {
+    setLayout((prev) => {
+      const regionH = editorRegionHeightRef.current || 600;
+      const handleH = 10;
+      if (!open) {
+        // Collapse editor fully, bottom takes everything above the handle
+        return {
+          ...prev,
+          editorOpen: false,
+          bottomPanelOpen: true,
+          bottomHeight: Math.max(regionH - handleH, BOTTOM_COLLAPSE_THRESHOLD),
+        };
+      }
+      // Restore editor with reasonable size (shrink bottom if it was fully expanded)
+      let h = prev.bottomHeight;
+      const minEditorSpace = 200; // sensible editor space when restoring from full bottom
+      if (h > regionH - handleH - minEditorSpace) {
+        h = regionH - handleH - minEditorSpace;
+      }
+      const { max } = bottomHeightLimits(regionH);
+      h = clamp(h, BOTTOM_COLLAPSE_THRESHOLD, max);
+      return {
+        ...prev,
+        editorOpen: true,
+        bottomPanelOpen: true,
+        bottomHeight: h,
+      };
+    });
+  }, []);
+
+  // Force the bottom panel open with a safe, fixed height suitable for
+  // the render progress view. This prevents the editor from being squashed
+  // to empty when the render flow opens the dock.
+  const forceOpenForRender = useCallback(() => {
+    setLayout((prev) => {
+      const regionH = editorRegionHeightRef.current || 800;
+      const target = 300; // reliable size for progress + terminal
+      const { min, max } = bottomHeightLimits(regionH);
+      // Make sure bottom doesn't eat all the space - leave room for editor
+      const safeMax = Math.max(min, Math.min(max, regionH - 200));
+      const capped = Math.min(target, Math.max(200, Math.min(safeMax, 420)));
+      return {
+        ...prev,
+        bottomPanelOpen: true,
+        editorOpen: true,
+        bottomHeight: clamp(capped, min, max),
       };
     });
   }, []);
@@ -232,5 +317,7 @@ export function usePanelLayout() {
     setSidebarWidthFromPointer,
     resizeBottom,
     maximizeBottom,
+    forceOpenForRender,
+    setEditorOpen,
   };
 }

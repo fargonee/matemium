@@ -49,6 +49,27 @@ pub struct ChatCompletionRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PublishRequest {
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scene_class: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PublishResponse {
+    pub id: String,
+    pub status: String,
+    #[serde(default)]
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeEdit {
     pub description: String,
     #[serde(default)]
@@ -279,6 +300,81 @@ pub async fn get_profile(settings: &Settings) -> Result<Value, String> {
         .json::<Value>()
         .await
         .map_err(|e| format!("parse profile response: {e}"))
+}
+
+pub async fn list_gallery(
+    settings: &Settings,
+    query: Option<&str>,
+) -> Result<Value, String> {
+    let base = settings.server_url.trim_end_matches('/');
+    let mut url = format!("{base}/v1/gallery?status=published&limit=100");
+    if let Some(q) = query {
+        if !q.is_empty() {
+            url.push_str(&format!("&search={}", urlencoding::encode(q)));
+        }
+    }
+
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| format!("http client: {e}"))?;
+
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("gallery request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "<empty body>".to_string());
+        return Err(format!("gallery HTTP {status}: {body}"));
+    }
+
+    response
+        .json::<Value>()
+        .await
+        .map_err(|e| format!("parse gallery response: {e}"))
+}
+
+pub async fn publish_to_gallery(
+    settings: &Settings,
+    request: PublishRequest,
+) -> Result<PublishResponse, String> {
+    let base = settings.server_url.trim_end_matches('/');
+    let url = format!("{base}/v1/publish");
+
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("http client: {e}"))?;
+
+    let mut req = client.post(url).json(&request);
+    if let Some(token) = &settings.api_token {
+        req = req.header("Authorization", format!("Bearer {token}"));
+    }
+
+    let response = req
+        .send()
+        .await
+        .map_err(|e| format!("publish request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "<empty body>".to_string());
+        return Err(format!("publish HTTP {status}: {body}"));
+    }
+
+    response
+        .json::<PublishResponse>()
+        .await
+        .map_err(|e| format!("parse publish response: {e}"))
 }
 
 #[cfg(test)]

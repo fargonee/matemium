@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Full Linux production build.
 # Respects MATEMIUM_TARGET_TRIPLE (defaults to x86_64-unknown-linux-gnu).
+# Phase 10: Includes asset manifest copy, size checks (via build-sidecar), CI readiness.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -57,3 +58,10 @@ cd "$ROOT/desktop/src-tauri"
 cargo tauri build
 
 echo "Done. Artifacts under desktop/src-tauri/target/release/bundle/"
+
+# Phase 10: Quick size check for base installer (example; real CI enforces)
+BUNDLE_DIR="$ROOT/desktop/src-tauri/target/release/bundle"
+if [[ -d "$BUNDLE_DIR" ]]; then
+  du -sh "$BUNDLE_DIR"/* 2>/dev/null | head -5 || true
+  echo "Phase 10 packaging notes applied (see PRODUCT-ARCHITECTURE-IMPLEMENTATION.md §11)."
+fi

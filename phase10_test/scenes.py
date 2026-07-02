@@ -194,32 +194,31 @@ class Phase10Comprehensive(CanvasScene):
         )
         builder.add_world_object(marker_wo)
 
-        # === 3. Camera tour using all target types ===
-        # Look at the floating cube
+        # === 3. Camera tour using both observation styles (Phase 6) ===
+        # Normal 3D observation (ObjectAnchor) — tape or solids treated as 3D objects.
+        # No internal tape scroll/reveal is triggered.
         builder.add_camera_keyframe(
             target=ObjectAnchor(object_id="main_cube", anchor="center"),
             duration=3.2,
         )
 
-        # Scroll along the rotated tape
+        # Explicit tape-scroll-mode (TapeScroll) — activates local tape mechanisms.
         builder.add_camera_keyframe(
             target=TapeScroll(tape_id="root_tape", local_y=5.5, framing_mode="sheet"),
             duration=4.5,
         )
 
-        # Jump to a world point
+        # More 3D observations
         builder.add_camera_keyframe(
             target=WorldPoint(position=(1.5, 3.8, 7.0)),
             duration=2.8,
         )
 
-        # Focus the sphere
         builder.add_camera_keyframe(
             target=ObjectAnchor(object_id="hover_sphere", anchor="center"),
             duration=2.0,
         )
 
-        # End on the custom marker
         builder.add_camera_keyframe(
             target=ObjectAnchor(object_id="special_point", anchor="center"),
             duration=2.5,
@@ -232,7 +231,9 @@ class Phase10Comprehensive(CanvasScene):
 # Simple legacy-style scene (proves backward compatibility)
 # ------------------------------------------------------------------
 class LegacyCompatScene(CanvasScene):
-    """Traditional sheet authoring still works unchanged."""
+    """Traditional sheet authoring still works unchanged (Phase 6 compat guarantee).
+    Uses classic CameraMove / auto flow on default root tape → identical behavior.
+    """
 
     def __init__(self, **kwargs):
         settings = CanvasSettings.for_youtube(title="Legacy Compat")

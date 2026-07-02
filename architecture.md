@@ -14,15 +14,18 @@ The root is one **infinite 3D space** (XZ ground, Y up by convention). The legac
 - **The elements:** Stateless components anchored at `(x, y, z)` canvas coordinates.
 - **The engine:** Scrolls the camera on the sheet; zoom crops the frame on the plane; optional **tilt** only for 3D surface moments.
 
-**Canonical model (Phase 10 complete; see `canvas/3D-model.md` and the 3D world unification plan):**
+**Canonical model (clarified model — see `3D-WORLD-DESCRIPTION.md`):**
 
-The root is one **infinite 3D space** (XZ ground / Y up). The legacy "tape/sheet" is a special `TapeObject` inside the world. All authoring, camera, measurement, and preview now operate under the unified 3D model with full backward compat for sheet-style videos.
+The root is one **infinite 3D space** (XZ ground / Y up). The legacy "tape/sheet" is a special `TapeObject` inside the world.
 
-- Everything is an **Object** with a `WorldTransform`.
-- Objects have a **local space**. `TapeObject` carries the full 2D sheet layout/styling/lazy-reveal engine inside its local coordinates.
-- Camera uses generalized keyframes that target world points **or** objects (with object-specific **observation protocols** — tape observation does scroll+reveal; regular 3D objects do cinematic look-at/orbit).
-- This makes the engine more generic while preserving the excellent sheet ergonomics inside `TapeObject`s.
-- See `canvas/3D-model.md` for diagrams, terminology (`WorldTransform`, `ObservationTarget`, `TapeScroll`, etc.), and current-code audit.
+**Clarified observation model:**
+- Every object (tapes included) is observed by default with normal cinematic 3D behavior (look-at, orbit, follow transforms).
+- Free 3D objects do not get tape-like features.
+- `TapeScroll` target (tape-scroll-mode) is the only way to activate a tape's internal 2D mechanisms: local-coordinate scroll, lazy reveal driven by local progress, sheet focus/layout logic.
+- The outer camera always respects a tape's `world_transform`, even in scroll mode.
+- Classic tape videos continue to work identically when authored the old way (they use tape-scroll-mode under the hood on the default root tape).
+
+See `3D-WORLD-DESCRIPTION.md` and `canvas/3D-model.md` for the full model, terminology, and current status. Architecture and camera implementation still need work to fully realize the separation between normal 3D observation and tape-scroll-mode.
 
 ## 3. Data Schema (The Sheet DSL)
 Claude, we will not write pure Manim scripts directly. We will build a JSON/YAML-based layout specification (or a lightweight Python DSL) that compiles into a Manim scene. 
@@ -308,6 +311,10 @@ Matemium is pivoting from a developer CLI/library to a **commercial/freemium des
 Visual **section fences** (`# ---DIV: Title---` before top-level `def`/`class`) give a multi-pane editor UX while keeping one Python file. See [`desktop-architecture.md`](desktop-architecture.md) §5.
 
 **v1** stays single-file (`scenes.py` only). **v2 agent mode** enforces a strict two-file workspace (`scenes.py` + `assets.py`) with function-calling tools, Search/Replace patches, and an autonomous compile self-correction loop. See [`ai-agent-architecture.md`](ai-agent-architecture.md).
+
+**Latest product decisions** (local vector DB/RAG in sidecar, lazy loading, first-run downloads of Jina embeddings + TinyTeX, YouTube-based thin publishing, strict user gating until fully ready, local + hosted MCP) are in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
+
+**PAD-10 complete:** Cross-platform packaging, CI updates, docs refresh. Full implementation details in [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md).
 
 ### 8.3 Process architecture
 

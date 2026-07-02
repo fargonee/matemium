@@ -96,6 +96,68 @@ export async function sidecarCancel(): Promise<void> {
   return invoke("sidecar_cancel");
 }
 
+export async function getAssetStatus(assetId?: string): Promise<any[]> {
+  return invoke<any[]>("get_asset_status", { assetId: assetId ?? null });
+}
+
+export async function startAssetDownload(assetId: string): Promise<void> {
+  return invoke("start_asset_download", { assetId });
+}
+
+export interface Readiness {
+  phase: string;
+  assetsReady: boolean;
+  engineReady: boolean;
+  intelligenceReady: boolean;
+  fullyReady: boolean;
+  message: string;
+  enginePhase?: string;
+}
+
+export async function getReadiness(): Promise<Readiness> {
+  return invoke<Readiness>("get_readiness");
+}
+
+export async function sidecarRetrieve(
+  projectId: string,
+  query: string,
+  topK: number = 8
+): Promise<{ query: string; results: any[] }> {
+  return invoke<{ query: string; results: any[] }>("sidecar_retrieve", {
+    project_id: projectId,
+    query,
+    top_k: topK,
+  });
+}
+
+export interface PublishResponse {
+  id: string;
+  status: string;
+  message?: string;
+}
+
+export async function publishAnimation(
+  projectId: string,
+  title: string,
+  description?: string,
+  tags?: string[],
+  scene?: string,
+  duration?: number
+): Promise<PublishResponse> {
+  return invoke<PublishResponse>("publish_animation", {
+    project_id: projectId,
+    title,
+    description: description ?? null,
+    tags: tags ?? null,
+    scene: scene ?? null,
+    duration: duration ?? null,
+  });
+}
+
+export async function listGallery(search?: string): Promise<any> {
+  return invoke("list_gallery", { search: search ?? null });
+}
+
 export async function cloudChat(
   messages: ChatMessage[],
   projectId?: string,

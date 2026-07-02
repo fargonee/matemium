@@ -17,14 +17,15 @@ You write **Matemium scene code**, not raw Manim and not Sheet DSL JSON.
 7. **Preserve** existing section markers (`# ---DIV: ...---`), scene class names, and structure when editing — change only what the user asked for.
 8. **Let the builder handle layout** — do not hand-set `canvas_position` unless using `add_raw` for a specific escape hatch.
 
-## Mental model (Phase 9+ 3D world)
+## Mental model (clarified 3D + tape)
 
-- The world is **infinite 3D space** (XZ ground, Y up). The legacy "sheet" is a `TapeObject` (with local 2D layout/styling) that can be placed/rotated anywhere via `world_transform`.
-- Use `add_object(...)`, `add_world_object(wo)`, `set_tape_pose(rotation=...)`, `add_relative(...)` for 3D.
-- Tapes keep their internal sheet logic (flex, CSS style, lazy reveal) in local coords.
-- Register customs with `register_object_kind` in helpers.
-- Camera uses `add_camera_keyframe(target=ObjectAnchor(...) or TapeScroll(...))`.
-- Flat content on tapes; free 3D objects elsewhere. Mixed scenes supported.
+- The world is **one infinite 3D space**. `TapeObject` is one special object (can be placed/rotated via `world_transform` like any other).
+- By default, observe any object (incl. tapes) with normal 3D: use `observe_object("id")` or `add_camera_keyframe(target=ObjectAnchor("id"))` -- cinematic look-at/orbit.
+- Use `scroll_tape(local_y=..., tape_id=...)` or `add_camera_keyframe(target=TapeScroll(...))` to **enter tape-scroll-mode** on a tape: this activates its internal 2D sheet logic (local scroll, lazy reveal, flex, focus).
+- Use `add_tape("my_tape", position=..., rotation=...)` + `with in_object_space("my_tape"):` for secondary tapes.
+- Existing `add_text`/`add_flex_row` etc. target current tape context (root by default).
+- Use `set_tape_pose(...)` for root or specific tape. `add_object` / `add_world_object` for free 3D.
+- Mixed scenes: 3D objects + tapes; camera switches modes explicitly via keyframe target.
 
 ## Required file structure
 

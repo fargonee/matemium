@@ -29,6 +29,13 @@ HOOKS = Path(SPECPATH).resolve() / "hooks"
 block_cipher = None
 
 # Manim + engine graph
+# NOTE (PAD Phase 1 + Phase 10): We keep full collection so that lazy imports inside handlers
+# (matemium/lazy.py + per-function imports) succeed at runtime in the frozen binary.
+# The "minimal control plane" is achieved at *runtime* (no top-level import of manim/canvas
+# when the sidecar process starts — ping/get_status stay cheap).
+# Intelligence features (lancedb etc) are optional and loaded lazily; not forced into base binary.
+# See build scripts for size guards and asset manifest handling (separate from binary).
+# Future work may split lite vs full or use PyInstaller's runtime hooks / multipackage.
 hiddenimports = []
 hiddenimports += collect_submodules("manim")
 hiddenimports += collect_submodules("canvas")

@@ -43,6 +43,7 @@ See [`desktop-architecture.md`](../desktop-architecture.md).
 | P6 — Cloud client + auth | **done** | `auth_login` + `cloud_chat` → [`server/`](../server/) |
 | P7 — Linux ship | **done** | `build-linux.sh` → `.deb` / `.AppImage`; CI in [`.github/workflows/build-linux.yml`](../.github/workflows/build-linux.yml) |
 | P8 — CI matrix (Win/Mac) | done | Windows + macOS GitHub Actions workflows + native sidecars for all platforms (see `.github/workflows/build-*.yml`) |
+| **P9-P10 (PAD 8-10)** | **done** | Publishing+Gallery, MCP+Agent, full Packaging/CI/cross-platform + docs refresh (root `PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`) |
 
 ## Phase 0 — Ubuntu dev setup (do this first)
 
@@ -81,7 +82,7 @@ cargo tauri dev --manifest-path desktop/src-tauri/Cargo.toml
 ```bash
 ./desktop/scripts/build-linux.sh
 sudo dpkg -i desktop/src-tauri/target/release/bundle/deb/Matemium_*.deb
-sudo apt -f install -y   # ffmpeg + TeX Live (~500MB–1GB)
+sudo apt -f install -y   # ffmpeg (+ TinyTeX delivered as first-run asset by the app)
 ```
 
 **Full checklist:** [`COMPLETE_LINUX_UBUNTU_APP_TODO.md`](../COMPLETE_LINUX_UBUNTU_APP_TODO.md) — Phases 0–7 and 9 complete; Phase 8 (clean VM validation) deferred until a fresh Ubuntu 24.04 image is available.

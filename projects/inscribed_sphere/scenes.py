@@ -25,6 +25,10 @@ class InscribedSphere(CanvasScene):
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Inscribed Sphere")
 
+        # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
+        # mode will automatically look straight down the local normal (from above).
+        builder.set_tape_pose(rotation=(18, 22, 0))
+
         builder.add_heading(
             "Sphere inscribed in a cube",
             style={"align": "center", "margin-bottom": 0.45},
@@ -105,6 +109,15 @@ class InscribedSphere(CanvasScene):
             style={"align": "center"},
         )
 
+        # Additional 3D object + camera tour (pose was set at top of method)
+        builder.add_object("Solid3D", id="demo_cube", position=(3, 0.8, 2), content={"shape": "cube", "size": 0.9})
+
+        # Normal 3D view of the solid (tape as 3D object)
+        builder.observe_object("demo_cube", run_time=2.2)
+
+        # Enter tape scroll mode on the posed tape
+        builder.scroll_tape(local_y=5.0, run_time=2.8)
+
         super().__init__(dsl=builder.build(), **kwargs)
 
 
@@ -113,6 +126,10 @@ class InscribedSphereFullTour(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Inscribed Sphere — Full Tour")
+
+        # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
+        # mode will automatically look straight down the local normal (from above).
+        builder.set_tape_pose(rotation=(18, 22, 0))
 
         builder.add_heading("Sphere inscribed in a cube", style={"align": "center", "margin-bottom": 0.4})
         builder.add_body(

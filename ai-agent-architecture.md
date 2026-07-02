@@ -1,11 +1,15 @@
 # Matemium AI Agent Architecture
 
-**Status:** Authoritative (2026-06-26)  
+**Status:** Core agent mechanics (2026-06-26). **Product-level decisions** have evolved — see [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).  
 **Audience:** Desktop shell, cloud router, sidecar, and AI integration authors.
 
-This document records how Matemium upgrades from a **standard chat canvas** (LLM returns markdown code blocks the user copies) to an **autonomous, file-aware AI coding agent** — similar to Cursor or Claude Code — specialized for Manim/Matemium scene authoring.
+**PAD Phase 10:** Packaging/CI/docs complete; MCP (phase 9) and RAG (phase 6) integrated into agent tools. See [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md).
 
-**Related:** [`desktop-architecture.md`](desktop-architecture.md) (product boundaries), [`matemium/ipc/PROTOCOL.md`](matemium/ipc/PROTOCOL.md) (sidecar wire format), [`shared/prompts/agent-system.txt`](shared/prompts/agent-system.txt) (agent system prompt).
+This document records the **core agent mechanics**: tool calling (`view_file`/`edit_file`/`compile_manim`), Search/Replace patches, self-correction loop, two-file boundary, and context handling.
+
+**Product decisions** (vector DB/RAG, lazy loading, first-run downloads, Jina embeddings, strict UX gating, thin YouTube publishing, local+hosted MCP, minimal control-plane sidecar) are documented in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
+
+**Related:** [`desktop-architecture.md`](desktop-architecture.md) (product boundaries), [`matemium/ipc/PROTOCOL.md`](matemium/ipc/PROTOCOL.md) (sidecar wire format), [`shared/prompts/agent-system.txt`](shared/prompts/agent-system.txt) (agent system prompt), [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md) (latest product architecture).
 
 ---
 

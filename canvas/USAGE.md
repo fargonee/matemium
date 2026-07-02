@@ -87,18 +87,23 @@ Run it:
 - 3D graphs optionally **tilt** the camera; flat content does not force a “2D mode” switch each time
 - `add_camera_move(dy=...)` / `auto_camera()` — explicit scroll when needed
 
-**3D world model (Phase 10 — canonical)**
+**3D world model (Clarified)**
 
-The "sheet" is a `TapeObject` inside infinite 3D space (XZ ground, Y height). Tapes can be placed/rotated arbitrarily; their internal content uses local 2D layout/styling.
-Old sheet authoring remains the default path for narrative videos (full compat).
+The "sheet" is a `TapeObject` — one special object inside the infinite 3D world. 
 
-- `add_object("Solid3D", position=(x,y,z), rotation=..., content=...)` or `add_world_object(wo)`
-- Relative placement: `add_relative("base_id", elem, (dx,dy,0), anchor="center")`; `place_relative_to(...)`; `set_tape_pose(rotation=(30,0,0))`
-- Context for sub-content: `with builder.in_object_space("tape42"): builder.add_text("local to tape")`
-- Register custom kinds (no core patches): `register_object_kind("MyDiagram", build=..., measure=..., observe=..., preview=...)`
-- Camera: `add_camera_keyframe(target=ObjectAnchor("obj", "center") or TapeScroll("tape", local_y=5))`
+**Default behavior:** Any object, including a TapeObject, can be observed with normal cinematic 3D (via `ObjectAnchor`). The tape acts like a movable/rotatable plane in 3D space. Free 3D objects do **not** get internal tape features.
 
-Legacy `add_solid` etc. still work on default tape. Use `projects/.../helpers.py` for compositions.
+**Tape-scroll-mode:** Only a `TapeScroll(...)` target activates the tape's classic internal behaviors (local scroll using its internal measurements, lazy reveal, focus, flex, etc.). The outer camera still uses the tape's world transform.
+
+Old pure-tape videos continue to work exactly as before (they implicitly use tape-scroll-mode on the root tape).
+
+Authoring examples:
+- `add_object("Solid3D", position=(x,y,z), ...)`
+- `set_tape_pose(rotation=(30,0,0))`
+- `add_camera_keyframe(target=ObjectAnchor("my_tape"))`          # 3D view of the tape plane
+- `add_camera_keyframe(target=TapeScroll("root_tape", local_y=5))` # enter classic tape scroll + reveal
+
+See `3D-WORLD-DESCRIPTION.md` for the mental model.
 
 See 3D-model.md for full details.
 

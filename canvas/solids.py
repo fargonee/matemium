@@ -41,13 +41,15 @@ def make_solid(
     content: Any,
     *,
     target_size: Optional[float] = None,
+    target_width: Optional[float] = None,
 ) -> Mobject:
     """Build a centered volumetric mobject (geometric center at origin)."""
     c = parse_solid_content(content)
     shape = str(c.get("shape", "cube")).lower()
     size = float(c.get("size", c.get("side", c.get("diameter", 2.0))))
-    if target_size is not None:
-        size = float(target_size)
+    effective = target_width if target_width is not None else target_size
+    if effective is not None:
+        size = float(effective)
 
     color = str(c.get("color", _DEFAULT_COLOR))
     opacity = float(c.get("opacity", _DEFAULT_OPACITY))
@@ -81,8 +83,8 @@ def make_solid(
             stroke_width=stroke_width,
         )
 
-    if target_size and mob.get_width() > 0:
-        mob.set_width(float(target_size))
+    if effective and mob.get_width() > 0:
+        mob.set_width(float(effective))
 
     return mob
 

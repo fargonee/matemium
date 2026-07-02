@@ -10,6 +10,8 @@ The Tauri Rust shell spawns `matemium-sidecar` as a child process. All engine wo
 
 **Agent mode:** the LLM tool `compile_manim` maps to `check_project` + `render_project` on the sidecar. The desktop orchestrator runs the tool loop; see [`ai-agent-architecture.md`](../../ai-agent-architecture.md).
 
+**MCP mode (Phase 9+):** Run with `--mcp` to expose tools/resources over stdio MCP (for local clients/agents). Tools: view_file, edit_file, compile_manim, retrieve. See `matemium/mcp_server.py`.
+
 ## Envelope types
 
 ### Request (desktop → sidecar)
@@ -42,6 +44,9 @@ Events may arrive **between** the request write and the matching response line. 
 
 | Command | Required params | Result |
 |---------|-----------------|--------|
+| `get_status` | — | Lightweight status: `{ phase, engine_loaded, core_ready, version, ... }`. Does **not** load heavy engines. |
+| `configure_assets` | e.g. `{"tinytex_dir": "..."}` | `{ok, configured: [...]}`. Light (no engine). Allows Rust to tell sidecar asset locations early. |
+| `retrieve` | `{"query": "...", "workspace"?, "top_k"?: 8, "files"?: [...]}` | `{query, results: [{file, chunk, score, type}], top_k}`. Uses vector RAG if INTELLIGENCE_READY, else keyword fallback. |
 | `lint_project` | `workspace` | `{ ok, diagnostics[], workspace }` |
 | `check_project` | `workspace`, (`scene`?) | `{ ok, errors[], warnings[], scene, timeline_length?, title? }` |
 | `list_scenes` | `workspace` | `{ scenes[], workspace }` |
@@ -80,11 +85,13 @@ Optional: `path` — alternate scenes file relative to workspace (default `scene
 
 | Event | When | Data |
 |-------|------|------|
+| `loading_phase` | Engine lazy load transitions (Phase 1+) | `{ phase: "ENGINE_LOADING" | "ENGINE_READY" | ..., message? }` |
 | `compile_started` | DSL accepted | `element_count` |
 | `layout_done` | Timeline parsed | `duration_estimate` |
 | `render_started` | Manim render begins | `quality` |
 | `render_progress` | Lifecycle updates | `pct`, `message`, optional `job_id`, `section`, `frame`, `total_frames` |
 | `render_complete` | MP4 written | `video` |
+| `lint_started`, `lint_complete`, `check_complete` | As used by project commands | See handlers |
 | `error` | Failure | `code`, `message` |
 
 **Async UI rule:** long renders must not block the Tauri window. Desktop triggers render via a non-blocking invoke; Rust reads stdout continuously and emits Tauri events from `render_progress` payloads. See [`ai-agent-architecture.md`](../../ai-agent-architecture.md) §8.B.

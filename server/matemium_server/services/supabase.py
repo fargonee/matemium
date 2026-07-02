@@ -281,6 +281,54 @@ class SupabaseService:
             "Content-Type": "application/json",
         }
 
+    # === Thin Gallery / Publishing (Phase 8) ===
+
+    async def create_animation(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Create a new animation metadata record. Returns the created row."""
+        # Use post with return=representation to get the row
+        headers = {**self._service_headers(), "Prefer": "return=representation"}
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                f"{self._base}/rest/v1/animations",
+                json=data,
+                headers=headers,
+            )
+        if response.status_code >= 400:
+            raise RuntimeError(f"Supabase create animation failed: {response.status_code} {response.text}")
+        rows = response.json()
+        return rows[0] if rows else {}
+
+    async def list_animations(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        status: str | None = "published",
+        featured: bool | None = None,
+        search: str | None = None,
+    ) -> list[dict[str, Any]]:
+        params: dict[str, str] = {
+            "select": "*",
+            "order": "created_at.desc",
+            "limit": str(limit),
+            "offset": str(offset),
+        }
+        if status:
+            params["status"] = f"eq.{status}"
+        if featured is not None:
+            params["featured"] = f"eq.{str(featured).lower()}"
+        if search:
+            # Simple ilike on title/desc (Supabase supports)
+            params["or"] = f"(title.ilike.*{search}*,description.ilike.*{search}*)"
+        return await self._rest_get("animations", params)
+
+    async def get_animation(self, animation_id: str) -> dict[str, Any] | None:
+        rows = await self._rest_get("animations", {"id": f"eq.{animation_id}", "select": "*", "limit": "1"})
+        return rows[0] if rows else None
+
+    async def update_animation(self, animation_id: str, data: dict[str, Any]) -> None:
+        await self._rest_patch("animations", {"id": f"eq.{animation_id}"}, data)
+
 
 @lru_cache
 def get_supabase_service() -> SupabaseService:

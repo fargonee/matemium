@@ -27,7 +27,8 @@ class ReelCutter:
         """Walk the timeline and accumulate time at CameraMove or CameraKeyframe events.
 
         These become the chapter / reel boundary points.
-        Phase 8: supports new generalized keyframes for 3D world model.
+        Phase 8: supports mixed 3D + tape-scroll observation types.
+        Includes mode hint for mixed scenes.
         """
         from .dsl import CameraMove, CameraKeyframe
 
@@ -47,14 +48,20 @@ class ReelCutter:
                 cumulative += dur
                 tgt = getattr(item, 'target', None)
                 ty = 0
+                mode = "3d"
                 if tgt and hasattr(tgt, 'local_y'):
                     ty = tgt.local_y
+                    mode = "tape_scroll"
                 elif tgt and isinstance(tgt, dict) and 'local_y' in tgt:
                     ty = tgt['local_y']
+                    mode = "tape_scroll"
+                elif tgt and hasattr(tgt, 'object_id'):
+                    mode = "3d_object"
                 manifest.append({
                     "time": round(cumulative, 3),
                     "label": item.id,
                     "target_y": ty,
+                    "mode": mode,
                 })
         return manifest
 

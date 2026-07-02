@@ -112,12 +112,16 @@ def get_measurement_backend() -> Optional["MeasurementBackend"]:
     return _CURRENT_BACKEND
 
 def measure_object_bounds(obj: Any, **kwargs: Any) -> BoundingBox3D:
-    """Phase 6: get 3D bounds using backend, fallback."""
+    """Phase 6: get 3D bounds using backend, fallback.
+    Phase 5: surface info now includes world orientation for rotated tapes/objects.
+    """
     if hasattr(obj, 'get_surface_info'):
         surf = obj.get_surface_info()
         if surf and surf.get('is_planar'):
             w = surf.get('width', 9.0)
             h = surf.get('height', 16.0)
+            # Local bounds for layout/measurement; for oriented (rotated) tapes use world_transform
+            # separately (as done in scene placement and camera transforms)
             return BoundingBox3D(min=(-w/2, -h/2, 0), max=(w/2, h/2, 0.01))
     backend = get_measurement_backend()
     if backend and hasattr(backend, 'measure_bounding_box'):

@@ -18,6 +18,10 @@ class InscribedSphereLabels(CanvasScene):
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Billboard Labels")
 
+        # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
+        # mode will automatically look straight down the local normal (from above).
+        builder.set_tape_pose(rotation=(18, 22, 0))
+
         builder.add_heading(
             "Labels face the camera",
             style={"align": "center", "margin-bottom": 0.4},

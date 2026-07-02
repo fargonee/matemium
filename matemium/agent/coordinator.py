@@ -33,6 +33,9 @@ from .stubs import (
 )
 from .timing import instantiate_timing_blueprint
 
+# Optional RAG retriever (injected when INTELLIGENCE_READY)
+RetrieverFn = Callable[[str, int], list[dict[str, Any]]] | None
+
 DirectorFn = Callable[[str, ProcessingMode], DirectorOutput]
 EngineerFn = Callable[[ProjectSession], object]
 TTSFn = Callable[[str], TTSResult]
@@ -60,6 +63,7 @@ class CoordinatorConfig:
     patch_fn: PatchFn = lambda _stderr: None
     visual_qc_fn: Callable[[], bool] = default_visual_qc
     use_sidecar_compile: bool = False
+    retriever_fn: "RetrieverFn" = None  # RAG when available
 
     def resolve_compile_fn(self, project_dir: Path) -> CompileFn:
         """Resolve compile_fn — explicit override, optional sidecar, else stub success."""

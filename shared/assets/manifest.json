@@ -1,0 +1,17 @@
+{
+  "version": "2026-07-02",
+  "assets": [
+    {
+      "id": "tinytex-linux",
+      "name": "TinyTeX (Linux x86_64)",
+      "url": "https://github.com/yihui/tinytex-releases/releases/download/v2024.11/TinyTeX-1-v2024.11.tar.gz",
+      "sha256": "PLACEHOLDER_REPLACE_WITH_REAL",
+      "size": 120000000,
+      "extract": true,
+      "extract_format": "tar.gz",
+      "install_path": "bin/tinytex",
+      "platforms": ["linux"]
+    }
+  ],
+  "notes": "This is a placeholder manifest. Replace URLs and checksums with actual signed bundles. In production the manifest can be fetched from the Matemium server."
+}

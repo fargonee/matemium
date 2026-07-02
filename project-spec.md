@@ -4,6 +4,8 @@
 
 **We are building a commercial/freemium desktop application**, not an open-source developer tool as the primary product.
 
+**PAD-10 (Packaging/CI/cross-platform + docs) status:** Complete. All prior phases wired; see [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md).
+
 | Layer | Role |
 |-------|------|
 | **Cloud** | Thin router — auth, billing, **chat LLM**; returns text + code edits only |
@@ -13,6 +15,8 @@
 **Authoring:** one `scenes.py` per project (v1 chat), `CanvasBuilder` + `CanvasScene`, visual `# ---DIV: ...---` section fences. **v2 agent mode:** strict `scenes.py` + `assets.py` with tool loop (view/edit/compile) and self-correction. **Not** AI → Sheet DSL JSON.
 
 Full product architecture: [`desktop-architecture.md`](desktop-architecture.md). Agent upgrade: [`ai-agent-architecture.md`](ai-agent-architecture.md). Engine rules: [`architecture.md`](architecture.md) (incl. §8).
+
+**Latest decisions** on vector/RAG, lazy sidecar, first-run downloads, UX gating, and YouTube publishing: [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
 The CLI (`matemium`) and `projects/` layout remain for **engine development and parity testing**.
 
@@ -280,6 +284,8 @@ See [`desktop-architecture.md`](desktop-architecture.md) §6 for full detail. (L
 
 See [`ai-agent-architecture.md`](ai-agent-architecture.md) §12. (UI supports two-file scenes+assets + chat; full autonomous loop + patch engine in progress.)
 
+Product constraints on when the agent and render become available (strict gating until dependencies ready) are in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
+
 | Phase | Status | Deliverable |
 |-------|--------|-------------|
 | A1 — Patch engine | partial | Code edit utils + apply; Rust parser / full apply in progress |
@@ -287,7 +293,7 @@ See [`ai-agent-architecture.md`](ai-agent-architecture.md) §12. (UI supports tw
 | A3 — Tool loop orchestrator | partial | `compile_manim` via sidecar + render pipeline; full view/edit/compile agent loop |
 | A4 — Async render bridge | **done** | Non-blocking render + streamed `render_progress` events |
 | A5 — Two-file workspace | **done** | `assets.py` template + editor support for scenes/assets files |
-| A6 — TinyTeX bootstrap | pending | First-run install + PATH injection in sidecar |
+| A6 — TinyTeX bootstrap | partial (PAD-2) | Python injection + paths implemented; Rust asset unpacker in PAD-3 |
 | A7 — Agent system prompt | **done** | [`shared/prompts/agent-system.txt`](shared/prompts/agent-system.txt) |
 
 ## Engine next steps (parallel)

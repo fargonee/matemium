@@ -1,7 +1,12 @@
 # 3D World Model — Transition Plan & Current Audit
 
-**Status:** Phase 10 complete — 3D world model is canonical. The infinite tape is a special `TapeObject` inside unified 3D space (XZ ground / Y up). All prior phases implemented. See implementation plan and CHANGELOG.
-Legacy sheet behavior fully preserved via root_tape shims.
+**Status:** Core 3D world structures (WorldTransform, TapeObject, WorldObject, root graph, CameraKeyframes) are in place and basic mixed placement works. 
+
+**Important (2026-07 clarification):** The tape is one special object. By **default** it is observed like any other 3D object (cinematic). Only an explicit `TapeScroll` target activates "tape-scroll-mode", at which point the tape's internal 2D sheet mechanisms (local scroll, lazy reveal, focus, layout) fully apply. Free 3D objects do not get tape features. Old tape behavior must be reproduced exactly via the new model.
+
+Full differentiated camera observation (especially tape-scroll-mode on angled tapes) is still partial. See `3D-WORLD-DESCRIPTION.md` and the updated implementation plan for the target model.
+
+Legacy sheet behavior is preserved when using classic authoring + TapeScroll on a default root tape.
 
 See also:
 - `../3D-world-implementation-plan.md` (in math-preview)
@@ -9,22 +14,18 @@ See also:
 - `../architecture.md`
 - `USAGE.md`
 
-## 1. High-Level Vision (Recap)
+## 1. High-Level Vision (Recap - Clarified)
 
 - The **root** is one infinite 3D space (XZ ground plane, Y height by convention).
-- **Everything** is an `Object` with a `WorldTransform` (position, orientation, scale) in world space.
-- Objects have a **local space**.
-- The current "infinite sheet/tape" becomes `TapeObject`:
-  - Lives in world 3D (can be positioned, rotated, scaled anywhere).
-  - Owns its internal 2D layout engine, CSS-like styling, flex, lazy reveal, etc. in its local XY.
-- Regular content (3D solids, graphs) are other `Object`s.
-- **Camera** is an intelligent observer with keyframes that target:
-  - World points (absolute)
-  - Objects / anchors (relative)
-  - Special `ObservationTarget`s (e.g., `TapeScroll {tape_id, local_y, framing}`)
-- Different object types activate different **observation protocols** (cinematic 3D vs. sheet-style panning + reveal).
-- Measurement & layout are **local to the object**.
-- This unifies the system and makes the engine more granular/abstract.
+- **Everything** is an `Object` with a `WorldTransform`.
+- The "infinite tape" is one special `TapeObject`:
+  - Lives in world 3D (can be positioned, rotated, scaled, moved like any object).
+  - Owns internal 2D layout + styling + lazy reveal in its local space.
+- **Default observation for any object (including TapeObject):** normal cinematic 3D (look-at, orbit, follow transform).
+- **Tape-scroll-mode (TapeScroll target only):** camera uses the tape's internal local measurements; classic sheet behaviors (local pan/scroll, reveal driven by local_y, focus, etc.) engage. Outer camera still respects tape world_transform.
+- Free 3D objects stay simple — they do not get tape internal features.
+- The goal is that classic tape videos continue to work identically, expressed through the 3D world model.
+- Measurement & layout for tape content remain local to the TapeObject.
 
 ## 2. Current Architecture Audit (Sheet-First Reality)
 
@@ -137,15 +138,18 @@ Objects:
 - Group of objects
 ```
 
-### 5.2 Camera Targeting
+### 5.2 Camera Targeting (Clarified Model)
 
 ```
 Camera Keyframe Timeline
-1. t=0: target = WorldPoint(0,0,5)          → free 3D look
-2. t=3: target = ObjectAnchor("tape42", "center") → tape observation mode activates
-3. t=7: target = TapeScroll("tape42", local_y=12.5) → scroll + reveal on tape
-4. t=12: target = ObjectAnchor("solid7", "top") → cinematic orbit
+1. t=0: target = WorldPoint(0,0,5)                    → free 3D look
+2. t=3: target = ObjectAnchor("tape42", "center")     → normal 3D cinematic observation of the tape plane (like any object)
+3. t=7: target = TapeScroll("tape42", local_y=12.5)   → **enters tape-scroll-mode**: internal local scroll + reveal + sheet behaviors activate (outer camera respects tape transform)
+4. t=12: target = ObjectAnchor("solid7", "top")       → cinematic orbit on 3D object
+5. t=15: target = ObjectAnchor("tape42", "top_edge")  → back to normal 3D view of the tape object
 ```
+
+**Key rule:** `ObjectAnchor` on a tape = 3D object observation. Only `TapeScroll` turns on tape internal mechanisms.
 
 ### 5.3 Local vs World Coordinates (Mermaid)
 
@@ -166,39 +170,27 @@ After this document:
 
 **Current sheet still works exactly as before.** All changes in this phase were documentation and analysis only.
 
-## Phase 7 Completion (manim-web Preview as Full 3D World + Special Tape Mode)
+## Phase 7/8 Status (Preview + Scene Execution)
 
-**Implemented (per plan):**
-- Updated preview data emission (observations list + full root graph).
-- LiveMeasurementPreview now a full 3D manim-web renderer:
-  - Renders root_objects using world_transforms and 3D mobjects (Cube/Sphere/etc for Solid3D/3D types).
-  - Special TapeObject mode: local content (rich Text/MathTex/Quadratic etc using existing 2D logic) grouped and transformed by tape's world_transform (pos + rotations), effectively "projected" onto the 3D tape plane.
-  - Observation replay: uses `observations` (CameraKeyframes etc); 3D camera via moveTo for world targets; for tape_scroll: local group shift + outer camera simulate.
-  - 3D camera mode enabled (perspective), adaptive scene size, UI labels.
-- Fallback to 2D sheet mode for legacy data.
-- Types updated.
+**What works today:**
+- Preview data includes `root_objects`, `root_tape`, and `observations`.
+- Live preview can render mixed world objects + tape content transformed by `world_transform`.
+- Basic 3D placement and some camera keyframe replay exist.
+- Tape content is rendered on the transformed plane.
 
-**Milestone:** Loading mixed 3D scenes shows correct world layout + tape content on transformed plane + keyframe-driven camera (orbit/3D vs tape local scroll+reveal). Pure-sheet projects unchanged and beautiful.
+**Gaps vs clarified model:**
+- Camera replay in preview and render does not yet cleanly separate "normal 3D observation of a tape" vs "tape-scroll-mode".
+- `observe_target` for TapeScroll is still a thin y-offset hack rather than proper local + world transform pose calculation.
+- Reveal and focus logic is not strictly gated behind tape-scroll-mode.
+- Many "Phase 10 complete" claims in this file and elsewhere are aspirational; core structures landed but the differentiated observation (the key part of the clarified vision) is incomplete.
 
-## Phase 7 Completion (manim-web Preview as Full 3D World + Special Tape Mode)
+**Target for this area:** When playing a `TapeScroll` keyframe, enter full internal tape mode. `ObjectAnchor` targets on tapes must stay in pure 3D camera behavior. Parity between preview and final render.
 
-**Implemented:**
-- PreviewData types extended with observations, root_ graph, etc.
-- LiveMeasurementPreview.tsx refactored for 3D:
-  - Imports 3D mobjects (Sphere, Cube, ThreeDAxes, Cylinder).
-  - createMobjectFromSpec applies world_transform (pos+rot+scale) and handles Solid3D/3D types with 3D primitives.
-  - playWebPreview detects is3D (coord sys or root_*), renders root_objects in world space with transforms.
-  - Special Tape mode: builds tapeGroup with local_elements using sheet rendering logic (rich text/math), applies tape world_transform (pos/rot).
-  - Replay uses observations list (or falls to timeline), with special handling for tape_scroll (local shift + outer camera).
-  - simulateCamera updated for 3D moveTo; sets 3D camera mode when active.
-  - UI adapts (size, labels, demo button) based on is3DMode.
-- Python handler now always emits "observations" (camera keyframes) + root graph for preview.
-- Pure 2D/sheet still fully supported as fallback.
-- ManimScene key includes mode for remount.
+## Phase 8 Status (Scene/Render Execution)
 
-**Milestone:** Desktop preview is now a full 3D manim-web renderer. Mixed 3D + tape scenes render with correct world positions, tape planes, and observation-driven camera (3D for solids, local sheet for tapes). Current sheet projects preview beautifully.
+(Details below are historical implementation notes. Full behavior per the clarified model in 3D-WORLD-DESCRIPTION.md is not yet complete.)
 
-## Phase 8 Completion (Scene/Render Execution & Existing 3D Features Migration)
+## Phase 8 Work (Scene/Render Execution & 3D Features)
 
 **Implemented:**
 - CanvasScene now pre-builds root_objects and root_tape (local content grouped at tape world transform).

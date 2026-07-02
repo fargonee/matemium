@@ -28,7 +28,8 @@ Visual section fences (`# ---DIV: Title---`) make one file feel like multiple co
 **Key docs:**
 
 - [desktop-architecture.md](desktop-architecture.md) — product goals, boundaries, workspace model
-- [ai-agent-architecture.md](ai-agent-architecture.md) — autonomous agent: tools, patches, TinyTeX, self-correction loop
+- [ai-agent-architecture.md](ai-agent-architecture.md) — autonomous agent: tools, patches, self-correction loop
+- [PRODUCT-ARCHITECTURE-DECISIONS.md](PRODUCT-ARCHITECTURE-DECISIONS.md) — vector DB/RAG, lazy loading, first-run downloads, UX gating, YouTube publishing, MCP (latest product decisions)
 - [architecture.md](architecture.md) — engine design rules (§8 desktop summary)
 - [STRUCTURE.md](STRUCTURE.md) — monorepo map
 
@@ -184,7 +185,8 @@ The agent upgrades chat from "copy markdown code blocks" to an **autonomous codi
 2. **Tools** — `view_file`, `edit_file` (Search/Replace patches), `compile_manim`
 3. **Self-correction** — compile failure → feed stderr to LLM → auto-fix → retry
 
-Full spec: [ai-agent-architecture.md](ai-agent-architecture.md).
+Full spec: [ai-agent-architecture.md](ai-agent-architecture.md).  
+Latest product decisions on the agent, sidecar, and intelligence engine: [PRODUCT-ARCHITECTURE-DECISIONS.md](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
 ### LaTeX (TinyTeX)
 

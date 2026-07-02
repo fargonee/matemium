@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-06-30
 
 ### Added
-- Phase 10 complete: 3D world model is now the canonical architecture (TapeObject + WorldObject graph in infinite space).
+- 3D world structures (TapeObject, WorldTransform, keyframes, mixed placement) added.
+- **Clarification (July 2026):** Tape is observed as a normal 3D object by default. Only explicit tape-scroll-mode (`TapeScroll`) activates internal sheet behaviors. See `3D-WORLD-DESCRIPTION.md` and `TODO-3d-tape-observation-enhancement.md`. Full realization of differentiated observation is still needed. Legacy tape behavior is preserved.
 - Auto-registration of all built-in object kinds; registry dispatch is primary path (no more core if/elif patching for new viz).
 - Enhanced Space3DDemo showcasing rotated tape, add_object, relative anchors, mixed camera keyframes (ObjectAnchor/TapeScroll/WorldPoint).
 - Comprehensive Phase 10 tests for registration, resolution, DSL roundtrips, mixed builder, dispatch parity.
@@ -22,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed / Polished
 - Existing sheet videos continue to author and render identically; 3D features are opt-in extensions.
 - Registry cutover ensures extensibility for future custom object kinds in both sheet and 3D contexts.
+
+### Documentation (Phase 7)
+- Added short section + example to `canvas/README.md`.
+- Verified and updated agent prompts / shared prompts for clarified 3D + tape model (no old assumptions hard-coded).
+- Added Phase 7 completion note here. Full TODO tracking in `TODO-3d-tape-observation-enhancement.md`.
 
 ## Phase 10: Full Migration, Examples, Tests & Cutover
 - 3D world model (XZ ground / Y up) declared canonical.

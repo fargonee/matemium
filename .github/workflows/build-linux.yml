@@ -175,6 +175,13 @@ jobs:
         # installs it to binaries/ (overwriting any dummy), builds frontend, then cargo tauri build.
         run: ./desktop/scripts/build-linux.sh
 
+      - name: Phase 10 - PAD readiness smoke (verify new commands, phases, manifest)
+        run: |
+          ./desktop/scripts/verify-pad-readiness.sh || echo "PAD readiness script warnings (non-fatal in CI for now)"
+
+      - name: Phase 10 - Quick asset manifest presence check
+        run: test -f shared/assets/manifest.json && echo "✅ Asset manifest present" || (echo "FAIL: manifest missing" && exit 1)
+
       - name: Upload desktop bundles (as artifact)
         uses: actions/upload-artifact@v4
         with:

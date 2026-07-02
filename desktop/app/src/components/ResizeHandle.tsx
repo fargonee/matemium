@@ -68,6 +68,7 @@ export function ResizeHandle({ orientation, onDrag, onDragPosition, onDoubleClic
       role="separator"
       aria-orientation={orientation}
       aria-label="Resize panel"
+      title="Drag to resize"
     />
   );
 }

@@ -1,14 +1,81 @@
 :root {
   color-scheme: dark;
-  font-family:
-    "Inter",
-    system-ui,
-    -apple-system,
-    sans-serif;
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Sizing & Spacing (4px base scale) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 999px;
+
+  /* Professional Sophisticated Dark Palette */
+  --bg-base: #0a0c14;
+  --bg-surface: #10141e;
+  --bg-elevated: #161b28;
+  --bg-subtle: #1a202f;
+  --bg-header: linear-gradient(180deg, #10141e 0%, #0e121a 100%);
+
+  --border-subtle: #232a38;
+  --border: #2a3244;
+  --border-strong: #353f52;
+
+  --text-primary: #e8eaf0;
+  --text-secondary: #a8b0c0;
+  --text-tertiary: #7f8a9a;
+  --text-muted: #5f697a;
+  --text-inverse: #0a0c14;
+
+  /* Accent - refined professional indigo (serious + modern) */
+  --accent: #5c6cf0;
+  --accent-hover: #6f80f8;
+  --accent-active: #4a59d8;
+  --accent-subtle: rgba(92, 108, 240, 0.12);
+  --accent-border: rgba(92, 108, 240, 0.28);
+
+  /* Semantic */
+  --success: #22c55e;
+  --success-subtle: rgba(34, 197, 94, 0.14);
+  --warning: #eab308;
+  --warning-subtle: rgba(234, 179, 8, 0.14);
+  --error: #f87171;
+  --error-subtle: rgba(248, 113, 113, 0.14);
+  --info: #60a5fa;
+
+  /* Shadows & Depth (subtle, professional) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.38);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  /* Transitions */
+  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 240ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Base app styles */
+  color: var(--text-primary);
+  background-color: var(--bg-base);
+  font-family: var(--font-sans);
   line-height: 1.5;
-  font-weight: 400;
-  color: #e8eaed;
-  background-color: #0b0d12;
+  font-weight: var(--font-weight-normal);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -41,4 +108,10 @@ button {
 button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+/* Professional focus ring */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

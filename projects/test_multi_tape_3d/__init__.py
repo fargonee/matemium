@@ -1,0 +1,1 @@
+"""Test project for multiple tapes and 3D objects in world."""

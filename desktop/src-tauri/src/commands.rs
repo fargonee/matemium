@@ -3,12 +3,10 @@ use std::path::{Path, PathBuf};
 use base64;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::State;
-
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 
-use crate::cloud::{ChatCompletionRequest, ChatMessage};
+use crate::cloud::{ChatCompletionRequest, ChatMessage, PublishRequest, PublishResponse};
 use crate::media_preview::playback_path_for_media;
 use crate::outputs::{
     clear_render_cache, delete_output, list_outputs, validate_output_path,
@@ -109,6 +107,10 @@ pub async fn project_create(
     state: State<'_, AppState>,
     params: ProjectCreateParams,
 ) -> Result<Value, String> {
+    let readiness = get_readiness(state.clone()).await?;
+    if !readiness.fully_ready {
+        return Err(format!("APP_NOT_READY: {}", readiness.message));
+    }
     let project = create_project(&state.paths, params.name)?;
     serde_json::to_value(project).map_err(|e| e.to_string())
 }
@@ -127,6 +129,10 @@ pub async fn project_save(
     state: State<'_, AppState>,
     params: ProjectSaveParams,
 ) -> Result<(), String> {
+    let readiness = get_readiness(state.clone()).await?;
+    if !readiness.fully_ready {
+        return Err(format!("APP_NOT_READY: {}", readiness.message));
+    }
     save_scenes(&state.paths, &params.project_id, &params.content)
 }
 
@@ -151,11 +157,122 @@ pub async fn sidecar_ping(state: State<'_, AppState>) -> Result<Value, String> {
     state.sidecar.request("ping", json!({})).await
 }
 
+/// Tell the sidecar where first-run assets (e.g. TinyTeX) live.
+/// Called early by desktop before heavy engine commands (PAD Phase 2+).
+#[tauri::command]
+pub async fn sidecar_configure_assets(
+    state: State<'_, AppState>,
+    tinytex_dir: Option<String>,
+) -> Result<Value, String> {
+    let mut params = serde_json::Map::new();
+    if let Some(dir) = tinytex_dir {
+        params.insert("tinytex_dir".to_string(), json!(dir));
+    }
+    state.sidecar.request("configure_assets", Value::Object(params)).await
+}
+
+#[tauri::command]
+pub async fn get_asset_status(
+    state: State<'_, AppState>,
+    asset_id: Option<String>,
+) -> Result<Value, String> {
+    let statuses = state.assets.get_status(asset_id.as_deref());
+    serde_json::to_value(statuses).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn start_asset_download(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    asset_id: String,
+) -> Result<(), String> {
+    // In real use, after download we can call configure + notify sidecar
+    state.assets.start_download(app.clone(), &asset_id, None).await?;
+
+    // After successful TinyTeX download, auto-configure sidecar if possible
+    if asset_id == "tinytex-linux" {
+        if let Some(bin_dir) = state.assets.tinytex_bin_dir() {
+            let _ = state.sidecar.request(
+                "configure_assets",
+                json!({ "tinytex_dir": bin_dir.to_string_lossy().to_string() }),
+            ).await;
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Readiness {
+    pub phase: String,
+    pub assets_ready: bool,
+    pub engine_ready: bool,
+    pub intelligence_ready: bool,
+    pub fully_ready: bool,
+    pub message: String,
+    pub engine_phase: Option<String>,
+}
+
+#[tauri::command]
+pub async fn get_readiness(state: State<'_, AppState>) -> Result<Readiness, String> {
+    let asset_statuses = state.assets.get_status(None);
+    let tinytex_ready = asset_statuses
+        .iter()
+        .any(|a| a.id == "tinytex-linux" && a.downloaded && a.verified)
+        || state.assets.tinytex_bin_dir().is_some();
+
+    let engine_status = state.sidecar.request("get_status", json!({})).await.unwrap_or(json!({}));
+    let engine_phase = engine_status.get("phase").and_then(|v| v.as_str()).unwrap_or("CORE_READY").to_string();
+    let engine_ready = engine_phase == "ENGINE_READY" || engine_phase.contains("READY");
+    let intelligence_ready = engine_status.get("intelligence_ready").and_then(|v| v.as_bool()).unwrap_or(false)
+        || engine_phase.contains("INTELLIGENCE_READY");
+
+    let fully_ready = tinytex_ready && engine_ready;
+
+    let (phase, message) = if !tinytex_ready {
+        ("assets".to_string(), "Downloading Local Code Intelligence assets (TinyTeX)...".to_string())
+    } else if !engine_ready {
+        ("engine".to_string(), "Loading Manim / canvas engine...".to_string())
+    } else {
+        ("ready".to_string(), "Ready".to_string())
+    };
+
+    Ok(Readiness {
+        phase,
+        assets_ready: tinytex_ready,
+        engine_ready,
+        intelligence_ready,
+        fully_ready,
+        message,
+        engine_phase: Some(engine_phase),
+    })
+}
+
+#[tauri::command]
+pub async fn sidecar_retrieve(
+    state: State<'_, AppState>,
+    project_id: String,
+    query: String,
+    top_k: Option<u32>,
+) -> Result<Value, String> {
+    let workspace = workspace_path(&state.paths, &project_id)?;
+    state.sidecar.request("retrieve", json!({
+        "workspace": workspace,
+        "query": query,
+        "top_k": top_k.unwrap_or(8),
+        "files": ["scenes.py", "assets.py"],
+    })).await
+}
+
 #[tauri::command]
 pub async fn sidecar_lint(
     state: State<'_, AppState>,
     params: ProjectIdParams,
 ) -> Result<Value, String> {
+    let readiness = get_readiness(state.clone()).await?;
+    if !readiness.fully_ready {
+        return Err(format!("APP_NOT_READY: {}", readiness.message));
+    }
     let workspace = workspace_path(&state.paths, &params.project_id)?;
     state
         .sidecar
@@ -173,6 +290,10 @@ pub async fn sidecar_check(
     state: State<'_, AppState>,
     params: SidecarCheckParams,
 ) -> Result<Value, String> {
+    let readiness = get_readiness(state.clone()).await?;
+    if !readiness.fully_ready {
+        return Err(format!("APP_NOT_READY: {}", readiness.message));
+    }
     let workspace = workspace_path(&state.paths, &params.project_id)?;
     let mut ipc_params = json!({ "workspace": workspace });
     if let Some(scene) = params.scene {
@@ -203,6 +324,10 @@ pub async fn sidecar_render(
     state: State<'_, AppState>,
     params: SidecarRenderParams,
 ) -> Result<Value, String> {
+    let readiness = get_readiness(state.clone()).await?;
+    if !readiness.fully_ready {
+        return Err(format!("APP_NOT_READY: {}", readiness.message));
+    }
     let workspace = workspace_path(&state.paths, &params.project_id)?;
     let output_dir = if let Some(raw) = params.output_dir.as_deref() {
         validate_render_output_dir(raw)?
@@ -234,6 +359,10 @@ pub async fn sidecar_get_preview_data(
     state: State<'_, AppState>,
     params: ProjectIdParams,
 ) -> Result<Value, String> {
+    let readiness = get_readiness(state.clone()).await?;
+    if !readiness.fully_ready {
+        return Err(format!("APP_NOT_READY: {}", readiness.message));
+    }
     let workspace = workspace_path(&state.paths, &params.project_id)?;
     state
         .sidecar
@@ -280,6 +409,10 @@ pub async fn cloud_chat(
     state: State<'_, AppState>,
     params: CloudChatParams,
 ) -> Result<Value, String> {
+    let readiness = get_readiness(state.clone()).await?;
+    if !readiness.fully_ready {
+        return Err(format!("APP_NOT_READY: {}", readiness.message));
+    }
     let settings = state.paths.load_settings()?;
     let request = ChatCompletionRequest {
         messages: params.messages,
@@ -295,6 +428,40 @@ pub async fn cloud_chat(
 pub async fn settings_get(state: State<'_, AppState>) -> Result<Value, String> {
     let settings = state.paths.load_settings()?;
     serde_json::to_value(settings).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn publish_animation(
+    state: State<'_, AppState>,
+    project_id: String,
+    title: String,
+    description: Option<String>,
+    tags: Option<Vec<String>>,
+    scene: Option<String>,
+    duration: Option<f64>,
+) -> Result<PublishResponse, String> {
+    let readiness = get_readiness(state.clone()).await?;
+    if !readiness.fully_ready {
+        return Err(format!("APP_NOT_READY: {}", readiness.message));
+    }
+
+    // For thin publish, we send metadata only. The video is local; YT upload is separate.
+    let request = PublishRequest {
+        title,
+        description,
+        tags: tags.unwrap_or_default(),
+        scene_class: scene,
+        duration,
+    };
+
+    crate::cloud::publish_to_gallery(&state.paths.load_settings()?, request).await
+}
+
+#[tauri::command]
+pub async fn list_gallery(state: State<'_, AppState>, search: Option<String>) -> Result<Value, String> {
+    // Public, no auth needed for list. Uses server settings for URL.
+    let settings = state.paths.load_settings()?;
+    crate::cloud::list_gallery(&settings, search.as_deref()).await
 }
 
 #[tauri::command]

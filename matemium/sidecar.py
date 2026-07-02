@@ -19,6 +19,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print version and exit (does not start the request loop)",
     )
+    parser.add_argument(
+        "--mcp",
+        action="store_true",
+        help="Run as MCP server (stdio) exposing tools/resources for local agents/clients. Requires 'mcp' extra.",
+    )
     return parser
 
 
@@ -32,6 +37,13 @@ def main(argv: list[str] | None = None) -> int:
         from .ipc.protocol import IPC_PROTOCOL_VERSION
 
         print(f"matemium-sidecar {__version__} (protocol {IPC_PROTOCOL_VERSION})")
+        return 0
+
+    if args.mcp:
+        # Run MCP server mode (for local MCP clients)
+        from .mcp_server import main as run_mcp
+        import asyncio
+        asyncio.run(run_mcp())
         return 0
 
     # Sidecar protocol traffic uses stdout; keep stderr for engine logs.

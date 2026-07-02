@@ -49,7 +49,7 @@ export function BottomDock({
             className={`bottom-tab ${tab === "output" ? "active" : ""}`}
             onClick={() => onTabChange("output")}
           >
-            Output
+            Console
           </button>
           <button
             type="button"
@@ -58,7 +58,7 @@ export function BottomDock({
             className={`bottom-tab ${tab === "preview" ? "active" : ""}`}
             onClick={() => onTabChange("preview")}
           >
-            Live Preview
+            Preview
           </button>
         </div>
         <div className="bottom-dock-toolbar-actions">
@@ -73,8 +73,10 @@ export function BottomDock({
           ) : (
             <span className="bottom-dock-hint">
               {tab === "progress"
-                ? "Structured pipeline view"
-                : "Raw sidecar stream"}
+                ? "Pipeline status"
+                : tab === "output"
+                ? "Engine logs"
+                : "Live measurement preview"}
             </span>
           )}
         </div>

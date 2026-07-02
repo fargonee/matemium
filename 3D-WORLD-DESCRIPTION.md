@@ -33,26 +33,35 @@ Objects in General
 • Composition is natural: a Tape can contain regular objects projected onto its surface; a larger 3D assembly can contain Tapes as "pages" or "screens".
 • Every object can be a target for relative positioning: "place this at the center of Tape #7's local (3.2, 1.1)" or "attach this label 0.4 units above the top edge of this Solid".
 
-The Camera as Intelligent Observer This is where the "different observation rules" become the feature, not a hack.
+The Camera as Intelligent Observer
 
-Camera is a first-class participant in the 3D space with a timeline of observations (keyframes or smooth paths).
+The camera is a first-class participant in the 3D space. Keyframes target objects, anchors, or world points. By default, **every object is observed the same way** — as a 3D object in world space.
 
-A keyframe can target:
+A keyframe target can be:
 • A world point (absolute)
-• The center (or a named anchor) of any Object (relative)
-• A specific observation mode on an Object
+• The center or a named anchor of any Object (relative) — this includes TapeObjects
+• A special "tape scroll" observation that activates tape mode
 
-When the target is a regular 3D object, observation is "cinematic 3D":
-• Look-at, orbit, dolly, distance, phi/theta, etc.
-• Smooth interpolation between poses.
+**Default observation (applies to regular 3D objects AND to TapeObjects):**
+• Pure cinematic 3D: look-at, orbit, dolly, follow a moving/rotating object, phi/theta, distance control, smooth interpolation.
+• The tape (when targeted via ObjectAnchor or similar) is treated exactly like any other 3D object — a flat plane you can fly the camera around in world space.
+• Free 3D objects never receive tape-like internal behaviors (layout, lazy reveal driven by local scroll, sheet panning, etc.) unless they are explicitly a TapeObject.
 
-When the target is (or includes) a TapeObject, the camera activates the tape's special observation protocol:
-• The local framing logic (the old sheet panning, auto-focus on elements, viewport_fit, etc.) takes over in the tape's local coordinates.
-• Camera movement along the tape becomes "scroll + reveal" rather than pure 3D orbit.
-• Lazy content reveal, flex groups, and internal timing are driven by how far the observation has traveled along the tape's local Y.
-• The outer 3D camera still respects the tape's current world transform, so you can have a tilted or moving tape and the internal sheet logic still feels correct.
+**Tape-scroll-mode (activated explicitly via TapeScroll target or equivalent):**
+This is the **only** time the tape's special internal mechanisms engage.
+• Camera is positioned using the tape's internal local measurements (local Y position on the tape plane).
+• The old sheet behaviors activate in the tape's local 2D space: panning/scrolling along local coordinates, auto-focus on elements, viewport fitting, flex groups, and lazy content reveal driven by observation progress along the tape's local Y.
+• All internal sheet machinery (LayoutEngine, styling, reveal timing) runs locally inside the TapeObject.
+• The outer 3D camera still respects the tape's full world_transform, so a rotated, positioned, or moving tape works correctly when in scroll mode.
+• Transitions into and out of tape-scroll-mode are first-class.
 
-Transitions between object types are first-class and can be smoothed. You can keyframe "observe this solid for 4 seconds → now observe Tape #3 starting at local y=2.1 → follow this flying diagram while the camera also tracks the tape in the background."
+In short:
+- Observe a TapeObject with a normal 3D target → it behaves like any free 3D object.
+- Activate tape-scroll-mode (TapeScroll) → camera "enters" the tape and the classic infinite-tape experience takes over, but the whole thing remains one object inside the 3D world.
+
+Transitions are explicit and smoothable. Example: "cinematic 3D orbit around a floating cube → look at the angled tape as a 3D plane (ObjectAnchor) → enter tape-scroll-mode at local_y=4.5 → later exit back to free 3D camera following the moving tape object."
+
+The old "infinite tape" experience is recovered exactly when using TapeScroll targets against a default (identity transform) root TapeObject. All classic authoring continues to work through the new model.
 
 Measurement, Layout, and Renderer-Agnosticism
 • Measurement is always performed in an object's local space.
@@ -81,12 +90,13 @@ How This Solves the "Rest Problems"
 
 Creative Implications & New Opportunities
 
-• Nested tapes and "books": A TapeObject can itself contain other TapeObjects as "pages" or "side panels" at different local positions.
-• Dynamic observation: An object can declare "when observed this way, reveal these internal elements with this timing".
-• Relative everything: "Keep this label always facing the camera but attached to the moving tape's local (x, 0.5)".
-• Multi-tape narratives: One scene could have three tapes at different heights and angles. The camera can "visit" them in sequence, each time using proper sheet behavior inside that tape.
-• Hybrid authoring: The builder can have context — "I'm building inside this TapeObject's local space right now" vs "I'm placing top-level objects in world space".
-• Future renderers: A new renderer only needs to understand objects + observation targets. The sheet logic stays inside the TapeObject implementation.
+• Tape as a 3D citizen + special mode: You can treat a tape as a normal 3D prop (rotate it, orbit the camera around it, attach other objects to it) and only enter full tape-scroll-mode when you want the classic scrolling narrative experience.
+• Normal 3D observation of tapes vs. tape-scroll-mode: Camera can fly around tapes like any object, then "dive in" via a TapeScroll keyframe.
+• Nested tapes and "books": A TapeObject can itself contain other TapeObjects as "pages" or "side panels". Each can be observed in 3D or entered via scroll-mode independently.
+• Relative everything in world + local: Place objects relative to a tape's world anchor, or position things inside a tape using its local coordinates.
+• Multi-tape + mixed scenes: Multiple tapes + free 3D objects. Camera can do pure 3D moves between them, or enter scroll-mode on one tape at a time.
+• Explicit mode switching: Authors consciously choose `ObjectAnchor("my_tape")` (3D view of the plane) vs `TapeScroll("my_tape", local_y=...)` (enter classic tape experience).
+• Hybrid authoring remains powerful: Builder still feels natural for pure tape videos; 3D features are additive.
 
 Open Tensions (Things to Keep Thinking About)
 

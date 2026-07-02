@@ -265,19 +265,27 @@ FlexTicTacToeDemo = TicTacToeTutorial
 FlexTicTacToeDemo = TicTacToeTutorial
 
 
-# --- Phase 10: 3D Space Demo ---
-from canvas.dsl import WorldObject, WorldTransform, Vector3, CanvasElement, ObjectAnchor, TapeScroll, WorldPoint
+# --- 3D World Demo ---
+from canvas.dsl import WorldObject, WorldTransform, Vector3, CanvasElement, WorldPoint
 
 
 class Space3DDemo(CanvasScene):
-    """Phase 10 demo: mixed 3D world with rotated TapeObject, floating 3D solids,
-    relative positioning, and camera keyframes moving between them.
+    """Demo of mixed 3D world with rotated TapeObject, floating 3D solids,
+    relative positioning, using newest authoring patterns.
 
-    Showcases the unified 3D space where the "tape" is just one object.
+    - `observe_object("id")` for normal 3D view
+    - `scroll_tape(local_y=...)` for tape-scroll mode
+    - `add_tape()` + `in_object_space()` for secondary tapes
+
+    Classic `CameraMove` + pure tape still works exactly as before.
     """
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="3D Space Demo")
+
+        # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
+        # mode will automatically look straight down the local normal (from above).
+        builder.set_tape_pose(rotation=(35, 15, 0))  # pitch ~35°, yaw 15°
 
         # Tape content in its local space (old sheet ergonomics preserved)
         builder.add_heading("3D World Demo", style={"align": "center"})
@@ -287,9 +295,6 @@ class Space3DDemo(CanvasScene):
             style={"margin-bottom": 0.8},
         )
         builder.add_math(r"\vec{r} = (x, y, z)", style={"margin-bottom": 0.5})
-
-        # Rotate the root tape in 3D (XZ ground, Y up)
-        builder.set_tape_pose(rotation=(35, 15, 0))  # pitch ~35°, yaw 15°
 
         builder.add_body(
             "Content inside the tape still uses familiar flex, styling, and lazy reveal — "
@@ -325,22 +330,29 @@ class Space3DDemo(CanvasScene):
             scale=0.7,
         )
 
-        # Camera keyframe: look at the floating cube
-        builder.add_camera_keyframe(
-            target=ObjectAnchor(object_id="cube1", anchor="center"),
-            duration=3.0,
+        # Demonstrate a second top-level tape as a first-class 3D object
+        info_tape = builder.add_tape(
+            "info_card",
+            position=( -4.2, 2.8, 1.5 ),
+            rotation=( 12, -35, 8 ),
         )
+        with builder.in_object_space(info_tape):
+            builder.add_body("Tilted secondary tape", style={"align": "center"})
 
-        # Camera keyframe: scroll along the (rotated) tape
-        builder.add_camera_keyframe(
-            target=TapeScroll(tape_id="root_tape", local_y=4.0, framing_mode="sheet"),
-            duration=4.0,
-        )
+        # === Camera tour using newest patterns ===
+        # Normal 3D: observe_object (cinematic, no tape logic)
+        builder.observe_object("cube1", run_time=3.0)
 
-        # Back to world point
+        # Tape-scroll mode: scroll_tape (internal tape logic)
+        builder.scroll_tape(local_y=4.0, run_time=4.0)
+
+        # Back to world point (normal 3D)
         builder.add_camera_keyframe(
             target=WorldPoint(position=(2.0, 3.0, 4.0)),
             duration=2.5,
         )
+
+        # Visit the secondary info tape in pure 3D
+        builder.observe_object("info_card", run_time=2.0)
 
         super().__init__(dsl=builder.build(), **kwargs)

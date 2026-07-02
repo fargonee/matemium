@@ -4,6 +4,8 @@ A **layout-to-animation compiler** for math education videos, built on [Manim Co
 
 Output targets **9:16 portrait reels** (TikTok / Shorts) by default, with landscape YouTube support. Long-form sheets can be exported as static study materials or auto-chunked into short clips.
 
+**PAD Phase 10 complete:** Packaging, CI, cross-platform builds, and docs refresh per [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md). Full product architecture (lazy sidecar, first-run assets, RAG/MCP, strict gating, thin publishing) integrated.
+
 ## Product direction
 
 Monorepo for a **commercial/freemium desktop app** — three deployable layers:

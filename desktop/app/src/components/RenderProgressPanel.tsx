@@ -50,11 +50,6 @@ function statusTone(phase: RenderPipelineState["phase"]): string {
   return "busy";
 }
 
-function partialStripCount(partialTotal: number | null): number {
-  if (partialTotal === null || partialTotal <= 0) return 0;
-  return Math.min(partialTotal, 28);
-}
-
 export function RenderProgressPanel({ pipeline }: RenderProgressPanelProps) {
   const [now, setNow] = useState(Date.now());
 
@@ -79,7 +74,7 @@ export function RenderProgressPanel({ pipeline }: RenderProgressPanelProps) {
   const showRenderDetail = pipeline.phase === "rendering";
 
   const stripCells = useMemo(() => {
-    const total = partialStripCount(pipeline.partialTotal);
+    const total = Math.max(0, pipeline.partialTotal ?? 0);
     if (total <= 0) return [];
     const completed = Math.max(
       0,
@@ -221,11 +216,6 @@ export function RenderProgressPanel({ pipeline }: RenderProgressPanelProps) {
                     />
                   );
                 })}
-                {pipeline.partialTotal !== null && pipeline.partialTotal > stripCells.length ? (
-                  <span className="render-partial-overflow">
-                    +{pipeline.partialTotal - stripCells.length}
-                  </span>
-                ) : null}
               </div>
               <div className="render-partial-legend" aria-hidden>
                 <span className="render-partial-legend-item">

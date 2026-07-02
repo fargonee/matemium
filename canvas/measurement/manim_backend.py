@@ -89,7 +89,15 @@ class ManimMeasurementBackend:
         return BoundingBox3D(min=(0,0,0), max=(1,1,1))
 
     def get_surface_info(self, obj: Any, **kwargs: Any) -> dict:
-        # For TapeObject, report local 2D size.
+        # Prefer the object's own reporting (now includes orientation for rotated tapes)
+        if hasattr(obj, 'get_surface_info'):
+            try:
+                surf = obj.get_surface_info()
+                if surf:
+                    return surf
+            except:
+                pass
+        # Fallback for TapeObject
         if hasattr(obj, 'local_canvas_settings') and obj.local_canvas_settings:
             s = obj.local_canvas_settings
             return {"width": s.frame_width, "height": s.frame_height, "is_planar": True}

@@ -5,19 +5,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from canvas import CanvasScene, ReelCutter, SheetDSL
-from canvas.dsl import CanvasElement, CameraKeyframe  # Phase 3
+# NOTE: No heavy imports (canvas, manim, render that pulls them) at module top level.
+# All engine loading is deferred via matemium.lazy and local imports inside handlers.
+# This makes the sidecar control-plane start instantly (CORE_READY / ping / get_status).
 
+import os
+
+from .. import lazy
 from ..__version__ import __version__
-from ..render import (
-    RENDER_PIPELINE_ID,
-    apply_render_orientation,
-    normalize_orientation,
-    publish_preview_video,
-    render_quality_config,
-    render_scene_class,
-    render_sheet,
-)
+from ..intelligence import get_retriever
+from .duration import estimate_timeline_duration
+from .events import EventEmitter
+from .protocol import IPC_PROTOCOL_VERSION, ProtocolError
+from .validate import validate_dsl_payload
+
+# Lightweight workspace helpers (we still import the module, but its canvas use is now deferred)
 from ..workspace import (
     exports_dir_for_workspace,
     media_dir_for_workspace,
@@ -26,18 +28,10 @@ from ..workspace import (
 )
 from ..workspace_project import (
     check_project,
-    instantiate_scene,
     lint_scenes_file,
     list_scenes_in_workspace,
-    load_scene_class,
-    resolve_scene_name,
     resolve_workspace,
-    workspace_context,
 )
-from .duration import estimate_timeline_duration
-from .events import EventEmitter
-from .protocol import IPC_PROTOCOL_VERSION, ProtocolError
-from .validate import validate_dsl_payload
 
 HandlerFn = Callable[[dict[str, Any], EventEmitter], dict[str, Any]]
 
@@ -55,6 +49,8 @@ def _resolve_scene_or_error(
     *,
     path: str | None = None,
 ) -> str:
+    # Deferred: only called from heavy paths
+    from ..workspace_project import resolve_scene_name
     try:
         return resolve_scene_name(workspace, scene, path=path)
     except (ValueError, RuntimeError) as exc:
@@ -80,7 +76,10 @@ def _require_workspace(params: dict[str, Any]) -> Path:
         raise ProtocolError("MISSING_WORKSPACE", str(exc)) from exc
 
 
-def _dsl_from_params(params: dict[str, Any], *, strict: bool = True) -> SheetDSL:
+def _dsl_from_params(params: dict[str, Any], *, strict: bool = True) -> Any:
+    lazy.ensure_engine_loaded(None)
+    from ..workspace_project import instantiate_scene
+
     if params.get("workspace"):
         workspace = _require_workspace(params)
         scene_name = _resolve_scene_or_error(
@@ -96,7 +95,7 @@ def _dsl_from_params(params: dict[str, Any], *, strict: bool = True) -> SheetDSL
     return _require_dsl(params, strict=strict)
 
 
-def _require_dsl(params: dict[str, Any], *, strict: bool = True) -> SheetDSL:
+def _require_dsl(params: dict[str, Any], *, strict: bool = True) -> Any:
     dsl_data = params.get("dsl")
     if dsl_data is None:
         raise ProtocolError("MISSING_DSL", "params.dsl is required")
@@ -108,13 +107,59 @@ def _require_dsl(params: dict[str, Any], *, strict: bool = True) -> SheetDSL:
 
 
 def handle_ping(_params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+    # ping must stay completely light — no engine load
     return {
         "ok": True,
         "version": __version__,
         "protocol": IPC_PROTOCOL_VERSION,
         "engine": "matemium",
-        "render_pipeline": RENDER_PIPELINE_ID,
+        "render_pipeline": "partial-movie-progress-v1",
     }
+
+
+def handle_get_status(_params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+    """Lightweight status. Does NOT trigger engine load."""
+    status = lazy.get_status()
+    status.update({
+        "version": __version__,
+        "protocol": IPC_PROTOCOL_VERSION,
+    })
+    return status
+
+
+def handle_retrieve(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
+    """RAG retrieve using vector or keyword fallback."""
+    lazy.ensure_intelligence_loaded(events)
+    workspace = None
+    if params.get("workspace"):
+        workspace = _require_workspace(params)
+
+    query = str(params.get("query", ""))
+    top_k = int(params.get("top_k", 8))
+    files = params.get("files") or ["scenes.py", "assets.py"]
+
+    retriever = get_retriever(workspace)
+    # Try to index relevant files if it's the vector retriever and not yet indexed
+    if hasattr(retriever, "index_files"):
+        try:
+            retriever.index_files(files)
+        except Exception:
+            pass
+
+    results = retriever.retrieve(query, top_k=top_k)
+    return {"query": query, "results": results, "top_k": top_k}
+
+
+def handle_configure_assets(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+    """Lightweight (no engine load): tell sidecar where first-run assets live.
+
+    Example: {"tinytex_dir": "/path/to/Matemium/bin/tinytex"}
+    Used by Rust desktop before any heavy command.
+    """
+    if td := params.get("tinytex_dir"):
+        os.environ["MATEMIUM_TINYTEX_DIR"] = str(td)
+    # Future: embeddings_model_dir, etc.
+    return {"ok": True, "configured": list(params.keys())}
 
 
 def handle_validate_dsl(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
@@ -136,6 +181,10 @@ def handle_estimate_duration(params: dict[str, Any], _events: EventEmitter) -> d
 
 
 def handle_compile_preview(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
+    lazy.ensure_engine_loaded(events)
+    # Local import after ensure (canvas now loaded)
+    from canvas.dsl import CanvasElement
+
     dsl = _require_dsl(params)
     workspace = resolve_job_workspace(params)
     exports = exports_dir_for_workspace(workspace)
@@ -157,7 +206,11 @@ def handle_compile_preview(params: dict[str, Any], events: EventEmitter) -> dict
 
 
 def handle_render(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
+    lazy.ensure_engine_loaded(events)
     from ..play_count import resolve_animation_count
+
+    # Local heavy imports
+    from ..render import render_sheet
 
     dsl = _require_dsl(params)
     workspace = resolve_job_workspace(params)
@@ -194,13 +247,16 @@ def handle_render(params: dict[str, Any], events: EventEmitter) -> dict[str, Any
     }
 
 
-def handle_list_scenes(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+def handle_list_scenes(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
+    # list_scenes will cause user scenes.py + canvas load inside workspace_project helpers
+    lazy.ensure_engine_loaded(events)
     workspace = _require_workspace(params)
     scenes = list_scenes_in_workspace(workspace, path=params.get("path"))
     return {"scenes": scenes, "workspace": str(workspace)}
 
 
 def handle_lint_project(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
+    # Lint is intentionally lightweight (syntax + ruff) — does not require full engine load
     workspace = _require_workspace(params)
     events.lint_started(workspace=str(workspace))
     diagnostics = lint_scenes_file(workspace, path=params.get("path"))
@@ -213,6 +269,7 @@ def handle_lint_project(params: dict[str, Any], events: EventEmitter) -> dict[st
 
 
 def handle_check_project(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
+    lazy.ensure_engine_loaded(events)
     workspace = _require_workspace(params)
     result = check_project(
         workspace,
@@ -224,7 +281,24 @@ def handle_check_project(params: dict[str, Any], events: EventEmitter) -> dict[s
 
 
 def handle_render_project(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
+    lazy.ensure_engine_loaded(events)
+
     from ..play_count import resolve_animation_count
+
+    # Heavy imports inside after ensure
+    from ..render import (
+        apply_render_orientation,
+        normalize_orientation,
+        publish_preview_video,
+        render_quality_config,
+        render_scene_class,
+        render_sheet,
+    )
+    from ..workspace_project import (
+        instantiate_scene,
+        load_scene_class,
+        resolve_scene_name,
+    )
 
     workspace = _require_workspace(params)
     scene_name = _resolve_scene_or_error(
@@ -350,7 +424,11 @@ def handle_export_sheet(params: dict[str, Any], events: EventEmitter) -> dict[st
     return {"path": str(path), "format": fmt, "workspace": workspace_str}
 
 
-def handle_cut_reels(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+def handle_cut_reels(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
+    lazy.ensure_engine_loaded(events)
+    from ..workspace import resolve_job_workspace
+    from canvas import ReelCutter
+
     video_raw = params.get("video")
     if not video_raw:
         raise ProtocolError("MISSING_VIDEO", "params.video is required")
@@ -387,7 +465,7 @@ def handle_cut_reels(params: dict[str, Any], _events: EventEmitter) -> dict[str,
 
 
 def _export_static_sheet(
-    dsl: SheetDSL,
+    dsl: Any,
     stem: Path,
     *,
     quality: str = "preview",
@@ -396,7 +474,9 @@ def _export_static_sheet(
     title: str | None = None,
 ) -> Path:
     """Build a static sheet export without playing the full video timeline."""
+    lazy.ensure_engine_loaded(None)
     from manim import tempconfig
+    from canvas import CanvasScene
 
     from ..render import render_quality_config
 
@@ -418,8 +498,13 @@ def _export_static_sheet(
         )
 
 
-def _serialize_preview_element(el: CanvasElement) -> dict[str, Any]:
+def _serialize_preview_element(el: Any) -> dict[str, Any]:
     """Rich serialization for manim-web preview (1-1 as possible)."""
+    # Lazy canvas names resolved by caller ensure; local import for isinstance safety in future calls
+    from canvas.dsl import CanvasElement as _CanvasElement
+    if not isinstance(el, _CanvasElement):
+        # defensive
+        pass
     raw_content = el.content
     runs = None
     plain = ""
@@ -508,6 +593,8 @@ def _serialize_preview_element(el: CanvasElement) -> dict[str, Any]:
 
 def _serialize_timeline_action(item: Any) -> dict[str, Any]:
     """Serialize any TimelineItem for the manim-web replay engine. Phase 3 support."""
+    from canvas.dsl import CameraKeyframe, CanvasElement
+
     if isinstance(item, CanvasElement):
         base = _serialize_preview_element(item)
         base["kind"] = "element"
@@ -527,7 +614,16 @@ def _serialize_timeline_action(item: Any) -> dict[str, Any]:
     return {"kind": "unknown", "raw": str(item)}
 
 
-def handle_get_preview_data(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+def handle_get_preview_data(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
+    lazy.ensure_engine_loaded(events)
+    from ..workspace_project import (
+        instantiate_scene,
+        resolve_workspace,
+        workspace_context,
+    )
+    # Canvas classes for serializers (loaded by ensure)
+    from canvas.dsl import CameraKeyframe, CanvasElement
+
     if params.get("workspace"):
         workspace = resolve_workspace(params)
         attempted_scene = params.get("scene")
@@ -568,6 +664,9 @@ def handle_get_preview_data(params: dict[str, Any], _events: EventEmitter) -> di
 
 COMMANDS: dict[str, HandlerFn] = {
     "ping": handle_ping,
+    "get_status": handle_get_status,
+    "configure_assets": handle_configure_assets,
+    "retrieve": handle_retrieve,
     "list_scenes": handle_list_scenes,
     "lint_project": handle_lint_project,
     "check_project": handle_check_project,

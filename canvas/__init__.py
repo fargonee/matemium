@@ -24,6 +24,7 @@ from .dsl import (
     ObjectAnchor,
     TapeScroll,
     ObservationTarget,
+    ObservationMode,  # Phase 8
     TransformElement,
     EntryAnimation,
     StateBehavior,
@@ -104,5 +105,6 @@ __all__ = [
     "ObjectAnchor",
     "TapeScroll",
     "ObservationTarget",
+    "ObservationMode",  # Phase 8
     "resolve_world_position",
 ]

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from canvas import CanvasScene
 from canvas.builder import CanvasBuilder
+from canvas.dsl import WorldPoint
 
 
 # ---DIV: Scene parts---
@@ -23,13 +24,21 @@ def part_conclusion(b: CanvasBuilder) -> None:
     b.add_3d("z = x^2 - y^2")
     b.add_text("Conclusion: x = 2 or x = 3", after_3d=True)
 
+    # Additional 3D objects + camera tour (newest authoring). Pose already set at top.
+    b.add_object("Solid3D", id="root_sphere", position=(2.5, 0, 2), content={"shape": "sphere", "size": 0.5})
+
+    b.observe_object("root_sphere", run_time=2.0)
+    b.scroll_tape(local_y=3.5, run_time=2.5)
+    b.add_camera_keyframe(target=WorldPoint(position=(0, 1, 7)), duration=1.8)
+
 
 # ---DIV: Main scene---
 class MyScene(CanvasScene):
-    """Main scene for this project."""
+    """Main scene for this project. Now uses the 3D world + tape model."""
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="My Scene")
+
         part_intro(builder)
         part_conclusion(builder)
         super().__init__(dsl=builder.build(), **kwargs)

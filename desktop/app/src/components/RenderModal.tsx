@@ -50,6 +50,7 @@ export function RenderModal({
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [pickingFolder, setPickingFolder] = useState(false);
+  const [localScenes, setLocalScenes] = useState<string[]>(scenes);
 
   useEffect(() => {
     if (!isOpen || !projectId) return;
@@ -61,6 +62,12 @@ export function RenderModal({
     void (async () => {
       try {
         await onPrepare();
+        // Always fetch fresh scenes list so stale "MyScene" from new project metadata doesn't cause issues after overwriting scenes.py
+        const listRes = await api.sidecarListScenes(projectId);
+        if (!cancelled) {
+          const fresh = listRes.scenes || [];
+          setLocalScenes(fresh);
+        }
         const result = await api.sidecarCheck(projectId, scene || undefined);
         if (!cancelled) {
           setCheck(result);
@@ -119,10 +126,10 @@ export function RenderModal({
         <label htmlFor="render-scene">Scene</label>
         <select
           id="render-scene"
-          value={scene}
+          value={localScenes.includes(scene) ? scene : (localScenes[0] || scene)}
           onChange={(e) => onSceneChange(e.target.value)}
         >
-          {scenes.map((item) => (
+          {localScenes.map((item) => (
             <option key={item} value={item}>
               {item}
             </option>
@@ -221,7 +228,7 @@ export function RenderModal({
               </span>
             ) : (
               <span className="render-validation-bad">
-                {(check?.errors ?? []).map((e) => e).join("; ") || "Scene failed validation"}
+                {(check?.errors ?? []).map((e: any) => (typeof e === "string" ? e : e?.message || JSON.stringify(e))).join("; ") || "Scene failed validation"}
               </span>
             )}
           </div>
@@ -229,9 +236,11 @@ export function RenderModal({
 
         {!checking && check && !check.ok && (check.errors?.length ?? 0) > 0 ? (
           <ul className="render-error-list">
-            {(check.errors ?? []).map((err, index) => (
-              <li key={`${err}-${index}`}>{err}</li>
-            ))}
+            {(check?.errors ?? []).map((err: any, index: number) => {
+              const msg = typeof err === "string" ? err : err?.message || JSON.stringify(err);
+              const key = typeof err === "string" ? err : err?.message || index;
+              return <li key={`${key}-${index}`}>{msg}</li>;
+            })}
           </ul>
         ) : null}
 

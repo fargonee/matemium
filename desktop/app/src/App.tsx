@@ -16,10 +16,12 @@ import "./App.css";
 import { ChatPanel } from "./components/ChatPanel";
 import { CodeEditor, type CodeEditorHandle } from "./components/Editor";
 import { ProjectsLanding } from "./components/ProjectsLanding";
+import { CommunityGallery } from "./components/CommunityGallery";
+import { ObsidianLoadingScreen } from "./components/ObsidianLoadingScreen";
 import { ProjectSidebar, type SidebarView } from "./components/ProjectSidebar";
 import { MediaPreviewModal } from "./components/MediaPreviewModal";
 import { RenderModal } from "./components/RenderModal";
-import { SettingsModal } from "./components/SettingsModal";
+import { SettingsScreen } from "./components/SettingsScreen";
 import { BottomDock } from "./components/BottomDock";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { resolveBottomDockDefault, useBottomDockTab } from "./hooks/useBottomDockTab";
@@ -102,6 +104,8 @@ export default function App() {
   const [renderOpen, setRenderOpen] = useState(false);
   const [outputsRefreshToken, setOutputsRefreshToken] = useState(0);
   const [mediaPreview, setMediaPreview] = useState<MediaPreviewItem | null>(null);
+  const [readiness, setReadiness] = useState<api.Readiness | null>(null);
+  const [showGallery, setShowGallery] = useState(false);
   const {
     layout,
     setBottomPanelOpen,
@@ -111,6 +115,7 @@ export default function App() {
     setSidebarWidthFromPointer,
     resizeBottom,
     maximizeBottom,
+    setEditorOpen,
   } = usePanelLayout();
 
   useEffect(() => {
@@ -183,14 +188,9 @@ export default function App() {
 
   const handleBottomResize = useCallback(
     (delta: number) => {
-      // Refresh measured region height right before applying resize so max is up-to-date
-      const el = editorBottomRef.current;
-      if (el) {
-        setEditorRegionHeight(el.getBoundingClientRect().height);
-      }
       resizeBottom(delta);
     },
-    [resizeBottom, setEditorRegionHeight],
+    [resizeBottom],
   );
 
   const handleMaximizeBottom = useCallback(() => {
@@ -314,9 +314,75 @@ export default function App() {
 
   useSidecarEvents(handleSidecarEvent);
 
+  const refreshReadiness = useCallback(async () => {
+    try {
+      const r = await api.getReadiness();
+      setReadiness(r);
+    } catch (e) {
+      // ignore, default not ready
+    }
+  }, []);
+
+  const refreshLlmProfile = useCallback(async () => {
+    if (!inTauri) return;
+    try {
+      const profile = await api.cloudGetProfile();
+      setLlmProfile(profile);
+    } catch (e) {
+      // ignore profile fetch errors (e.g. no token)
+    }
+  }, [inTauri]);
+
+  useEffect(() => {
+    // initial check
+    void refreshReadiness();
+    const id = setInterval(() => { void refreshReadiness(); }, 2000);
+    return () => clearInterval(id);
+  }, [refreshReadiness]);
+
+  // Listen to asset progress and loading to refresh readiness faster
+  useEffect(() => {
+    // we can also listen for asset-progress
+    let unlistenAsset: (() => void) | undefined;
+    void import("@tauri-apps/api/event").then(({ listen }) => {
+      listen("asset-progress", () => { void refreshReadiness(); }).then(fn => { unlistenAsset = fn; });
+      listen("sidecar-event", (e: any) => {
+        if (e.payload?.event === "loading_phase" || e.payload?.event === "status_update") {
+          void refreshReadiness();
+        }
+      }).then(() => {});
+    });
+    return () => { unlistenAsset?.(); };
+  }, [refreshReadiness]);
+
+  const isReady = readiness?.fullyReady || readiness?.phase === "ready" || (readiness?.assetsReady && readiness?.engineReady);
+  const readinessMessage = readiness?.message || "Checking readiness...";
+
+  // Auto trigger asset download on start if not ready (demo for phase 4)
+  useEffect(() => {
+    if (readiness && !readiness.assetsReady) {
+      // fire and forget; UI will show via polling
+      void api.startAssetDownload("tinytex-linux").catch(() => {});
+    }
+  }, [readiness?.assetsReady]);
+
+  // Auto-trigger intelligence/RAG load in background once engine is ready
+  // (retrieve handler calls ensure_intelligence_loaded; keyword fallback if no vector deps)
+  useEffect(() => {
+    if (readiness?.engineReady && !readiness?.intelligenceReady && projects.length > 0) {
+      const firstId = projects[0].id;
+      // dummy query to kick off the lazy load
+      void api.sidecarRetrieve(firstId, "__preload__", 1).catch(() => {});
+    }
+  }, [readiness?.engineReady, readiness?.intelligenceReady, projects]);
+
   const saveFile = useCallback(
     async (file: ProjectFile, projectId = project?.id) => {
       if (!projectId || !dirtyFiles[file]) return;
+      if (!isReady) {
+        setStatusMessage("App not ready — " + readinessMessage, "idle");
+        return;
+      }
       setSaving(true);
       try {
         if (file === "scenes") {
@@ -329,7 +395,7 @@ export default function App() {
         setSaving(false);
       }
     },
-    [dirtyFiles, fileContents.assets, fileContents.scenes, project?.id],
+    [dirtyFiles, fileContents.assets, fileContents.scenes, project?.id, isReady, readinessMessage],
   );
 
   const flushDirtyFiles = useCallback(
@@ -358,6 +424,10 @@ export default function App() {
   const runLint = useCallback(
     async (options?: { silent?: boolean }) => {
       if (!project) return;
+      if (!isReady && !options?.silent) {
+        setStatusMessage("App not ready — " + readinessMessage, "idle");
+        return;
+      }
       setLinting(true);
       try {
         const result = await api.sidecarLint(project.id);
@@ -386,6 +456,10 @@ export default function App() {
 
   const openProjectById = useCallback(
     async (projectId: string) => {
+      if (!isReady) {
+        setStatusMessage("App not ready — " + readinessMessage, "idle");
+        return;
+      }
       if (project) {
         await flushDirtyFiles(project.id);
       }
@@ -406,7 +480,7 @@ export default function App() {
       saveProjectRenderPrefs(opened.id, { scene });
       setStatusMessage(`Opened ${opened.name}`, "ok");
     },
-    [applyProjectRenderPrefs, flushDirtyFiles, loadScenes, project],
+    [applyProjectRenderPrefs, flushDirtyFiles, loadScenes, project, isReady, readinessMessage],
   );
 
   const closeProject = useCallback(async () => {
@@ -482,6 +556,10 @@ export default function App() {
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
+    if (!isReady) {
+      setStatusMessage("App not ready yet — waiting for assets and engine", "idle");
+      return;
+    }
     try {
       setBusy(true);
       const created = await api.projectCreate(newName.trim());
@@ -549,15 +627,6 @@ export default function App() {
           orientation,
         }),
       );
-      const el = editorBottomRef.current;
-      if (el) {
-        setEditorRegionHeight(el.getBoundingClientRect().height);
-      } else {
-        // Safe default so bottom panel open doesn't squash the viewport to empty
-        setEditorRegionHeight(700);
-      }
-      setBottomPanelOpen(true);
-      focusProgress();
       appendLog(`[render] starting (${quality}, ${orientation})`);
       const result = await api.sidecarRender(
         project.id,
@@ -614,7 +683,7 @@ export default function App() {
         ? { tts_provider: settings.llmProvider, use_personal_llm: true }
         : undefined;
       const res = await api.cloudGenerateAudio(text, "alloy", llmConfig);
-      if (res.dataBase64) {
+      if (res.audioBase64) {
         appendLog(`[audio] generated ${text.length} chars`);
         setStatusMessage("Audio generated (base64 in log for now - integrate with media preview)", "ok");
         // For live preview parallel safety, just log; future can save via project
@@ -640,6 +709,10 @@ export default function App() {
 
   const handleChatSend = async () => {
     if (!chatInput.trim()) return;
+    if (!isReady) {
+      setStatusMessage("App not ready — " + readinessMessage, "idle");
+      return;
+    }
     const userMessage: ChatMessage = { role: "user", content: chatInput.trim() };
     const nextMessages = [...chatMessages, userMessage];
     setChatMessages(nextMessages);
@@ -647,10 +720,21 @@ export default function App() {
     try {
       setBusy(true);
       const llmConfig = getLlmConfigForCall();
+      let scenesExcerpt = fileContents.scenes;
+      // Phase 6: use RAG chunks if intelligence ready (reduces token use)
+      if (isReady && project) {
+        try {
+          const rag = await api.sidecarRetrieve(project.id, chatInput.trim() || userMessage.content, 6);
+          const ragText = rag.results?.map((r: any) => `// ${r.file}\n${r.chunk}`).join("\n\n---\n\n") || "";
+          if (ragText) {
+            scenesExcerpt = ragText + "\n\n// --- full scenes below if needed ---\n" + fileContents.scenes.slice(0, 3000);
+          }
+        } catch {}
+      }
       const response = await api.cloudChat(
         nextMessages,
         project?.id,
-        fileContents.scenes,
+        scenesExcerpt,
         llmConfig,
       );
       setChatMessages((prev) => [...prev, response.message]);
@@ -689,6 +773,35 @@ export default function App() {
     }
   };
 
+  const handlePublish = async () => {
+    if (!project || !publishTitle.trim()) return;
+    setPublishing(true);
+    try {
+      const tags = publishTags ? publishTags.split(",").map(t => t.trim()).filter(Boolean) : [];
+      const res = await api.publishAnimation(
+        project.id,
+        publishTitle.trim(),
+        publishDesc.trim() || undefined,
+        tags,
+        selectedScene,
+        undefined // duration from last render if available
+      );
+      setStatusMessage(`Published! ID: ${res.id} — ${res.message || 'Pending YT upload'}`, "ok");
+      setPublishOpen(false);
+      setPublishTitle("");
+      setPublishDesc("");
+      setPublishTags("");
+      // Refresh gallery if open
+      if (showGallery) {
+        // trigger reload somehow
+      }
+    } catch (error) {
+      setStatusMessage(formatError(error), "error");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const handleSaveSettings = async (nextSettings: Settings = settings) => {
     try {
       await api.settingsSet(nextSettings);
@@ -722,28 +835,42 @@ export default function App() {
     );
   }
 
+  // Phase 5: Loading screen + gallery always accessible (header always shown)
+  const isFullyReady = isReady;
+  const loadingProgress = readiness?.engineReady ? 90 : readiness?.assetsReady ? 65 : readiness ? 30 : 5;
+  const showLoadingScreen = !isFullyReady;
+
+  // Phase 8: Publish flow
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishTitle, setPublishTitle] = useState("");
+  const [publishDesc, setPublishDesc] = useState("");
+  const [publishTags, setPublishTags] = useState("");
+  const [publishing, setPublishing] = useState(false);
+
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Matemium</h1>
+        <div className="header-brand">
+          <h1>Matemium</h1>
+          <span className="header-tag">Canvas</span>
+        </div>
         {project ? (
           <>
             <button type="button" className="btn btn-ghost" onClick={() => void closeProject()}>
-              Projects
+              Library
             </button>
             <span className="project-name">{project.name}</span>
           </>
         ) : null}
 
-        {/* Modern LLM status for easy visibility of credits and mode */}
+        {/* Professional LLM status */}
         {llmProfile && (
           <span 
             className="llm-status" 
             title="Click to refresh credits. Platform uses our tokens (margin priced). Personal = your keys from web."
             onClick={() => void refreshLlmProfile()}
-            style={{ cursor: 'pointer' }}
           >
-            {settings.usePersonalLlm ? '🔑 Personal' : `💳 Platform • ${llmProfile.llm_credits ?? '—'} credits`}
+            {settings.usePersonalLlm ? 'Personal' : `Platform • ${llmProfile.llm_credits ?? '—'} credits`}
             {llmProfile.llm_provider && ` (${llmProfile.llm_provider})`}
           </span>
         )}
@@ -751,21 +878,40 @@ export default function App() {
         <button type="button" className="btn btn-ghost" onClick={() => setSettingsOpen(true)}>
           Settings
         </button>
+        <button 
+          type="button" 
+          className="btn btn-ghost" 
+          onClick={() => setShowGallery(true)}
+          title="Browse public community animations"
+        >
+          Gallery
+        </button>
         <span className={`status-pill ${statusKind}`}>{busy ? "Working…" : status}</span>
       </header>
 
-      <div
-        ref={appBodyRef}
-        className={`app-body ${project ? "app-body-project" : "app-body-landing"}`}
-        style={
-          project
-            ? ({
-                "--sidebar-width": `${layout.sidebarWidth}px`,
-                "--chat-width": `${layout.chatWidth}px`,
-              } as React.CSSProperties)
-            : undefined
-        }
-      >
+      {showGallery ? (
+        <CommunityGallery onClose={() => setShowGallery(false)} />
+      ) : showLoadingScreen ? (
+        <ObsidianLoadingScreen
+          progress={loadingProgress}
+          message={readinessMessage}
+          phase={readiness?.phase}
+          onBrowseGallery={() => setShowGallery(true)}
+          onRetry={() => void refreshReadiness()}
+        />
+      ) : (
+        <div
+          ref={appBodyRef}
+          className={`app-body ${project ? "app-body-project" : "app-body-landing"}`}
+          style={
+            project
+              ? ({
+                  "--sidebar-width": `${layout.sidebarWidth}px`,
+                  "--chat-width": `${layout.chatWidth}px`,
+                } as React.CSSProperties)
+              : undefined
+          }
+        >
         {project ? (
           <>
             <aside className="sidebar">
@@ -814,10 +960,27 @@ export default function App() {
                   type="button"
                   className="btn btn-primary"
                   disabled={busy || linting || saving}
-                  onClick={() => setRenderOpen(true)}
+                  onClick={() => {
+                    if (!isReady) {
+                      setStatusMessage("App not ready — " + readinessMessage, "idle");
+                      return;
+                    }
+                    setRenderOpen(true);
+                  }}
                 >
                   Render
                 </button>
+                {project && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={!isReady || publishing}
+                    onClick={() => setPublishOpen(true)}
+                    title="Publish thin metadata to community gallery (YouTube)"
+                  >
+                    Publish to Community
+                  </button>
+                )}
                 <span className="toolbar-meta">
                   {saving
                     ? "Saving…"
@@ -836,31 +999,71 @@ export default function App() {
               </div>
 
               <div className="editor-bottom-region" ref={editorBottomRef}>
-                <div
-                  className="editor-stage"
-                  style={layout.bottomPanelOpen ? { minHeight: 140 } : undefined}
-                >
-                  <CodeEditor
-                    ref={editorRef}
-                    value={activeCode}
-                    diagnostics={activeFile === "scenes" ? diagnostics : []}
-                    onChange={(value) => {
-                      setFileContents((prev) => ({ ...prev, [activeFile]: value }));
-                      setDirtyFiles((prev) => ({ ...prev, [activeFile]: true }));
+                {layout.editorOpen ? (
+                  <div className="editor-stage">
+                    <CodeEditor
+                      ref={editorRef}
+                      value={activeCode}
+                      diagnostics={activeFile === "scenes" ? diagnostics : []}
+                      onChange={(value) => {
+                        setFileContents((prev) => ({ ...prev, [activeFile]: value }));
+                        setDirtyFiles((prev) => ({ ...prev, [activeFile]: true }));
+                      }}
+                      readOnly={!isReady}
+                    />
+                    {!isReady && (
+                      <div className="editor-locked-overlay">
+                        <div className="locked-message">
+                          Editor locked until ready<br />
+                          <span className="locked-detail">{readinessMessage}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="editor-bump"
+                    title="Show code editor"
+                    onClick={() => {
+                      const el = editorBottomRef.current;
+                      if (el) setEditorRegionHeight(el.getBoundingClientRect().height);
+                      setEditorOpen(true);
                     }}
-                  />
-                </div>
+                  >
+                    <span className="editor-bump-tab">
+                      <span className="bottom-panel-bump-icon" aria-hidden>
+                        ▼
+                      </span>
+                      Editor
+                    </span>
+                  </button>
+                )}
 
                 {layout.bottomPanelOpen ? (
                   <>
-                    <div className="bottom-dock-chrome">
+                    <div
+                      className="bottom-dock-chrome"
+                      onMouseDown={() => {
+                        // Ensure we have a fresh measurement of available height for clamp/max on drag start
+                        const el = editorBottomRef.current;
+                        if (el) setEditorRegionHeight(el.getBoundingClientRect().height);
+                      }}
+                    >
                       <ResizeHandle
                         orientation="horizontal"
                         onDrag={handleBottomResize}
                         onDoubleClick={handleMaximizeBottom}
                       />
                     </div>
-                    <div className="bottom-panels" style={{ height: layout.bottomHeight }}>
+                    <div
+                      className="bottom-panels"
+                      style={
+                        layout.editorOpen
+                          ? { flex: `0 0 ${layout.bottomHeight}px` }
+                          : { flex: '1 1 auto' }
+                      }
+                    >
                       <BottomDock
                         tab={bottomDockTab}
                         onTabChange={selectBottomDockTab}
@@ -895,15 +1098,23 @@ export default function App() {
               </div>
             </>
           ) : (
-            <ProjectsLanding
+            <>
+              {!isReady && (
+                <div className="readiness-banner">
+                  {readinessMessage} — workspace actions disabled
+                </div>
+              )}
+              <ProjectsLanding
               projects={projects}
               newName={newName}
-              busy={busy}
+              busy={busy || !isReady}
               onNewNameChange={setNewName}
               onCreate={() => void handleCreate()}
               onOpen={(id) => void openProjectById(id)}
               onDelete={(id) => void handleDelete(id)}
+              readinessMessage={!isReady ? readinessMessage : undefined}
             />
+            </>
           )}
         </section>
 
@@ -913,6 +1124,11 @@ export default function App() {
               orientation="vertical"
               onDragPosition={resizeChatFromPointer}
             />
+            {!isReady && project && (
+              <div className="readiness-banner" style={{ gridColumn: "1 / -1" }}>
+                {readinessMessage} — creation/editing/rendering blocked
+              </div>
+            )}
             <aside className="chat-panel">
               <ChatPanel
                 messages={chatMessages}
@@ -930,20 +1146,23 @@ export default function App() {
                     : undefined
                 }
                 onGenerateAudio={() => void handleGenerateAudio()}
+                disabled={!isReady}
               />
             </aside>
           </>
         ) : null}
       </div>
+      )}
 
-      <SettingsModal
-        settings={settings}
-        open={settingsOpen}
-        busy={busy}
-        onChange={setSettings}
-        onClose={() => setSettingsOpen(false)}
-        onSave={handleSaveSettings}
-      />
+      {settingsOpen && (
+        <SettingsScreen
+          settings={settings}
+          busy={busy}
+          onChange={setSettings}
+          onClose={() => setSettingsOpen(false)}
+          onSave={handleSaveSettings}
+        />
+      )}
 
       <MediaPreviewModal
         item={mediaPreview}
@@ -974,6 +1193,25 @@ export default function App() {
           onRender={() => void handleRender()}
         />
       ) : null}
+
+      {/* Thin Publish Modal */}
+      {publishOpen && (
+        <div className="modal" onClick={() => setPublishOpen(false)}>
+          <div className="modal-content publish-modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Publish to Community</h3>
+            <p className="modal-hint">Thin publish: only metadata sent. Video hosted on YouTube. Requires engine ready.</p>
+            <input value={publishTitle} onChange={(e) => setPublishTitle(e.target.value)} placeholder="Title (required)" />
+            <textarea value={publishDesc} onChange={(e) => setPublishDesc(e.target.value)} placeholder="Description (optional)" rows={3} />
+            <input value={publishTags} onChange={(e) => setPublishTags(e.target.value)} placeholder="Tags (comma separated)" />
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setPublishOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" disabled={!publishTitle.trim() || publishing} onClick={() => void handlePublish()}>
+                {publishing ? 'Publishing…' : 'Publish'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

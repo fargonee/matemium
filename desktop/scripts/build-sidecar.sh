@@ -45,7 +45,15 @@ if [[ ! -f "$OUT" ]]; then
 fi
 
 chmod +x "$OUT" 2>/dev/null || true
-echo "==> Built: $OUT ($(du -h "$OUT" | cut -f1))"
+SIZE=$(du -h "$OUT" | cut -f1)
+echo "==> Built: $OUT ($SIZE)"
+
+# Phase 10: Installer size guardrail (base sidecar should stay small; assets separate)
+# Adjust threshold as needed; current ~50MB target for full installer includes minimal sidecar.
+SIZE_BYTES=$(stat -c%s "$OUT" 2>/dev/null || stat -f%z "$OUT" 2>/dev/null || echo 0)
+if [[ $SIZE_BYTES -gt 150000000 ]]; then  # ~150MB warning; tune per platform
+  echo "WARNING: Sidecar binary over 150MB ($SIZE). Review excludes in spec."
+fi
 
 BIN_DIR="$ROOT/desktop/src-tauri/binaries"
 mkdir -p "$BIN_DIR"
@@ -56,5 +64,12 @@ echo "==> Installed Tauri externalBin: $BIN_DIR/$TAURI_NAME"
 echo "==> Smoke test"
 BIN="$BIN_DIR/$TAURI_NAME" "$ROOT/desktop/scripts/verify-sidecar-binary.sh" || true
 
+# Phase 10: Copy asset manifest for runtime reference (if needed by sidecar)
+MANIFEST_SRC="$ROOT/shared/assets/manifest.json"
+if [[ -f "$MANIFEST_SRC" ]]; then
+  cp "$MANIFEST_SRC" "$BIN_DIR/" 2>/dev/null || true
+  echo "==> Copied asset manifest to binaries (for reference)"
+fi
+
 echo ""
-echo "Phase 2 complete. Binary ready for Tauri externalBin."
+echo "Phase 10 packaging updates applied. Binary ready for Tauri externalBin."

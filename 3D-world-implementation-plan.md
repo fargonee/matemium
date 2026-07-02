@@ -1,6 +1,16 @@
 # 3D World Unification Implementation Plan
 
-**Goal:** Evolve the Matemium engine from a sheet-first system (with bolted-on 3D) into a true infinite 3D space where the current "infinite tape/sheet" is simply one special kind of object (`TapeObject` or equivalent). This enables a more generic, abstract, granular engine while preserving (and enhancing) the powerful CSS-like styling, layout, lazy reveal, and WYSIWYG preview characteristics of the sheet.
+**Goal:** Evolve the Matemium engine from a sheet-first system (with bolted-on 3D) into a true infinite 3D space where the current "infinite tape/sheet" is simply one special kind of object (`TapeObject`). 
+
+**Clarified observation model (2026-07):**
+- The tape is one object among others.
+- By default, **all objects** (including TapeObjects) are observed with normal cinematic 3D behavior.
+- Free 3D objects never get tape-like internal features.
+- **Tape-scroll-mode** (triggered by `TapeScroll` target) is the only time the tape activates its full internal 2D sheet mechanisms (local scroll, lazy reveal driven by local progress, layout, focus, etc.).
+- The old tape experience must be perfectly reproduced when using tape-scroll-mode on a default root tape.
+- See `3D-WORLD-DESCRIPTION.md` for the full mental model.
+
+This enables a more generic, abstract, granular engine while preserving (and enhancing) the powerful CSS-like styling, layout, lazy reveal, and WYSIWYG preview characteristics of the sheet.
 
 **Source Vision:** See `3D-WORLD-DESCRIPTION.md` (the extended mental model).
 
@@ -15,13 +25,15 @@
 
 **Guiding Principles:**
 - **Evolutionary, not big-bang rewrite.** Current sheet behavior must continue to work (and improve) at every milestone.
-- **Tape as a first-class but special Object.** It lives in world 3D space (with transform) but owns its internal 2D local space + layout engine + styling.
-- **Observation modes over special cases.** Camera targets objects (or points) and delegates behavior based on the target's observation protocol.
-- **Local spaces everywhere.** Measurement, layout, and content authoring happen in an object's local coordinates. World space is only for placement, transforms, and general camera.
-- **Registry + protocols for extensibility.** New object kinds (or custom visuals) register their local renderer/measure/observe logic instead of requiring core patches.
-- **Preview is the 3D world.** manim-web renders the full 3D scene; special "tape observation" reuses/enhances the existing high-fidelity sheet preview logic.
-- **One by one.** Each step is small, testable, and builds only on completed prior steps. Backwards compatibility for existing `scenes.py` / DSL where possible.
-- **Document as we go.** Update architecture.md, canvas/USAGE.md, desktop-architecture.md, etc.
+- **Tape as one special object.** It lives in world 3D space (with transform) but owns rich internal 2D machinery that is **only activated** when tape-scroll-mode is explicitly engaged.
+- **Default = uniform 3D observation.** Every object (tape or not) is observed cinematically in 3D space unless a `TapeScroll` (tape-scroll-mode) target is used.
+- **Tape-scroll-mode is opt-in and special.** Only `TapeScroll` targets (or legacy CameraMove on root tape for compat) activate internal local sheet logic, reveal driven by local progress, etc.
+- **Old tape must work exactly as before.** Using the classic builder + TapeScroll on a default identity root_tape must produce identical behavior and feel.
+- **Free 3D objects stay simple.** They do not get layout engines or tape-scroll behaviors by default.
+- **Local spaces everywhere.** Measurement and content authoring for tapes happen in the tape's local 2D coordinates.
+- **Registry + protocols.** Support per-kind observe behavior (normal 3D vs tape-scroll).
+- **Preview is the 3D world.** manim-web renders the full scene; tape-scroll-mode reuses high-fidelity local sheet logic on the transformed plane.
+- **Document as we go.** Keep docs in sync with the clarified model.
 
 **Risks & Mitigations (high-level):**
 - Sheet UX regression → Prioritize "tape mode" preservation in every phase; use existing tests + new 3D examples.
@@ -104,27 +116,33 @@
 **Dependencies:** Phase 1 (transforms).
 **Success:** All current projects/ demos still render exactly the same.
 
-## Phase 3: Generalized Camera & Keyframe Observation System
+## Phase 3: Generalized Camera & Keyframe Observation System (Updated for Clarified Model)
 
-**Purpose:** Replace sheet-centric camera with a general 3D observer that has special behavior for tapes.
+**Purpose:** Build a uniform 3D observer. Normal observation works for every object (including tapes). Tape-scroll-mode is a distinct, opt-in activation of the tape's internal mechanisms.
 
-1. Redesign camera primitives (in `canvas/camera.py` or new `canvas/observation.py`):
-   - `ObservationTarget` union: `WorldPoint`, `ObjectAnchor`, `TapeScroll(local_y, framing_mode, ...)`.
-   - `CameraKeyframe(time, target, look_at_offset?, easing, duration, ...)` 
-   - General smooth path interpolation (position + angles).
-2. Extend `CameraController` (or new `CameraSystem`):
-   - Support world 3D navigation (free XYZ + full phi/theta when not on a tape).
-   - When target is a TapeObject (or TapeScroll): delegate to "tape observation protocol" that reuses existing pan_to, focus, reveal logic in the tape's *local* coordinates, while applying the tape's world transform to the outer camera.
-   - Modes: "free_3d", "observing_tape", "cinematic_lookat", etc.
-   - Support relative targets ("follow object X while also tracking tape Y").
-3. Update timeline items:
-   - Generalize `CameraMove` → `CameraObservation` (or keep alias for compat).
-   - Add support for object-targeted keyframes (`target_object_id`, `tape_scroll_params`).
-4. Adapt `scene.py` execution loop:
-   - During construct, resolve observations against the object registry + current world transforms.
-   - Trigger tape-internal lazy reveal when observing a tape.
-5. Preserve existing sheet camera behavior exactly when using old-style CameraMove on the default tape.
-6. **Milestone:** Camera can keyframe to world points and to a tape (with correct internal scrolling/reveal). Old scenes unchanged.
+**Clarified behavior:**
+- `ObjectAnchor` (or WorldPoint) on a TapeObject → normal cinematic 3D observation of the tape plane as a 3D object.
+- `TapeScroll` target → explicitly enters tape-scroll-mode: camera uses tape local measurements + internal sheet logic (local pan, reveal timing, focus) while the outer camera pose accounts for the tape's world_transform.
+- Legacy `CameraMove` on root tape acts as tape-scroll for full backward compatibility.
+
+1. Redesign camera primitives:
+   - Keep `ObservationTarget`: `WorldPoint`, `ObjectAnchor`, `TapeScroll`.
+   - `TapeScroll` is the explicit "enter tape-scroll-mode" signal.
+2. Implement two observation paths:
+   - **Normal 3D observation** (default for WorldPoint + ObjectAnchor on any object, including tapes): resolve to world pose using object's transform + anchor; use 3D look-at / orbit / follow logic.
+   - **Tape-scroll observation** (only for TapeScroll): compute desired camera position from tape local_y (using internal measurement), transform through tape.world_transform, then activate scoped legacy sheet behaviors (local pan, focus, lazy reveal) inside that tape.
+3. Support smooth 3D camera for moving/rotating targets (tapes and free objects).
+4. Update timeline:
+   - `CameraKeyframe` with different target kinds drives the two paths.
+   - Keep `CameraMove` as sugar that maps to tape-scroll on root tape.
+5. Adapt scene execution:
+   - Resolve targets against the object registry.
+   - Only run tape-internal reveal/focus machinery when the current observation is a TapeScroll.
+6. **Milestone:** 
+   - `ObjectAnchor` on a tape does pure 3D cinematic observation.
+   - `TapeScroll` activates full classic tape scroll + reveal behavior (local to the tape).
+   - Old pure-tape videos are bit-identical.
+   - Mixed scenes (3D objects + tape) work with explicit mode switching.
 
 **Dependencies:** Phase 2 (tapes as objects).
 **Success:** Existing tilt/inspect/sheet panning still work; new tape-targeted keyframes produce equivalent or better behavior.

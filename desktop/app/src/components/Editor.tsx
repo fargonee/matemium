@@ -12,10 +12,11 @@ interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   diagnostics: LintDiagnostic[];
+  readOnly?: boolean;
 }
 
 export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
-  function CodeEditor({ value, onChange, diagnostics }, ref) {
+  function CodeEditor({ value, onChange, diagnostics, readOnly = false }, ref) {
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
 
@@ -70,6 +71,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
             scrollBeyondLastLine: false,
             automaticLayout: true,
             padding: { top: 8 },
+            readOnly,
           }}
         />
       </div>

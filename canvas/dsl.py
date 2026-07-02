@@ -7,11 +7,18 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field, asdict
+from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Optional, Union, List, Dict
 
 # Phase 1: world transforms (forward import to avoid cycles)
 from .coords import WorldTransform, Vector3
+
+
+class ObservationMode(str, Enum):
+    """Explicit modes for camera observation (Phase 8 polish)."""
+    NORMAL_3D = "normal_3d"      # Default: cinematic 3D for any object (incl. tapes)
+    TAPE_SCROLL = "tape_scroll"  # Only this activates internal tape logic (local scroll, reveal, etc.)
 
 
 @dataclass
@@ -179,6 +186,8 @@ class TapeScroll:
     tape_id: str
     local_y: float
     framing_mode: str = "sheet"  # "sheet", "zoomed", etc.
+    dim_others: bool = True
+    dim_opacity: float = 0.15
 
 ObservationTarget = Union[WorldPoint, ObjectAnchor, TapeScroll]
 
@@ -376,7 +385,15 @@ class WorldObject:
     def get_surface_info(self) -> dict:
         if self.element and hasattr(self.element, 'get_surface_info'):
             return self.element.get_surface_info()
-        return {"is_planar": False}
+        wt = self.transform
+        info = {"is_planar": False}
+        if wt:
+            info.update({
+                "world_position": wt.position.as_tuple(),
+                "world_rotation": wt.rotation.as_tuple(),
+                "world_scale": wt.scale,
+            })
+        return info
 
 
 @dataclass
@@ -438,7 +455,20 @@ class TapeObject:
 
     def get_surface_info(self) -> dict:
         w, h = self.get_local_frame()
-        return {"width": w, "height": h, "is_planar": True, "local_space": "2d"}
+        wt = self.world_transform
+        info = {
+            "width": w,
+            "height": h,
+            "is_planar": True,
+            "local_space": "2d",
+        }
+        if wt:
+            info.update({
+                "world_position": wt.position.as_tuple(),
+                "world_rotation": wt.rotation.as_tuple(),
+                "world_scale": wt.scale,
+            })
+        return info
 
 
 # Union of all timeline item types
@@ -571,8 +601,9 @@ class SheetDSL:
     """
     canvas_settings: CanvasSettings = field(default_factory=CanvasSettings)
     timeline: List[TimelineItem] = field(default_factory=list)
-    root_tape: Optional["TapeObject"] = None  # Phase 2
+    root_tape: Optional["TapeObject"] = None  # Phase 2 (default/primary tape)
     root_objects: List["WorldObject"] = field(default_factory=list)  # Phase 5
+    additional_tapes: List["TapeObject"] = field(default_factory=list)  # Phase 8: multiple top-level tapes as first-class citizens
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SheetDSL":
@@ -648,7 +679,13 @@ class SheetDSL:
                 elif kind == "object_anchor":
                     tgt = ObjectAnchor(object_id=target_data.get("object_id", ""), anchor=target_data.get("anchor", "center"))
                 elif kind == "tape_scroll":
-                    tgt = TapeScroll(tape_id=target_data.get("tape_id", ""), local_y=float(target_data.get("local_y", 0)), framing_mode=target_data.get("framing_mode", "sheet"))
+                    tgt = TapeScroll(
+                        tape_id=target_data.get("tape_id", ""),
+                        local_y=float(target_data.get("local_y", 0)),
+                        framing_mode=target_data.get("framing_mode", "sheet"),
+                        dim_others=bool(target_data.get("dim_others", True)),
+                        dim_opacity=float(target_data.get("dim_opacity", 0.15)),
+                    )
                 else:
                     tgt = WorldPoint()
                 ck = CameraKeyframe(

@@ -2,27 +2,33 @@
 
 from __future__ import annotations
 
-from canvas.dsl import (
-    CameraFocus,
-    CameraInspect,
-    CameraMove,
-    CanvasElement,
-    PlotTrace,
-    SheetDSL,
-    SolidLift,
-    SolidRotate,
-    TransformElement,
-)
+from typing import Any
+
+# Canvas imports are now inside functions to support lazy sidecar control plane.
+# The module can be imported without pulling manim/canvas.
 
 
-def _element_entry_time(elem: CanvasElement) -> float:
+
+def _element_entry_time(elem: Any) -> float:
     if elem.entry_animation is not None:
         return float(elem.entry_animation.run_time)
     return 1.0
 
 
-def estimate_timeline_duration(dsl: SheetDSL) -> float:
+def estimate_timeline_duration(dsl: Any) -> float:
     """Sum known run_time fields — conservative lower bound for preview."""
+    from canvas.dsl import (
+        CameraFocus,
+        CameraInspect,
+        CameraMove,
+        CanvasElement,
+        PlotTrace,
+        SheetDSL,
+        SolidLift,
+        SolidRotate,
+        TransformElement,
+    )
+
     total = 0.0
     for item in dsl.timeline:
         if isinstance(item, CanvasElement):
@@ -52,8 +58,19 @@ def estimate_timeline_duration(dsl: SheetDSL) -> float:
     return round(total, 3)
 
 
-def estimate_animation_count(dsl: SheetDSL) -> int:
+def estimate_animation_count(dsl: Any) -> int:
     """Conservative ``play()`` count for Manim partial-movie progress."""
+    from canvas.dsl import (
+        CameraFocus,
+        CameraInspect,
+        CameraMove,
+        CanvasElement,
+        PlotTrace,
+        SolidLift,
+        SolidRotate,
+        TransformElement,
+    )
+
     count = 2  # intro pause + tail padding
     for item in dsl.timeline:
         if isinstance(

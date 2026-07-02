@@ -11,6 +11,7 @@ interface ChatPanelProps {
   // LLM status from profile (for credits / mode visibility)
   llmStatus?: string;
   onGenerateAudio?: () => void;
+  disabled?: boolean;
 }
 
 export function ChatPanel({
@@ -23,14 +24,15 @@ export function ChatPanel({
   onApplyEdit,
   llmStatus,
   onGenerateAudio,
+  disabled = false,
 }: ChatPanelProps) {
   return (
     <>
-      <h2 className="panel-title">AI Chat {llmStatus && <span style={{ fontSize: "0.7rem", color: "#7c8595" }}>({llmStatus})</span>}</h2>
+      <h2 className="panel-title">AI Assistant {llmStatus && <span className="llm-sub">({llmStatus})</span>}</h2>
       <div className="chat-history">
         {messages.length === 0 ? (
           <div style={{ color: "#7c8595", fontSize: "0.8rem" }}>
-            Ask for help editing scenes.py
+            Ask the assistant to refine or extend the scene...
           </div>
         ) : (
           messages.map((message, index) => (
@@ -54,13 +56,15 @@ export function ChatPanel({
       <div className="chat-input-row">
         <textarea
           value={input}
-          placeholder="Ask Matemium to improve your scene..."
+          placeholder={disabled ? "Waiting for engine readiness..." : "Describe changes or ask for help..."}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSend();
           }}
+          disabled={disabled}
+          className={disabled ? "disabled" : ""}
         />
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={onSend}>
+        <button type="button" className="btn btn-primary" disabled={busy || disabled} onClick={onSend}>
           Send
         </button>
         {onGenerateAudio && (

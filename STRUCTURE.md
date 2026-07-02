@@ -64,7 +64,9 @@ math/  (repository root)
     ├── INTRODUCTION.md         Project overview (start here)
     ├── STRUCTURE.md            This file
     ├── desktop-architecture.md Product goals & boundaries
-    ├── ai-agent-architecture.md Autonomous agent: tools, patches, TinyTeX
+    ├── ai-agent-architecture.md Autonomous agent: tools, patches, self-correction
+    ├── PRODUCT-ARCHITECTURE-DECISIONS.md Latest decisions: vector/RAG, lazy sidecar, downloads, gating, YouTube publishing
+    ├── PRODUCT-ARCHITECTURE-IMPLEMENTATION.md Step-by-step guide to realize the decisions above in code and packaging (all PAD-0 through PAD-10 implemented)
     ├── architecture.md         Engine design spec
     └── project-spec.md         Feature status
 ```
@@ -136,5 +138,7 @@ See [`desktop/targets/README.md`](desktop/targets/README.md) for cross-compilati
 - Project introduction: [`INTRODUCTION.md`](INTRODUCTION.md)
 - Product architecture: [`desktop-architecture.md`](desktop-architecture.md)
 - AI agent architecture: [`ai-agent-architecture.md`](ai-agent-architecture.md)
+- Latest product & intelligence decisions: [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md)
+- How to apply them: [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md) (phases 0-10 complete)
 - Engine spec: [`architecture.md`](architecture.md)
 - Status tracker: [`project-spec.md`](project-spec.md)

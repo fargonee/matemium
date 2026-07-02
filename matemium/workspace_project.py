@@ -13,9 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Iterator, Type
-
-from canvas import CanvasScene
+from typing import Any, Iterator, Type
 
 from .paths import ensure_on_path
 
@@ -85,25 +83,83 @@ def workspace_context(workspace: Path) -> Iterator[Path]:
 
 
 def load_scenes_module(workspace: Path, *, path: str | None = None) -> ModuleType:
-    """Import scenes.py from an arbitrary workspace directory."""
+    """Import scenes.py from an arbitrary workspace directory.
+
+    A synthetic package is created for the workspace directory so that
+    relative imports (e.g. ``from .assets import ...`` or ``from .helpers import ...``)
+    work inside scenes.py when loaded from the desktop app. Bare-name imports
+    (``from assets import``) continue to work via sys.path as before.
+    """
     file_path = scenes_file(workspace, path=path)
     module_name = _module_name_for(workspace)
 
     with workspace_context(workspace):
-        if module_name in sys.modules:
-            del sys.modules[module_name]
+        # Use the directory containing the target scenes file as the "package root"
+        # for relative imports. This supports both flat workspaces and cases where
+        # an alternate `path` puts scenes.py alongside its own assets.py/helpers.py.
+        scene_dir = file_path.parent.resolve()
+        sd_str = str(scene_dir)
 
-        spec = importlib.util.spec_from_file_location(module_name, file_path)
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Cannot load module from {file_path}")
+        # Ensure bare imports of siblings work even if scenes.py is not at workspace root.
+        added_sd = sd_str not in sys.path
+        if added_sd:
+            sys.path.insert(0, sd_str)
 
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-        return module
+        try:
+            # Clean any previous synthetic package for this workspace hash.
+            pkg_name = f"{module_name}_pkg"
+            for key in list(sys.modules):
+                if key == pkg_name or key.startswith(pkg_name + "."):
+                    del sys.modules[key]
+            if module_name in sys.modules:
+                del sys.modules[module_name]
+
+            # Synthetic package rooted at the scenes file's directory.
+            pkg_spec = importlib.util.spec_from_loader(pkg_name, loader=None, is_package=True)
+            pkg = importlib.util.module_from_spec(pkg_spec)
+            pkg.__path__ = [sd_str]
+            sys.modules[pkg_name] = pkg
+
+            # Preload any sibling .py files next to scenes.py (assets.py, helpers.py, ...)
+            # under the synthetic package. Bare names are also bound to the same module.
+            scene_filename = file_path.name
+            for sibling in sorted(scene_dir.glob("*.py")):
+                if sibling.name in ("__init__.py", scene_filename):
+                    continue
+                base = sibling.stem
+                qual = f"{pkg_name}.{base}"
+                if qual not in sys.modules:
+                    sspec = importlib.util.spec_from_file_location(qual, sibling)
+                    if sspec and sspec.loader:
+                        smod = importlib.util.module_from_spec(sspec)
+                        smod.__package__ = pkg_name
+                        sys.modules[qual] = smod
+                        sspec.loader.exec_module(smod)
+                        sys.modules[base] = smod
+
+            # Load scenes.py under the package so __package__ is set and relatives work.
+            qual_name = f"{pkg_name}.scenes"
+            spec = importlib.util.spec_from_file_location(qual_name, file_path)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"Cannot load module from {file_path}")
+
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[qual_name] = module
+            sys.modules[module_name] = module  # flat alias for back-compat
+            module.__name__ = qual_name
+            module.__package__ = pkg_name
+            spec.loader.exec_module(module)
+            return module
+        finally:
+            if added_sd and sd_str in sys.path:
+                sys.path.remove(sd_str)
+
 
 
 def list_scenes_in_workspace(workspace: Path, *, path: str | None = None) -> list[str]:
+    # Lazy import: do not pull canvas at module load time
+    from canvas import CanvasScene
+
     module = load_scenes_module(workspace, path=path)
     scenes: list[str] = []
     for name, obj in inspect.getmembers(module, inspect.isclass):
@@ -122,7 +178,10 @@ def load_scene_class(
     scene_name: str,
     *,
     path: str | None = None,
-) -> Type[CanvasScene]:
+) -> Any:
+    # Lazy import: do not pull canvas at module load time
+    from canvas import CanvasScene
+
     if not isinstance(scene_name, str):
         raise TypeError(
             f"scene_name must be str, got {type(scene_name).__name__} ({scene_name!r})"
@@ -173,7 +232,8 @@ def instantiate_scene(
     scene_name: str,
     *,
     path: str | None = None,
-) -> CanvasScene:
+) -> Any:
+    # Lazy import happens inside load_scene_class
     cls = load_scene_class(workspace, scene_name, path=path)
     with workspace_context(workspace):
         return cls()

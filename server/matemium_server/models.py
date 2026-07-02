@@ -55,3 +55,39 @@ class AudioSpeechRequest(BaseModel):
 
 
 # Response is raw audio bytes. Route will return it with proper Content-Type (e.g. audio/mpeg).
+
+# ---------------- Thin Publishing & Gallery (Phase 8) ----------------
+
+class PublishRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str | None = Field(None, max_length=2000)
+    tags: list[str] = Field(default_factory=list, max_items=10)
+    # Optional scene info
+    scene_class: str | None = None
+    duration: float | None = None
+
+class GalleryItem(BaseModel):
+    id: str
+    title: str
+    description: str | None = None
+    tags: list[str] = []
+    author_id: str | None = None
+    author_name: str | None = None
+    youtube_id: str | None = None
+    status: str = "pending"  # pending, published, rejected
+    published_at: str | None = None
+    featured: bool = False
+    created_at: str | None = None
+    duration: float | None = None
+    scene_class: str | None = None
+
+class PublishResponse(BaseModel):
+    id: str
+    status: str
+    message: str = "Submitted for review. Video upload to YouTube channel pending."
+
+class GalleryListResponse(BaseModel):
+    items: list[GalleryItem]
+    total: int
+    limit: int
+    offset: int

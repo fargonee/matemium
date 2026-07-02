@@ -55,11 +55,16 @@ class CanvasBuilder:
             local_canvas_settings=self.settings,
         )
         self.dsl.root_tape = self.root_tape  # Phase 2
+        self._tapes: Dict[str, TapeObject] = {"root_tape": self.root_tape}
+        self._current_tape: Optional[TapeObject] = self.root_tape
+        self._layouts: Dict[str, LayoutEngine] = {}
         self._layout = LayoutEngine(
             frame_width=self.settings.frame_width,
             frame_height=self.settings.frame_height,
             scope=self.root_tape,  # Phase 6: scoped to the tape object
         )
+        self._layouts["root_tape"] = self._layout
+        self._current_layout = self._layout
         self._counter = 0
         self._boards: Dict[str, CanvasElement] = {}
         self._last_flex_ids: List[str] = []
@@ -71,15 +76,15 @@ class CanvasBuilder:
         return f"{prefix}_{self._counter}"
 
     def _add(self, el: CanvasElement) -> "CanvasBuilder":
-        # Phase 2: elements conceptually live in root_tape.local_elements
-        # We also keep dsl.timeline populated for full backward compat (timeline
-        # mixes elements + camera/action items).
-        if getattr(self, "root_tape", None):
-            self.root_tape.local_elements.append(el)
-            # Phase 4: compose element world with tape world for content inside angled tape
-            tape_wt = self.root_tape.world_transform
+        # Phase 2/3: elements live in the current tape context (root_tape by default).
+        # Supports multiple tapes via in_object_space("tape_id") or add_tape + scoping.
+        # Also populates timeline for backward compat.
+        current_tape = getattr(self, "_current_tape", None) or getattr(self, "root_tape", None)
+        if current_tape:
+            current_tape.local_elements.append(el)
+            # Phase 4: compose with the current tape's world transform
+            tape_wt = current_tape.world_transform
             el_wt = getattr(el, 'world_transform', None) or WorldTransform()
-            # local pos from canvas or el world
             local = Vector3.from_tuple(getattr(el, 'canvas_position', (0,0,0))) if not (el_wt.position.x or el_wt.position.y) else el_wt.position
             composed = resolve_world_position(local.as_tuple(), relative_to=tape_wt)
             el.world_transform = WorldTransform(position=composed, rotation=tape_wt.rotation, scale=tape_wt.scale)
@@ -929,6 +934,126 @@ class CanvasBuilder:
         self.dsl.timeline.append(kf)
         return self
 
+    def scroll_tape(
+        self,
+        local_y: float,
+        *,
+        tape_id: str = "root_tape",
+        run_time: float = 2.0,
+        rate_func: str = "smooth",
+        framing_mode: str = "sheet",
+        dim_others: bool = True,
+        dim_opacity: float = 0.15,
+    ) -> "CanvasBuilder":
+        """High-level sugar to enter tape-scroll-mode on a TapeObject.
+
+        This activates the tape's internal 2D mechanisms (local scroll, lazy reveal
+        driven by local_y, focus, flex, etc.) while the outer camera respects the
+        tape's world_transform.
+
+        When dim_others=True (default), other 3D objects and other tapes' content
+        are dimmed (to dim_opacity) so attention stays on the active tape.
+
+        Use dim_others=False to keep everything at full opacity.
+        """
+        from .dsl import TapeScroll
+        target = TapeScroll(
+            tape_id=tape_id,
+            local_y=local_y,
+            framing_mode=framing_mode,
+            dim_others=dim_others,
+            dim_opacity=dim_opacity,
+        )
+        return self.add_camera_keyframe(
+            target=target,
+            duration=run_time,
+            rate_func=rate_func,
+        )
+
+    def observe_object(
+        self,
+        object_id: str,
+        *,
+        anchor: str = "center",
+        run_time: float = 2.0,
+        rate_func: str = "smooth",
+        **params: Any,
+    ) -> "CanvasBuilder":
+        """High-level sugar for normal cinematic 3D observation of any object.
+
+        Works for free 3D objects AND for TapeObjects (treated as 3D planes,
+        no internal tape logic activated).
+        Use scroll_tape() to activate classic tape scroll + reveal on a tape.
+        """
+        from .dsl import ObjectAnchor
+        target = ObjectAnchor(object_id=object_id, anchor=anchor)
+        return self.add_camera_keyframe(
+            target=target,
+            duration=run_time,
+            rate_func=rate_func,
+            params=params or None,
+        )
+
+    def add_tape(
+        self,
+        id: Optional[str] = None,
+        *,
+        position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        scale: float = 1.0,
+        frame_width: Optional[float] = None,
+        frame_height: Optional[float] = None,
+    ) -> str:
+        """Create a new TapeObject as a first-class object in the 3D world.
+
+        Returns the tape's id. You can then:
+        - Use with in_object_space(tape_id) to author content inside its local 2D space.
+        - Use set_tape_pose(..., tape_id=...) to position/rotate it.
+        - Use scroll_tape(local_y, tape_id=...) for classic tape experience.
+        - Use observe_object(tape_id) for normal 3D view of the plane.
+
+        The tape is added to root_objects so it participates in the 3D scene graph.
+        """
+        tape_id = id or self._get_id("tape")
+        tape_settings = CanvasSettings(
+            frame_width=frame_width or self.settings.frame_width,
+            frame_height=frame_height or self.settings.frame_height,
+        )
+        new_tape = TapeObject(
+            id=tape_id,
+            world_transform=WorldTransform(
+                position=Vector3(*position),
+                rotation=Vector3(*rotation),
+                scale=scale,
+            ),
+            local_elements=[],
+            local_canvas_settings=tape_settings,
+        )
+        self._tapes[tape_id] = new_tape
+
+        tape_layout = LayoutEngine(
+            frame_width=tape_settings.frame_width,
+            frame_height=tape_settings.frame_height,
+            scope=new_tape,
+        )
+        self._layouts[tape_id] = tape_layout
+
+        # Phase 8: store as first-class additional tape
+        self.dsl.additional_tapes.append(new_tape)
+
+        # Also add WorldObject for 3D graph/positioning compatibility
+        wo = WorldObject(
+            id=tape_id,
+            transform=new_tape.world_transform,
+        )
+        self.dsl.root_objects.append(wo)
+
+        # Track for placement, anchors, and scoping
+        self._placed_transforms[tape_id] = new_tape.world_transform
+        self._placed_objects[tape_id] = new_tape
+
+        return tape_id
+
     def add_world_object(self, wo: WorldObject) -> str:
         """Phase 5/6: place a top-level WorldObject in the 3D world (outside default tape).
         For objects with local content (e.g. another tape), use scoped layout.
@@ -1000,20 +1125,30 @@ class CanvasBuilder:
 
     @contextlib.contextmanager
     def in_object_space(self, obj_id: str) -> Iterator[None]:
-        """Phase 9: temporarily scope layout/positioning to a specific object's local space (e.g. inside a sub-tape).
+        """Phase 3/9: temporarily scope layout/positioning to a specific TapeObject's local space.
+
+        This allows authoring content inside a secondary tape created with add_tape().
 
         Usage:
-            with builder.in_object_space("my_tape"):
-                builder.add_text("inside the tape")
+            tape_id = builder.add_tape("side_panel", position=(5, 0, 0), rotation=(0, 45, 0))
+            with builder.in_object_space(tape_id):
+                builder.add_text("content local to this tape")
+                # normal add_* will target this tape's 2D local space
         """
         prev_tape = getattr(self, '_current_tape', None)
-        obj = self._placed_objects.get(obj_id) or self.root_tape
+        prev_layout = getattr(self, '_current_layout', self._layout)
+        prev_active_layout = self._layout
+        obj = self._placed_objects.get(obj_id) or self._tapes.get(obj_id) or self.root_tape
         if obj and hasattr(obj, 'local_elements'):
             self._current_tape = obj
+            self._current_layout = self._layouts.get(obj_id, self._layout)
+            self._layout = self._current_layout  # swap for flow-based add_* methods
         try:
             yield
         finally:
             self._current_tape = prev_tape
+            self._current_layout = prev_layout
+            self._layout = prev_active_layout
 
     def auto_camera(
         self,
@@ -1092,14 +1227,24 @@ class CanvasBuilder:
         position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
         rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
         scale: float = 1.0,
+        tape_id: str = "root_tape",
     ) -> "CanvasBuilder":
-        """Phase 4: position/rotate the root tape in world 3D space (e.g. tilted tape)."""
-        if self.root_tape:
-            self.root_tape.world_transform = WorldTransform(
+        """Phase 3: position/rotate a tape (default root_tape) in 3D world space.
+
+        Use this to make the tape a positioned/rotated 3D object.
+        Content inside it uses its local 2D space.
+        To observe it as normal 3D, use observe_object(tape_id).
+        To use classic scroll/reveal, use scroll_tape(local_y) or TapeScroll keyframe.
+        """
+        tape = self._tapes.get(tape_id) or self.root_tape
+        if tape:
+            tape.world_transform = WorldTransform(
                 position=Vector3(*position),
                 rotation=Vector3(*rotation),
                 scale=scale,
             )
+            # update placed
+            self._placed_transforms[tape_id] = tape.world_transform
         return self
 
     # ---------------- Escape hatches ----------------

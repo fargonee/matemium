@@ -33,6 +33,20 @@ class MyVideo(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="MyVideo")
+        # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
+        # mode will automatically look straight down the local normal (from above).
+        builder.set_tape_pose(rotation=(20, 10, 0))
+
         part_intro(builder)
         part_conclusion(builder)
+
+        # Example secondary tape + mixed observation (newest patterns)
+        info = builder.add_tape("side_panel", position=(4, 0, 0), rotation=(0, 30, 0))
+        with builder.in_object_space(info):
+            builder.add_body("Side notes (local to tilted tape)")
+
+        # Switch behaviors explicitly:
+        builder.observe_object(info, run_time=1.5)  # pure 3D view of secondary tape
+        builder.scroll_tape(local_y=2.0)            # tape-scroll on main (posed) tape
+
         super().__init__(dsl=builder.build(), **kwargs)

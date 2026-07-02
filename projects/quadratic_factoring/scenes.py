@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from canvas import CanvasScene
 from canvas.builder import CanvasBuilder
+from canvas.dsl import WorldPoint
 
 
 class QuadraticFactoring(CanvasScene):
@@ -119,6 +120,50 @@ class QuadraticFactoring(CanvasScene):
         builder.add_math(
             r"x^2 - 5x + 6 = 0 \;\Rightarrow\; x = 2 \text{ or } x = 3",
             style={"align": "center", "margin-bottom": 0.8},
+        )
+
+        # --- 3D world enhancements (newest authoring) ---
+        # Test meaningful 3D world features:
+        # - Main tape default (flat)
+        # - Second tape perpendicular (90 deg rotation)
+        # - Bigger sphere, placed further away
+        # - Camera tour ends with orbiting the sphere
+        root_marker = builder.add_object(
+            "Solid3D",
+            position=(7, 1, 6),
+            content={"shape": "sphere", "size": 1.8},
+        )
+
+        # Secondary tape perpendicular to main tape
+        summary_tape = builder.add_tape(
+            "summary_panel",
+            position=(0, 1, -5),
+            rotation=(90, 0, 0),
+        )
+
+        with builder.in_object_space(summary_tape):
+            builder.add_heading("Roots", style={"align": "center"})
+            builder.add_math(r"x=2 \quad x=3", style={"align": "center"})
+
+        # Camera tour using the new high-level observation modes
+        # 1. Normal 3D cinematic look at the 3D marker (tape treated as 3D object)
+        builder.observe_object(root_marker, run_time=2.5)
+
+        # 2. Switch to tape-scroll-mode for classic reveal on the main tape
+        builder.scroll_tape(local_y=6.0, run_time=3.5)
+
+        # 3. Look at the secondary (perpendicular) tape in pure 3D
+        builder.observe_object(summary_tape, run_time=2.0)
+
+        # 4. Lift and orbit the sphere as the finale
+        builder.add_solid_lift(root_marker, lift=2.5, run_time=1.0)
+        builder.add_camera_inspect(
+            root_marker,
+            orbit=True,
+            orbit_degrees=360.0,
+            orbit_run_time=6.0,
+            return_to_sheet=True,
+            return_run_time=1.5,
         )
 
         super().__init__(dsl=builder.build(), **kwargs)

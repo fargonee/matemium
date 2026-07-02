@@ -4,11 +4,22 @@ from __future__ import annotations
 
 import sys
 import traceback
-from typing import TextIO
+from typing import TextIO, Any, Callable
 
 from .events import EventEmitter
-from .handlers import dispatch
 from .protocol import ProtocolError, Request, Response, encode_response, parse_line
+
+# Lazy import of dispatch so that even importing the server module does not
+# execute handlers.py top level (though we made it light).
+_dispatch: Callable[[str, dict[str, Any], EventEmitter], dict[str, Any]] | None = None
+
+
+def _get_dispatch():
+    global _dispatch
+    if _dispatch is None:
+        from .handlers import dispatch as _d
+        _dispatch = _d
+    return _dispatch
 
 
 def run_server(
@@ -44,7 +55,7 @@ def _handle_line(line: str, events: EventEmitter) -> Response:
         if request.command == "shutdown":
             return Response(id=req_id, ok=True, result={"shutdown": True})
 
-        result = dispatch(request.command, request.params, events)
+        result = _get_dispatch()(request.command, request.params, events)
         return Response(id=req_id, ok=True, result=result)
 
     except ProtocolError as exc:
@@ -72,7 +83,7 @@ def handle_request(request: Request, events: EventEmitter | None = None) -> Resp
     try:
         if request.command == "shutdown":
             return Response(id=request.id, ok=True, result={"shutdown": True})
-        result = dispatch(request.command, request.params, emitter)
+        result = _get_dispatch()(request.command, request.params, emitter)
         return Response(id=request.id, ok=True, result=result)
     except ProtocolError as exc:
         return Response(
