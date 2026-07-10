@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from .critic import CriticHooks, CoordinatorHaltError, run_critic_loop
 from .models import (

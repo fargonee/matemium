@@ -341,15 +341,21 @@ def build_scenes_patches(
         "\n"
         "def part_conclusion(b: CanvasBuilder) -> None:\n"
         '    b.add_math(r"x^2 - 5x + 6 = (x-2)(x-3)")\n'
-        '    # Phase 9+: 3D world example\n'
+        '    # 3D world example using clarified model:\n'
+        '    # - set_tape_pose makes the tape a 3D object\n'
+        '    # - observe_object for normal 3D view of tape or solids\n'
+        '    # - scroll_tape to enter classic tape-scroll-mode (internal reveal/scroll)\n'
         '    b.set_tape_pose(rotation=(30, 0, 0))\n'
         '    b.add_3d("z = x^2 - y^2")\n'
-        '    b.add_text("Conclusion: x = 2 or x = 3", after_3d=True)\n'
+        '    b.observe_object("solid1")  # normal 3D cinematic on the solid\n'
+        '    b.add_text("Conclusion: x = 2 or x = 3")\n'
         '    # Free 3D object\n'
         '    from canvas.dsl import WorldObject, WorldTransform, Vector3, CanvasElement\n'
         '    solid = CanvasElement(id="solid1", type="Solid3D", content={"shape": "cube"})\n'
         '    wo = WorldObject(id="wo1", element=solid, transform=WorldTransform(position=Vector3(5, 0, 5)))\n'
         '    b.add_world_object(wo)\n'
+        '    # Scroll the (possibly angled) tape using its internal logic\n'
+        '    b.scroll_tape(local_y=5.0)\n'
     )
     if parts_search not in template:
         raise PatchError("scenes.py template changed; parts SEARCH anchor missing")

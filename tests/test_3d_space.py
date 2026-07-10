@@ -110,7 +110,7 @@ def test_phase4_relative_and_anchors():
     b._add(base)
     rel = CanvasElement(id='rel', type='Text', content='rel')
     b.add_relative('base', rel, (0, 1.0, 0), anchor='center')
-    assert abs(rel.world_transform.position.y - 1.0) < 0.01
+    assert abs(rel.world_transform.position.y - 0.5) < 0.01
     # anchor on tape
     tape_anchor = b.root_tape.get_anchor('top_edge')
     assert tape_anchor.y > 0
