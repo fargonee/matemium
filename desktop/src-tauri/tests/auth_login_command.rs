@@ -71,6 +71,8 @@ async fn auth_login_then_chat_sends_bearer_header() {
             }],
             project_id: None,
             scenes_excerpt: None,
+            llm_provider: None,
+            use_personal_llm: None,
         },
     )
     .await

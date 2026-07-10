@@ -29,19 +29,19 @@ echo "Using sidecar: $SIDECAR"
 
 # Test get_status (from phase 1/4/6/9)
 echo "==> Testing get_status"
-STATUS=$(echo '{"type":"request","id":"1","command":"get_status","params":{}}' | "$SIDECAR" | head -1)
+STATUS=$(echo '{"type":"request","id":"1","command":"get_status","params":{}}' | "$SIDECAR")
 echo "$STATUS" | grep -q '"phase"' || { echo "FAIL: no phase in status"; exit 1; }
 echo "  phase present"
 
 # Test retrieve (phase 6)
 echo "==> Testing retrieve (fallback)"
-RETR=$(echo '{"type":"request","id":"2","command":"retrieve","params":{"query":"test"}}' | "$SIDECAR" | head -1)
+RETR=$(echo '{"type":"request","id":"2","command":"retrieve","params":{"query":"test"}}' | "$SIDECAR")
 echo "$RETR" | grep -q '"results"' || { echo "FAIL: no results in retrieve"; exit 1; }
 echo "  retrieve works"
 
 # Test configure_assets (phase 2/3)
 echo "==> Testing configure_assets"
-CONF=$(echo '{"type":"request","id":"3","command":"configure_assets","params":{"tinytex_dir":"/tmp/test"}}' | "$SIDECAR" | head -1)
+CONF=$(echo '{"type":"request","id":"3","command":"configure_assets","params":{"tinytex_dir":"/tmp/test"}}' | "$SIDECAR")
 echo "$CONF" | grep -q '"configured"' || { echo "FAIL: no configured"; exit 1; }
 echo "  configure_assets works"
 

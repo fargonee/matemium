@@ -274,6 +274,7 @@ mod tests {
             workspaces_root: root.join("workspaces"),
             config_dir: root.join("config"),
             settings_path: root.join("config/settings.json"),
+            assets_root: root.join("assets"),
         }
     }
 

@@ -43,6 +43,8 @@ async fn auth_and_chat_against_stub_server() {
             }],
             project_id: None,
             scenes_excerpt: Some("class MyScene(CanvasScene): pass".to_string()),
+            llm_provider: None,
+            use_personal_llm: None,
         },
     )
     .await

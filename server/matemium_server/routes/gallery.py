@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..deps import AuthenticatedUser, get_current_user, get_supabase_service
+from ..deps import AuthUser, require_user, get_supabase_service
 from ..models import (
     GalleryItem,
     GalleryListResponse,
@@ -25,7 +25,7 @@ router = APIRouter(tags=["gallery"])
 @router.post("/v1/publish", response_model=PublishResponse)
 async def publish_animation(
     payload: PublishRequest,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthUser = Depends(require_user),
     supabase: SupabaseService = Depends(get_supabase_service),
 ) -> PublishResponse:
     """Submit a rendered animation for the community gallery (thin metadata only).
@@ -42,8 +42,8 @@ async def publish_animation(
         "title": payload.title,
         "description": payload.description,
         "tags": payload.tags,
-        "author_id": user["id"],
-        "author_name": user.get("email", "anonymous"),  # or fetch profile
+        "author_id": user.id,
+        "author_name": user.email or "anonymous",  # or fetch profile
         "status": "pending",
         "created_at": now,
         "duration": payload.duration,
@@ -129,7 +129,7 @@ async def get_gallery_item(
 async def update_gallery_item(
     item_id: str,
     data: dict[str, Any],
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthUser = Depends(require_user),
     supabase: SupabaseService = Depends(get_supabase_service),
 ) -> dict[str, str]:
     # TODO: check admin role
