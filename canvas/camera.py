@@ -46,10 +46,6 @@ SHEET_PHI_DEG = 0.0
 SHEET_THETA_DEG = -90.0
 
 import numpy as np  # ensure
-try:
-    import scipy.optimize as _opt
-except ImportError:
-    _opt = None
 
 def _rot_z(a):
     c, s = np.cos(a), np.sin(a)
@@ -72,53 +68,53 @@ def get_tape_straight_above_angles(wt: "WorldTransform") -> tuple[float, float, 
     on the tape plane, the camera looks straight down the tape's local normal (from above),
     with roll aligned to the tape's local Y. This makes the tape's internal coords the
     'natural' sheet for the camera in tape-scroll mode.
-    Uses the tape's R to derive the desired camera orientation via math transform.
     """
-    if wt is None or _opt is None:
+    if wt is None:
         return 0.0, -90.0, 0.0
+        
+    try:
+        from scipy.spatial.transform import Rotation as _Rot
+    except ImportError:
+        # Fallback if scipy is not installed (though Manim usually requires it)
+        rot = getattr(wt, "rotation", None)
+        if not rot:
+            return 0.0, -90.0, 0.0
+        return float(rot.x), float(-rot.y - 90.0), float(-rot.z)
+
     R_tape = get_rotation_matrix(wt)
-    # Desired camera R so that projection rectifies the tape plane to flat XY
-    # (local deltas appear unrotated in cam space).
+    # We want R_cam = R_tape.T (so camera axes match tape axes).
+    # Since camera looks along its -Z, it will look from +Z_tape towards -Z_tape,
+    # which is looking at the front face of the tape.
+    # Its UP is +Y_tape. This perfectly matches the 2D sheet.
     R_desired = R_tape.T
-    # To ensure viewer on +Z side, we may flip Z sign in the basis.
-    flip = np.diag([1., 1., -1.])
-    R_desired = R_desired @ flip
 
-    def objective(angs):
-        p, t, g = angs
-        R = _camera_rotation_from_angles(p, t, g)
-        return np.sum((R - R_desired)**2)
+    # Manim's camera R = rotz(gamma) @ rotx(-phi) @ rotz(-theta - 90)
+    # Scipy intrinsic ZXZ: R = rotz(a) @ rotx(b) @ rotz(c)
+    try:
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            rot = _Rot.from_matrix(R_desired)
+            zxz = rot.as_euler('ZXZ', degrees=True)
+            
+        gamma = zxz[0]
+        phi = -zxz[1]
+        theta = -zxz[2] - 90.0
 
-    rx = float(getattr(wt.rotation, 'x', 0))
-    ry = float(getattr(wt.rotation, 'y', 0))
-    x0 = np.array([-rx, -ry - 90.0, 0.0])
-    res = _opt.minimize(objective, x0, method='Nelder-Mead', tol=1e-10)
-    phi, theta, gamma = res.x
+        # Manim clamps phi to [0, PI]. If phi is negative, we can find the equivalent 
+        # Euler angles with positive phi by flipping signs and adding 180.
+        if phi < 0:
+            phi = -phi
+            theta -= 180.0
+            gamma += 180.0
+            
+        # Normalize to nice ranges
+        theta = (theta + 180) % 360 - 180
+        gamma = (gamma + 180) % 360 - 180
 
-    # Resolve 180° roll ambiguity in gamma.
-    # Compute for both options the alignment of tape's local +Y with camera's up.
-    # Choose the one where the tape's "top" (local +Y, beginning of content) points
-    # toward the camera's up direction, so top/bottom match user experience of
-    # tape look, no matter the tape's position/rotation in world space.
-    # This makes the camera "smart": it automatically positions and orients correctly
-    # in tape-scroll mode.
-    R_tape = get_rotation_matrix(wt)  # already have
-    tape_y_w = R_tape @ np.array([0., 1., 0.])
-
-    def get_align(g):
-        R_cam = _camera_rotation_from_angles(phi, theta, g)
-        # Camera up in world is the Y basis (column 1, assuming the R convention)
-        cam_up_w = R_cam[:, 1]
-        return np.dot(tape_y_w, cam_up_w)
-
-    align0 = get_align(gamma)
-    align1 = get_align(gamma + 180)
-
-    # Prefer the one with higher (more positive) alignment for "top" matching
-    if align1 > align0:
-        gamma += 180
-
-    return float(phi), float(theta), float(gamma)
+        return float(phi), float(theta), float(gamma)
+    except Exception:
+        return 0.0, -90.0, 0.0
 
 
 class CameraController:
@@ -514,11 +510,9 @@ class CameraController:
                 self._view_mode = "inspect"
                 self.camera.use_orthographic_projection = True
 
+                phi, theta, gamma = self._phi.get_value(), self._theta.get_value(), self._gamma.get_value()
                 if tape and getattr(tape, "world_transform", None):
                     phi, theta, gamma = get_tape_straight_above_angles(tape.world_transform)
-                    self._phi.set_value(phi)
-                    self._theta.set_value(theta)
-                    self._gamma.set_value(gamma)
 
                 local_x = self.tape_center_x  # 0 for content center; focus drives per-elem x
 
@@ -531,6 +525,9 @@ class CameraController:
                     self._inspect_z.animate(rate_func=rate_func, run_time=run_time).set_value(z),
                     self._x.animate(rate_func=rate_func, run_time=run_time).set_value(local_x),
                     self._y.animate(rate_func=rate_func, run_time=run_time).set_value(local_y),  # use *local* y for internal tape scroll tracking
+                    self._phi.animate(rate_func=rate_func, run_time=run_time).set_value(phi),
+                    self._theta.animate(rate_func=rate_func, run_time=run_time).set_value(theta),
+                    self._gamma.animate(rate_func=rate_func, run_time=run_time).set_value(gamma),
                     run_time=run_time,
                 )
                 self.camera.frame_center = np.array([x, y, z])

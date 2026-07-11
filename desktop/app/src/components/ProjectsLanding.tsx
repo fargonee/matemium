@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import * as api from "../api/tauri";
 import type { ProjectSummary } from "../api/types";
 import { formatRelativeTime } from "../utils/formatDate";
@@ -23,6 +23,12 @@ interface GalleryItem {
   tags?: string[];
   author_name?: string;
   status?: string;
+}
+
+interface Collection {
+  id: string;
+  name: string;
+  projectIds: string[];
 }
 
 function ProjectThumbnail({ previewVideo, sceneClass }: { previewVideo?: string | null; sceneClass: string }) {
@@ -64,12 +70,99 @@ export function ProjectsLanding({
   onDelete,
   readinessMessage,
 }: ProjectsLandingProps) {
+  // Gallery and basic states
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<GalleryItem | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Collections state
+  const [collections, setCollections] = useState<Collection[]>(() => {
+    try {
+      const raw = localStorage.getItem("matemium-collections");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+  const [showNewCollectionModal, setShowNewCollectionModal] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [managingProjectId, setManagingProjectId] = useState<string | null>(null);
+
+  // Helper to save collections
+  const saveCollections = useCallback((updated: Collection[]) => {
+    setCollections(updated);
+    localStorage.setItem("matemium-collections", JSON.stringify(updated));
+  }, []);
+
+  // Collection Handlers
+  const handleCreateCollection = () => {
+    if (!newCollectionName.trim()) return;
+    const newColl: Collection = {
+      id: Date.now().toString(),
+      name: newCollectionName.trim(),
+      projectIds: [],
+    };
+    const updated = [...collections, newColl];
+    saveCollections(updated);
+    setNewCollectionName("");
+    setShowNewCollectionModal(false);
+    setActiveCollectionId(newColl.id); // Switch to newly created collection
+  };
+
+  const handleDeleteCollection = (id: string) => {
+    const updated = collections.filter((c) => c.id !== id);
+    saveCollections(updated);
+    if (activeCollectionId === id) {
+      setActiveCollectionId(null);
+    }
+  };
+
+  const handleToggleProjectInCollection = useCallback(
+    (collectionId: string, projectId: string, forceState?: boolean) => {
+      const updated = collections.map((coll) => {
+        if (coll.id === collectionId) {
+          const alreadyHas = coll.projectIds.includes(projectId);
+          const shouldHave = forceState !== undefined ? forceState : !alreadyHas;
+
+          let newProjectIds = coll.projectIds;
+          if (shouldHave && !alreadyHas) {
+            newProjectIds = [...coll.projectIds, projectId];
+          } else if (!shouldHave && alreadyHas) {
+            newProjectIds = coll.projectIds.filter((id) => id !== projectId);
+          }
+
+          return { ...coll, projectIds: newProjectIds };
+        }
+        return coll;
+      });
+      saveCollections(updated);
+    },
+    [collections, saveCollections],
+  );
+
+  // Auto-associate newly created project with active collection
+  const projectsRef = useRef<string[]>(projects.map((p) => p.id));
+  const [prevProjectsCount, setPrevProjectsCount] = useState(projects.length);
+
+  useEffect(() => {
+    if (projects.length > prevProjectsCount) {
+      if (activeCollectionId) {
+        const prevIds = new Set(projectsRef.current);
+        const newProject = projects.find((p) => !prevIds.has(p.id));
+        if (newProject) {
+          handleToggleProjectInCollection(activeCollectionId, newProject.id, true);
+        }
+      }
+    }
+    setPrevProjectsCount(projects.length);
+    projectsRef.current = projects.map((p) => p.id);
+  }, [projects, activeCollectionId, prevProjectsCount, handleToggleProjectInCollection]);
+
+  // Gallery Loader
   const loadGallery = useCallback(async (q?: string) => {
     setLoading(true);
     setError(null);
@@ -79,7 +172,6 @@ export function ProjectsLanding({
       setGalleryItems(list);
     } catch (e: any) {
       setError(String(e));
-      // Fallback with rich, inspiring math animations
       setGalleryItems([
         {
           id: "demo-quadratic",
@@ -139,47 +231,21 @@ export function ProjectsLanding({
     );
   });
 
+  // Filter projects list by active collection
+  const activeCollection = collections.find((c) => c.id === activeCollectionId);
+  const filteredProjects = activeCollection
+    ? projects.filter((p) => activeCollection.projectIds.includes(p.id))
+    : projects;
+
   return (
-    <div className="projects-landing-page-modern">
+    <div className="projects-landing-page-modern" onClick={() => setManagingProjectId(null)}>
       {/* 1. Stunning Hero Section */}
-      <div className="projects-landing-hero-modern">
-        <div className="hero-left-modern">
-          <p className="projects-landing-eyebrow-modern">Professional Math Animation Studio</p>
-          <h2 className="projects-landing-heading-modern">Transform mathematical equations into stunning motion.</h2>
-          <p className="projects-landing-lead-modern">
-            Empower your teaching, presentations, and social feeds with professional-grade math visuals. AI-assisted scripting, real-time previews, and zero setup.
-          </p>
-        </div>
-        <div className="hero-right-modern">
-          <div className="projects-landing-create-card-modern">
-            <h3 className="create-card-title-modern">Initialize New Project</h3>
-            <div className="create-input-group-modern">
-              <input
-                value={newName}
-                placeholder="Name your mathematical creation..."
-                onChange={(e) => onNewNameChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onCreate();
-                }}
-                disabled={!!readinessMessage}
-                className="create-input-modern"
-              />
-              <button
-                type="button"
-                className="btn btn-primary create-button-modern"
-                disabled={busy || !newName.trim()}
-                onClick={onCreate}
-              >
-                Create &amp; Author
-              </button>
-            </div>
-            {readinessMessage && (
-              <div className="readiness-banner-modern">
-                <span className="readiness-pulse">●</span> {readinessMessage}
-              </div>
-            )}
-          </div>
-        </div>
+      <div className="projects-landing-hero-modern-unified">
+        <p className="projects-landing-eyebrow-modern">Professional Math Animation Studio</p>
+        <h2 className="projects-landing-heading-modern">Transform mathematical equations into stunning motion.</h2>
+        <p className="projects-landing-lead-modern">
+          Empower your teaching, presentations, and social feeds with professional-grade math visuals. AI-assisted scripting, real-time previews, and zero setup.
+        </p>
       </div>
 
       {/* 2. Dual-Pane Layout */}
@@ -189,55 +255,155 @@ export function ProjectsLanding({
           <div className="pane-header-modern">
             <div className="pane-header-title-container">
               <h3 className="pane-title-modern">Your Projects</h3>
-              <span className="count-badge-modern">{projects.length}</span>
+              <span className="count-badge-modern">{filteredProjects.length}</span>
             </div>
           </div>
 
-          {projects.length === 0 ? (
-            <div className="projects-landing-empty-modern">
-              <div className="projects-landing-empty-card-modern">
-                <div className="empty-icon-modern">🪄</div>
-                <h3>Your workspace is clean and quiet</h3>
-                <p>Type a name above to kickstart your first math scene, or browse the community inspiration feed on the right to see what is possible.</p>
+          {/* Collections filter row */}
+          <div className="collections-filter-row-modern" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className={`collection-pill-modern ${activeCollectionId === null ? "active" : ""}`}
+              onClick={() => setActiveCollectionId(null)}
+            >
+              All Projects
+            </button>
+
+            {collections.map((coll) => (
+              <div key={coll.id} className="collection-pill-wrapper-modern">
+                <button
+                  type="button"
+                  className={`collection-pill-modern ${activeCollectionId === coll.id ? "active" : ""}`}
+                  onClick={() => setActiveCollectionId(coll.id)}
+                >
+                  📁 {coll.name}
+                </button>
+                <button
+                  type="button"
+                  className="collection-pill-delete-modern"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteCollection(coll.id);
+                  }}
+                  title={`Delete collection "${coll.name}" (does not delete projects)`}
+                >
+                  ✕
+                </button>
               </div>
-            </div>
-          ) : (
-            <div className="project-card-grid-modern">
-              {projects.map((project) => (
-                <article key={project.id} className="project-card-modern">
-                  <button
-                    type="button"
-                    className="project-card-open-modern"
-                    onClick={() => onOpen(project.id)}
-                  >
-                    <div className="project-card-thumb-container-modern">
-                      <ProjectThumbnail
-                        previewVideo={project.preview_video}
-                        sceneClass={project.scene_class}
-                      />
-                      <div className="project-card-badge-modern">Open Studio</div>
+            ))}
+
+            <button
+              type="button"
+              className="collection-pill-modern collection-pill-create-modern"
+              onClick={() => setShowNewCollectionModal(true)}
+            >
+              + Create Collection
+            </button>
+          </div>
+
+          <div className="project-card-grid-modern">
+            {/* The First Item: Giant "+" Creation Card */}
+            <article
+              className="project-card-modern create-new-card-modern"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCreateModal(true);
+              }}
+              title="Click to start a new mathematical project"
+            >
+              <div className="project-card-thumb-container-modern create-new-thumb-container-modern">
+                <div className="create-new-plus-modern">+</div>
+              </div>
+              <div className="project-card-body-modern">
+                <h3 className="create-new-title-text-modern">New Project</h3>
+                <div className="project-card-footer-modern">
+                  <span className="project-card-scene-modern">
+                    {activeCollection ? `Add to ${activeCollection.name}` : "Start a new creation"}
+                  </span>
+                </div>
+              </div>
+            </article>
+
+            {/* Existing projects list */}
+            {filteredProjects.map((project) => (
+              <article key={project.id} className="project-card-modern">
+                <button
+                  type="button"
+                  className="project-card-open-modern"
+                  onClick={() => onOpen(project.id)}
+                >
+                  <div className="project-card-thumb-container-modern">
+                    <ProjectThumbnail
+                      previewVideo={project.preview_video}
+                      sceneClass={project.scene_class}
+                    />
+                    <div className="project-card-badge-modern">Open Studio</div>
+                  </div>
+                  <div className="project-card-body-modern">
+                    <h3>{project.name}</h3>
+                    <div className="project-card-footer-modern">
+                      <span className="project-card-scene-modern">{project.scene_class}</span>
+                      <span className="project-card-meta-modern">{formatRelativeTime(project.updated_at)}</span>
                     </div>
-                    <div className="project-card-body-modern">
-                      <h3>{project.name}</h3>
-                      <div className="project-card-footer-modern">
-                        <span className="project-card-scene-modern">{project.scene_class}</span>
-                        <span className="project-card-meta-modern">{formatRelativeTime(project.updated_at)}</span>
-                      </div>
+                  </div>
+                </button>
+
+                {/* Collection manager trigger button */}
+                <button
+                  type="button"
+                  className={`project-card-collection-btn-modern ${managingProjectId === project.id ? "active" : ""}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setManagingProjectId(managingProjectId === project.id ? null : project.id);
+                  }}
+                  title="Manage collections"
+                >
+                  📁
+                </button>
+
+                {/* Collection membership toggle popover */}
+                {managingProjectId === project.id && (
+                  <div className="collection-popover-modern" onClick={(e) => e.stopPropagation()}>
+                    <div className="popover-header-modern">
+                      <span>Collections</span>
+                      <button className="popover-close-modern" onClick={() => setManagingProjectId(null)}>✕</button>
                     </div>
-                  </button>
-                  <button
-                    type="button"
-                    className="project-card-delete-modern btn btn-ghost btn-danger"
-                    title="Delete project"
-                    disabled={busy}
-                    onClick={() => onDelete(project.id)}
-                  >
-                    ✕
-                  </button>
-                </article>
-              ))}
-            </div>
-          )}
+                    <div className="popover-list-modern">
+                      {collections.map((coll) => {
+                        const isMember = coll.projectIds.includes(project.id);
+                        return (
+                          <label key={coll.id} className="popover-item-modern">
+                            <input
+                              type="checkbox"
+                              checked={isMember}
+                              onChange={() => handleToggleProjectInCollection(coll.id, project.id)}
+                            />
+                            <span>{coll.name}</span>
+                          </label>
+                        );
+                      })}
+                      {collections.length === 0 && (
+                        <p className="popover-empty-modern">No collections yet. Create one above!</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="project-card-delete-modern btn btn-ghost btn-danger"
+                  title="Delete project"
+                  disabled={busy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(project.id);
+                  }}
+                >
+                  ✕
+                </button>
+              </article>
+            ))}
+          </div>
         </section>
 
         {/* Right Column: Live Inspiration Feed */}
@@ -322,7 +488,105 @@ export function ProjectsLanding({
         </section>
       </div>
 
-      {/* 3. Gorgeous Video Lightbox Modal (Reuses elegant App.css overlay styles) */}
+      {/* 3. Small Modal to Input Project Name */}
+      {showCreateModal && (
+        <div className="gallery-modal" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-content create-modal-content-modern" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
+            <h3 className="create-modal-title-modern">Initialize Your Project</h3>
+            <p className="create-modal-subtitle-modern">Give your math scene/visual a descriptive name to start your editing workspace.</p>
+            
+            <div className="create-modal-input-group-modern">
+              <input
+                value={newName}
+                placeholder="e.g., Fourier Series Epicycles, Inscribed Sphere..."
+                onChange={(e) => onNewNameChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newName.trim() && !busy && !readinessMessage) {
+                    onCreate();
+                    setShowCreateModal(false);
+                  }
+                }}
+                className="create-input-modern create-modal-input-modern"
+                autoFocus
+              />
+              
+              {readinessMessage && (
+                <div className="readiness-banner-modern" style={{ marginTop: "8px" }}>
+                  <span className="readiness-pulse">●</span> {readinessMessage}
+                </div>
+              )}
+
+              <div className="create-modal-actions-modern">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary create-modal-submit-btn-modern"
+                  disabled={busy || !newName.trim() || !!readinessMessage}
+                  onClick={() => {
+                    onCreate();
+                    setShowCreateModal(false);
+                  }}
+                >
+                  Create Project
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Collection Modal */}
+      {showNewCollectionModal && (
+        <div className="gallery-modal" onClick={() => setShowNewCollectionModal(false)}>
+          <div className="modal-content create-modal-content-modern" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setShowNewCollectionModal(false)}>✕</button>
+            <h3 className="create-modal-title-modern">Create New Collection</h3>
+            <p className="create-modal-subtitle-modern">Group and organize your mathematical projects (e.g. Calculus, Physics, Waves proofs).</p>
+            
+            <div className="create-modal-input-group-modern">
+              <input
+                value={newCollectionName}
+                placeholder="e.g., Linear Algebra, Calculus..."
+                onChange={(e) => setNewCollectionName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newCollectionName.trim()) {
+                    handleCreateCollection();
+                  }
+                }}
+                className="create-input-modern"
+                autoFocus
+              />
+              
+              <div className="create-modal-actions-modern">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setShowNewCollectionModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary create-modal-submit-btn-modern"
+                  disabled={!newCollectionName.trim()}
+                  onClick={handleCreateCollection}
+                >
+                  Create Collection
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Video Lightbox Modal */}
       {selectedVideo && (
         <div className="gallery-modal" onClick={() => setSelectedVideo(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>

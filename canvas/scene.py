@@ -370,17 +370,18 @@ class CanvasScene(ThreeDScene):
                 group_local_x = _group_visual_center_x(elements)
                 self.camera_ctl._view_mode = "inspect"
                 self.camera.use_orthographic_projection = True
+                phi, theta, gamma = self.camera_ctl._phi.get_value(), self.camera_ctl._theta.get_value(), self.camera_ctl._gamma.get_value()
                 if active_tape and getattr(active_tape, "world_transform", None):
                     phi, theta, gamma = get_tape_straight_above_angles(active_tape.world_transform)
-                    self.camera_ctl._phi.set_value(phi)
-                    self.camera_ctl._theta.set_value(theta)
-                    self.camera_ctl._gamma.set_value(gamma)
                 self.play(
                     self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=run_time).set_value(wpos[0]),
                     self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=run_time).set_value(wpos[1]),
                     self.camera_ctl._inspect_z.animate(rate_func=smooth, run_time=run_time).set_value(wpos[2] if len(wpos) > 2 else 0),
                     self.camera_ctl._x.animate(rate_func=smooth, run_time=run_time).set_value(group_local_x),
                     self.camera_ctl._y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
+                    self.camera_ctl._phi.animate(rate_func=smooth, run_time=run_time).set_value(phi),
+                    self.camera_ctl._theta.animate(rate_func=smooth, run_time=run_time).set_value(theta),
+                    self.camera_ctl._gamma.animate(rate_func=smooth, run_time=run_time).set_value(gamma),
                     run_time=run_time,
                 )
                 self.camera.frame_center = np.array([wpos[0], wpos[1], wpos[2] if len(wpos)>2 else 0])
@@ -635,10 +636,6 @@ class CanvasScene(ThreeDScene):
             wt = getattr(tape_for_observe, "world_transform", None)
             if wt:
                 try:
-                    phi, theta, gamma = get_tape_straight_above_angles(wt)
-                    self.camera_ctl._phi.set_value(phi)
-                    self.camera_ctl._theta.set_value(theta)
-                    self.camera_ctl._gamma.set_value(gamma)
                     self.camera_ctl._view_mode = "inspect"
                     self.camera_ctl.camera.use_orthographic_projection = True
                 except Exception:
@@ -814,17 +811,18 @@ class CanvasScene(ThreeDScene):
             self.registry.pause_far_updaters(current_y, buffer=5.0)
             self.camera_ctl._view_mode = "inspect"
             self.camera.use_orthographic_projection = True
+            phi, theta, gamma = self.camera_ctl._phi.get_value(), self.camera_ctl._theta.get_value(), self.camera_ctl._gamma.get_value()
             if active_tape and getattr(active_tape, "world_transform", None):
                 phi, theta, gamma = get_tape_straight_above_angles(active_tape.world_transform)
-                self.camera_ctl._phi.set_value(phi)
-                self.camera_ctl._theta.set_value(theta)
-                self.camera_ctl._gamma.set_value(gamma)
             self.play(
                 self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=run_time).set_value(wpos[0]),
                 self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=run_time).set_value(wpos[1]),
                 self.camera_ctl._inspect_z.animate(rate_func=smooth, run_time=run_time).set_value(wpos[2]),
                 self.camera_ctl._x.animate(rate_func=smooth, run_time=run_time).set_value(local_x),
                 self.camera_ctl._y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
+                self.camera_ctl._phi.animate(rate_func=smooth, run_time=run_time).set_value(phi),
+                self.camera_ctl._theta.animate(rate_func=smooth, run_time=run_time).set_value(theta),
+                self.camera_ctl._gamma.animate(rate_func=smooth, run_time=run_time).set_value(gamma),
                 run_time=run_time,
             )
             self.camera.frame_center = np.array(wpos)

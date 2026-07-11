@@ -878,16 +878,6 @@ export default function App() {
         <button type="button" className="btn btn-ghost" onClick={() => setSettingsOpen(true)}>
           Settings
         </button>
-        {project && (
-          <button 
-            type="button" 
-            className="btn btn-ghost" 
-            onClick={() => setShowGallery(true)}
-            title="Browse public community animations"
-          >
-            Gallery
-          </button>
-        )}
         <span className={`status-pill ${statusKind}`}>{busy ? "Working…" : status}</span>
       </header>
 

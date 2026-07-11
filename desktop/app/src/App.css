@@ -3488,3 +3488,303 @@
   color: var(--text-muted);
 }
 
+/* === Creation Flow & Unified Dashboard Styling === */
+.projects-landing-hero-modern-unified {
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-8);
+}
+
+.create-new-card-modern {
+  border: 1px dashed var(--accent-border) !important;
+  background: linear-gradient(180deg, rgba(92, 108, 240, 0.04) 0%, rgba(92, 108, 240, 0.01) 100%) !important;
+  cursor: pointer;
+}
+
+.create-new-card-modern:hover {
+  border-color: var(--accent) !important;
+  border-style: solid !important;
+  box-shadow: 0 12px 28px rgba(92, 108, 240, 0.15) !important;
+  background: linear-gradient(180deg, rgba(92, 108, 240, 0.08) 0%, rgba(92, 108, 240, 0.02) 100%) !important;
+}
+
+.create-new-thumb-container-modern {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(92, 108, 240, 0.03) !important;
+}
+
+.create-new-plus-modern {
+  font-size: 3.5rem;
+  font-weight: 300;
+  color: var(--accent);
+  transition: all var(--transition-base);
+}
+
+.create-new-card-modern:hover .create-new-plus-modern {
+  transform: scale(1.18);
+  color: var(--accent-hover);
+  text-shadow: 0 0 16px rgba(111, 128, 248, 0.6);
+}
+
+.create-new-title-text-modern {
+  color: var(--accent-hover) !important;
+}
+
+/* Custom Naming Modal */
+.create-modal-content-modern {
+  max-width: 480px !important;
+  background: linear-gradient(150deg, var(--bg-surface) 0%, var(--bg-elevated) 100%) !important;
+  border: 1px solid var(--border-strong) !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
+  animation: scale-up-modal 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scale-up-modal {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.create-modal-title-modern {
+  margin: 0 0 8px;
+  font-size: 1.2rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.create-modal-subtitle-modern {
+  margin: 0 0 var(--space-4);
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  line-height: 1.45;
+}
+
+.create-modal-input-group-modern {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.create-modal-input-modern {
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+.create-modal-actions-modern {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.create-modal-submit-btn-modern {
+  padding: 10px 20px !important;
+  font-size: 0.88rem;
+}
+
+/* === Collections System Styles === */
+.collections-filter-row-modern {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: var(--space-5);
+  align-items: center;
+}
+
+.collection-pill-wrapper-modern {
+  display: flex;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  padding-right: 6px;
+  transition: all var(--transition-fast);
+}
+
+.collection-pill-wrapper-modern:hover {
+  border-color: var(--border);
+  background: var(--bg-elevated);
+}
+
+.collection-pill-wrapper-modern .collection-pill-modern {
+  border: none !important;
+  background: transparent !important;
+  padding-right: 4px;
+}
+
+.collection-pill-modern {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--transition-fast);
+}
+
+.collection-pill-modern:hover {
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+.collection-pill-modern.active {
+  background: var(--accent-subtle) !important;
+  border-color: var(--accent) !important;
+  color: var(--text-primary) !important;
+}
+
+.collection-pill-wrapper-modern:has(.collection-pill-modern.active) {
+  background: var(--accent-subtle) !important;
+  border-color: var(--accent) !important;
+}
+
+.collection-pill-delete-modern {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  font-size: 0.65rem;
+  border-radius: var(--radius-full);
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.collection-pill-delete-modern:hover {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--error);
+}
+
+.collection-pill-create-modern {
+  border-style: dashed;
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.collection-pill-create-modern:hover {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+/* Project Card Collection Management Dropdown Button */
+.project-card-collection-btn-modern {
+  position: absolute;
+  top: 8px;
+  right: 36px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 12, 20, 0.75);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  border-radius: var(--radius-full);
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  z-index: 10;
+  opacity: 0;
+  padding: 0;
+}
+
+.project-card-modern:hover .project-card-collection-btn-modern {
+  opacity: 1;
+}
+
+.project-card-collection-btn-modern:hover,
+.project-card-collection-btn-modern.active {
+  background: var(--bg-subtle);
+  border-color: var(--accent);
+  color: var(--accent-hover);
+  opacity: 1 !important;
+}
+
+/* Collection popover menu inside Project Card */
+.collection-popover-modern {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  z-index: 20;
+  padding: var(--space-2) var(--space-3);
+  animation: slide-up-popover 0.15s ease-out;
+}
+
+@keyframes slide-up-popover {
+  from { transform: translateY(4px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.popover-header-modern {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.popover-close-modern {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.68rem;
+  padding: 0;
+}
+
+.popover-list-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.popover-item-modern {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.popover-item-modern:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.popover-item-modern input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.popover-empty-modern {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin: var(--space-1) 0;
+  text-align: center;
+}
+
+
+
