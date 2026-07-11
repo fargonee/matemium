@@ -714,6 +714,9 @@ class CanvasScene(ThreeDScene):
         Phase 2/8: In tape-scroll-mode for tape content, center the view.
         For posed/rotated tapes, directly animate the 3D camera (inspect mode) to the element's world position.
         """
+        if getattr(self, "_just_transitioned", False):
+            setattr(self, "_just_transitioned", False)
+            return
         if not self.camera_ctl or not self._should_auto_focus(elem):
             return
         # Automatic scrolling for tape content: always center the camera on reveal for tape elements
@@ -854,6 +857,22 @@ class CanvasScene(ThreeDScene):
                     gamma = self.camera_ctl._gamma.get_value()
                     
                     t_phi, t_theta, t_gamma = get_tape_straight_above_angles(wt)
+                    
+                    # Unwind Gimbal Lock if starting from straight-above
+                    if abs(phi) < 1e-3:
+                        V = gamma - theta - 90.0
+                        theta = t_theta
+                        gamma = V + theta + 90.0
+                        # Snap invisibly
+                        self.camera_ctl._theta.set_value(theta)
+                        self.camera_ctl._gamma.set_value(gamma)
+                        
+                    # Unwind Gimbal Lock if targeting straight-above
+                    if abs(t_phi) < 1e-3:
+                        V = t_gamma - t_theta - 90.0
+                        t_theta = theta
+                        t_gamma = V + t_theta + 90.0
+
                     target_phi = _closest_angle(phi, t_phi)
                     target_theta = _closest_angle(theta, t_theta)
                     target_gamma = _closest_angle(gamma, t_gamma)
@@ -870,12 +889,15 @@ class CanvasScene(ThreeDScene):
                         self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=2.0).set_value(el_x),
                         self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=2.0).set_value(el_y),
                         self.camera_ctl._inspect_z.animate(rate_func=smooth, run_time=2.0).set_value(el_z),
+                        self.camera_ctl._x.animate(rate_func=smooth, run_time=2.0).set_value(0.0),
+                        self.camera_ctl._y.animate(rate_func=smooth, run_time=2.0).set_value(el_local_y),
                         self.camera_ctl._phi.animate(rate_func=smooth, run_time=2.0).set_value(target_phi),
                         self.camera_ctl._theta.animate(rate_func=smooth, run_time=2.0).set_value(target_theta),
                         self.camera_ctl._gamma.animate(rate_func=smooth, run_time=2.0).set_value(target_gamma),
                         run_time=2.0,
                     )
                     self.camera.frame_center = np.array([el_x, el_y, el_z])
+                    setattr(self, "_just_transitioned", True)
 
         # --- END AUTO-TRANSITION ---
 
