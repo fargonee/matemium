@@ -807,6 +807,78 @@ class CanvasScene(ThreeDScene):
     def _handle_element_reveal(self, elem: CanvasElement, play_animation: bool = True):
         """Reveal an element lazily: create + (optionally) play entry animation.
 
+        # --- AUTO-TRANSITION TO NEW TAPE ---
+        is_tape_content = elem.id in getattr(self, "_tape_content_ids", set())
+        active_tape = self._element_tape_map.get(elem.id)
+        
+        if is_tape_content and play_animation and active_tape:
+            tape_id = getattr(active_tape, "id", None)
+            current_focused = getattr(self, "_current_focused_tape_id", None)
+            
+            if tape_id != current_focused and self.camera_ctl:
+                self._current_focused_tape_id = tape_id
+                self._observation_mode = ObservationMode.TAPE_SCROLL
+                self._active_scroll_tape = active_tape
+                
+                # Dimming logic
+                self._restore_dimmed_objects()
+                self._dimmed_opacities.clear()
+                self._current_dim_tape_id = tape_id
+                self._current_dim_opacity = 0.15
+                active_ids = self._get_active_ids(active_tape)
+                to_dim = []
+                if self.registry:
+                    for uid, m in self.registry._objects.items():
+                        if uid not in active_ids and m is not None:
+                            to_dim.append(uid)
+                for uid, m in getattr(self, "_world_objects", {}).items():
+                    if uid not in active_ids and m is not None:
+                        to_dim.append(uid)
+                self._dim_objects(to_dim, self._current_dim_opacity)
+                
+                # Transition camera BEFORE playing the element animation
+                wt = getattr(active_tape, "world_transform", None)
+                if wt:
+                    # Get the world position of the tape's origin
+                    try:
+                        from .coords import local_to_world_point
+                        x, y, z = local_to_world_point((0, 0, 0), wt)
+                    except Exception:
+                        x, y, z = 0., 0., 0.
+                        
+                    self.camera_ctl._view_mode = "inspect"
+                    self.camera.use_orthographic_projection = True
+                    
+                    phi = self.camera_ctl._phi.get_value()
+                    theta = self.camera_ctl._theta.get_value()
+                    gamma = self.camera_ctl._gamma.get_value()
+                    
+                    t_phi, t_theta, t_gamma = get_tape_straight_above_angles(wt)
+                    target_phi = _closest_angle(phi, t_phi)
+                    target_theta = _closest_angle(theta, t_theta)
+                    target_gamma = _closest_angle(gamma, t_gamma)
+                    
+                    # Also determine target x, y, z by checking the element's actual position
+                    # so we fly directly to the element rather than the tape origin
+                    el_local_y = getattr(elem, "canvas_position", (0, 0, 0))[1]
+                    try:
+                        el_x, el_y, el_z = local_to_world_point((0, el_local_y, 0), wt)
+                    except Exception:
+                        el_x, el_y, el_z = x, y, z
+                        
+                    self.play(
+                        self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=2.0).set_value(el_x),
+                        self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=2.0).set_value(el_y),
+                        self.camera_ctl._inspect_z.animate(rate_func=smooth, run_time=2.0).set_value(el_z),
+                        self.camera_ctl._phi.animate(rate_func=smooth, run_time=2.0).set_value(target_phi),
+                        self.camera_ctl._theta.animate(rate_func=smooth, run_time=2.0).set_value(target_theta),
+                        self.camera_ctl._gamma.animate(rate_func=smooth, run_time=2.0).set_value(target_gamma),
+                        run_time=2.0,
+                    )
+                    self.camera.frame_center = np.array([el_x, el_y, el_z])
+
+        # --- END AUTO-TRANSITION ---
+
         This is called when the timeline reaches this element's slot.
         Creation happens here (lazy), not upfront.
 
