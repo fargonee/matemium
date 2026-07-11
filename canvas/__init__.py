@@ -22,8 +22,6 @@ from .dsl import (
     CameraKeyframe,  # Phase 3 generalized observation
     WorldPoint,
     ObjectAnchor,
-    TapeScroll,
-    ObservationTarget,
     ObservationMode,  # Phase 8
     TransformElement,
     EntryAnimation,

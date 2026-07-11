@@ -34,10 +34,10 @@ from .coords import (
 from .inspect_path import CameraPose
 
 if TYPE_CHECKING:
-    from .dsl import ObservationTarget, TapeScroll, WorldPoint, ObjectAnchor, TapeObject
+    from .dsl import ObservationTarget, WorldPoint, ObjectAnchor, TapeObject
 
 # For runtime in observe_target (avoid full circular at module load)
-from .dsl import WorldPoint, TapeScroll, TapeObject, ObjectAnchor
+from .dsl import WorldPoint, TapeObject, ObjectAnchor
 
 ViewMode = Literal["sheet", "tilt", "inspect"]
 

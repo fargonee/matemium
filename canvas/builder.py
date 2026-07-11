@@ -35,8 +35,47 @@ from .plots import format_quadratic_tex
 from .rich_text import RunInput, RichInput, normalize_rich_input
 
 
+
+class TapeBuilder:
+    """Authoring sub-builder for a specific tape."""
+    def __init__(self, builder: "CanvasBuilder", tape_id: str):
+        self._builder = builder
+        self.tape_id = tape_id
+
+    def _with_tape(self, func, *args, **kwargs):
+        tape = self._builder._tapes.get(self.tape_id)
+        if tape:
+            with self._builder.in_object_space(tape.id):
+                func(*args, **kwargs)
+        return self
+
+    def add_text(self, *args, **kwargs): return self._with_tape(self._builder.add_text, *args, **kwargs)
+    def add_heading(self, *args, **kwargs): return self._with_tape(self._builder.add_heading, *args, **kwargs)
+    def add_body(self, *args, **kwargs): return self._with_tape(self._builder.add_body, *args, **kwargs)
+    def add_math(self, *args, **kwargs): return self._with_tape(self._builder.add_math, *args, **kwargs)
+    def add_flex_row(self, *args, **kwargs): return self._with_tape(self._builder.add_flex_row, *args, **kwargs)
+    def add_flex_column(self, *args, **kwargs): return self._with_tape(self._builder.add_flex_column, *args, **kwargs)
+    def add_observation(self, *args, **kwargs): return self._with_tape(self._builder.add_observation, *args, **kwargs)
+    def add_concept(self, *args, **kwargs): return self._with_tape(self._builder.add_concept, *args, **kwargs)
+    def add_grid_board(self, *args, **kwargs): return self._with_tape(self._builder.add_grid_board, *args, **kwargs)
+    def add_grid_mark(self, *args, **kwargs): return self._with_tape(self._builder.add_grid_mark, *args, **kwargs)
+    def add_grid_moves(self, *args, **kwargs): return self._with_tape(self._builder.add_grid_moves, *args, **kwargs)
+    def add_quadratic_plot(self, *args, **kwargs): return self._with_tape(self._builder.add_quadratic_plot, *args, **kwargs)
+    def add_quadratic_compare(self, *args, **kwargs): return self._with_tape(self._builder.add_quadratic_compare, *args, **kwargs)
+    def add_plot_trace(self, *args, **kwargs): return self._with_tape(self._builder.add_plot_trace, *args, **kwargs)
+    def add_space(self, height: float = 1.0):
+        layout = self._builder._layouts.get(self.tape_id)
+        if layout:
+            layout._current_y -= height
+        return self
+
+
 class CanvasBuilder:
     """Fluent builder for the canvas tape/sheet."""
+
+    @property
+    def tape(self) -> "TapeBuilder":
+        return TapeBuilder(self, "root_tape")
 
     def __init__(self, title: str = "Matemium", **settings_kwargs: Any):
         canvas_settings = settings_kwargs.pop("canvas_settings", None)
@@ -1039,6 +1078,8 @@ class CanvasBuilder:
             scope=new_tape,
         )
         self._layouts[tape_id] = tape_layout
+        
+        return TapeBuilder(self, tape_id)
 
         # Phase 8: store as first-class additional tape
         self.dsl.additional_tapes.append(new_tape)

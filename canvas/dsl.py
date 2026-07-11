@@ -182,15 +182,6 @@ class ObjectAnchor:
     anchor: str = "center"  # "center", "top", "local_y:xx" etc.
     framing: str = "cinematic"  # "cinematic" or "face_on"
 
-@dataclass
-class TapeScroll:
-    tape_id: str
-    local_y: float
-    framing_mode: str = "sheet"  # "sheet", "zoomed", etc.
-    dim_others: bool = True
-    dim_opacity: float = 0.15
-
-ObservationTarget = Union[WorldPoint, ObjectAnchor, TapeScroll]
 
 @dataclass
 class CameraKeyframe:
@@ -213,8 +204,6 @@ class CameraKeyframe:
             d["target"] = {"kind": "world_point", "position": self.target.position}
         elif isinstance(self.target, ObjectAnchor):
             d["target"] = {"kind": "object_anchor", "object_id": self.target.object_id, "anchor": self.target.anchor, "framing": getattr(self.target, "framing", "cinematic")}
-        elif isinstance(self.target, TapeScroll):
-            d["target"] = {"kind": "tape_scroll", "tape_id": self.target.tape_id, "local_y": self.target.local_y, "framing_mode": self.target.framing_mode}
         return d
 
 
@@ -683,14 +672,7 @@ class SheetDSL:
                         anchor=target_data.get("anchor", "center"),
                         framing=target_data.get("framing", "cinematic")
                     )
-                elif kind == "tape_scroll":
-                    tgt = TapeScroll(
-                        tape_id=target_data.get("tape_id", ""),
-                        local_y=float(target_data.get("local_y", 0)),
-                        framing_mode=target_data.get("framing_mode", "sheet"),
-                        dim_others=bool(target_data.get("dim_others", True)),
-                        dim_opacity=float(target_data.get("dim_opacity", 0.15)),
-                    )
+
                 else:
                     tgt = WorldPoint()
                 ck = CameraKeyframe(

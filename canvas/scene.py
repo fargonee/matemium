@@ -56,7 +56,6 @@ from .dsl import (
     TimelineItem,
     TransformElement,
     TapeObject,
-    TapeScroll,  # Phase 2
     WorldObject,
     WorldTransform,
 )
@@ -595,62 +594,6 @@ class CanvasScene(ThreeDScene):
             if hasattr(self.camera_ctl, "camera"):
                 self.camera_ctl.camera.use_orthographic_projection = True
 
-        if isinstance(target, TapeScroll):
-            tid = getattr(target, "tape_id", None)
-            if tid in (None, "root_tape") or (self.root_tape and tid == getattr(self.root_tape, "id", None)):
-                self._observation_mode = ObservationMode.TAPE_SCROLL
-                self._active_scroll_tape = self.root_tape
-                if self.camera_ctl:
-                    self.camera_ctl.tape_center_x = 0.0
-                    self.camera_ctl._x.set_value(0.0)
-            else:
-                # Phase 8: support additional top-level tapes
-                for at in getattr(self.dsl, 'additional_tapes', []) or []:
-                    if at and at.id == tid:
-                        self._observation_mode = ObservationMode.TAPE_SCROLL
-                        self._active_scroll_tape = at
-                        break
-            # Apply dimming if requested on the TapeScroll target
-            dim_others = getattr(target, 'dim_others', True)
-            dim_op = getattr(target, 'dim_opacity', 0.15)
-            if self._active_scroll_tape and dim_others:
-                self._dim_non_active_for_tape(self._active_scroll_tape, dim_op)
-        elif isinstance(target, dict) and target.get("kind") == "tape_scroll":
-            tid = target.get("tape_id")
-            if tid in (None, "root_tape") or (self.root_tape and tid == getattr(self.root_tape, "id", None)):
-                self._observation_mode = ObservationMode.TAPE_SCROLL
-                self._active_scroll_tape = self.root_tape
-                if self.camera_ctl:
-                    self.camera_ctl.tape_center_x = 0.0
-                    self.camera_ctl._x.set_value(0.0)
-            else:
-                for at in getattr(self.dsl, 'additional_tapes', []) or []:
-                    if at and at.id == tid:
-                        self._observation_mode = ObservationMode.TAPE_SCROLL
-                        self._active_scroll_tape = at
-                        break
-            dim_others = target.get("dim_others", True)
-            dim_op = float(target.get("dim_opacity", 0.15))
-            if self._active_scroll_tape and dim_others:
-                self._dim_non_active_for_tape(self._active_scroll_tape, dim_op)
-        # else: normal 3D observation (ObjectAnchor, WorldPoint) -- including on a TapeObject
-
-        tape_for_observe = self._active_scroll_tape or self.root_tape
-
-        # Set straight-above angles (math transform of tape R) so tape internal coords
-        # are the natural source for the camera view in tape-scroll mode.
-        if self._observation_mode == ObservationMode.TAPE_SCROLL and self.camera_ctl and tape_for_observe:
-            wt = getattr(tape_for_observe, "world_transform", None)
-            if wt:
-                try:
-                    self.camera_ctl._view_mode = "inspect"
-                    self.camera_ctl.camera.use_orthographic_projection = True
-                except Exception:
-                    pass
-
-        # Phase 5: wire observe= hook from register_object_kind for custom kinds
-        target_transform = None
-        target_pos_world = None
         if isinstance(target, ObjectAnchor):
             obj_id = target.object_id
             # Resolve the element/kind for this anchor
@@ -678,7 +621,7 @@ class CanvasScene(ThreeDScene):
                             self.camera_ctl,
                             run_time=getattr(kf, "duration", getattr(kf, "run_time", 2.0)),
                             rate_func=self._get_rate_func(getattr(kf, "rate_func", "smooth")),
-                            tape=tape_for_observe,
+                            tape=None,
                         )
                         return  # hook handled the observation
                     except Exception:
@@ -689,9 +632,9 @@ class CanvasScene(ThreeDScene):
                 target,
                 run_time=getattr(kf, "duration", getattr(kf, "run_time", 2.0)),
                 rate_func=self._get_rate_func(getattr(kf, "rate_func", "smooth")),
-                tape=tape_for_observe,
-                target_transform=target_transform,
-                target_pos_world=target_pos_world,
+                tape=None,
+                target_transform=None,
+                target_pos_world=None,
             )
 
     # ------------------- Tape-scroll dimming helpers -------------------

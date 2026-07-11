@@ -12,7 +12,7 @@ class PortraitDemo(CanvasScene):
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Portrait Demo")
         builder.add_heading("Matemium — Portrait Demo")
-        builder.add_math(
+        tape.add_math(
             r"\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}",
             style={"margin-bottom": 1.0},
         )
@@ -21,7 +21,7 @@ class PortraitDemo(CanvasScene):
             "The canvas is infinite. The reasoning continues forever.",
             after_3d=True,
         )
-        builder.add_body(
+        tape.add_body(
             "Note: long explanatory text wraps at the safe viewport width, "
             "keeping spacing and scroll rhythm correct on portrait reels.",
             style={"margin-top": 1.0, "margin-bottom": 1.0},
@@ -37,7 +37,7 @@ class LandscapeDemo(CanvasScene):
         builder = CanvasBuilder(title="Landscape Demo", canvas_settings=settings)
         builder.add_heading("Matemium")
         builder.add_text("Now in landscape for YouTube", style={"margin-bottom": 1.0})
-        builder.add_math(
+        tape.add_math(
             r"\nabla \times \vec{E} = -\frac{\partial \vec{B}}{\partial t}",
             style={"margin-bottom": 1.2},
         )
@@ -63,7 +63,7 @@ class BuilderDemo(CanvasScene):
             background_color="#0a0a0a",
         )
         builder.add_heading("Matemium — Builder Demo", style={"align": "center"})
-        builder.add_math(
+        tape.add_math(
             r"\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}",
             style={"margin-bottom": 1.4, "width": 6.5, "align": "left"},
         )
@@ -128,7 +128,7 @@ def _ttt_scenario(
     )
     if moves:
         builder.add_grid_moves(board_id, moves, run_time=0.55)
-    builder.add_body(takeaway, style={"margin-top": 0.25, "margin-bottom": 0.4})
+    tape.add_body(takeaway, style={"margin-top": 0.25, "margin-bottom": 0.4})
 
 
 class TicTacToeTutorial(CanvasScene):
@@ -139,7 +139,7 @@ class TicTacToeTutorial(CanvasScene):
 
         # ---- Intro (rules) ----
         builder.add_heading("Tic-Tac-Toe Tutorial", style={"align": "center", "margin-bottom": 0.5})
-        builder.add_body(
+        tape.add_body(
             "Two players — X and O — take turns on a 3×3 grid. "
             "First to get three in a row (horizontal, vertical, or diagonal) wins. "
             "Perfect play always ends in a draw, but mistakes are punishable.",
@@ -250,7 +250,7 @@ class TicTacToeTutorial(CanvasScene):
             align_items="center",
             style={"margin-bottom": 0.6},
         )
-        builder.add_body(
+        tape.add_body(
             "The canvas scrolls as the lesson continues — "
             "each scenario is its own row on the infinite tape.",
             style={"align": "center", "margin-bottom": 0.8},
@@ -288,15 +288,16 @@ class Space3DDemo(CanvasScene):
         builder.set_tape_pose(rotation=(35, 15, 0))  # pitch ~35°, yaw 15°
 
         # Tape content in its local space (old sheet ergonomics preserved)
-        builder.add_heading("3D World Demo", style={"align": "center"})
-        builder.add_body(
+        tape = builder.tape
+        tape.add_heading("3D World Demo", style={"align": "center"})
+        tape.add_body(
             "The infinite tape is now a TapeObject inside 3D space. "
             "It can be rotated and positioned arbitrarily.",
             style={"margin-bottom": 0.8},
         )
-        builder.add_math(r"\vec{r} = (x, y, z)", style={"margin-bottom": 0.5})
+        tape.add_math(r"\vec{r} = (x, y, z)", style={"margin-bottom": 0.5})
 
-        builder.add_body(
+        tape.add_body(
             "Content inside the tape still uses familiar flex, styling, and lazy reveal — "
             "but the whole plane lives in 3D.",
             style={"margin-top": 0.4, "margin-bottom": 0.8},
@@ -337,7 +338,7 @@ class Space3DDemo(CanvasScene):
             rotation=( 12, -35, 8 ),
         )
         with builder.in_object_space(info_tape):
-            builder.add_body("Tilted secondary tape", style={"align": "center"})
+            tape.add_body("Tilted secondary tape", style={"align": "center"})
 
         # === Camera tour using newest patterns ===
         # Normal 3D: observe_object (cinematic, no tape logic)
@@ -347,7 +348,6 @@ class Space3DDemo(CanvasScene):
         builder.observe_object("info_card", framing="face_on", run_time=2.0)
 
         # Tape-scroll mode: scroll_tape (internal tape logic)
-        builder.scroll_tape(local_y=4.0, run_time=4.0)
 
         # Back to world point (normal 3D)
         builder.add_camera_keyframe(
