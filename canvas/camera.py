@@ -86,7 +86,7 @@ def get_tape_straight_above_angles(wt: "WorldTransform") -> tuple[float, float, 
     # Since camera looks along its -Z, it will look from +Z_tape towards -Z_tape,
     # which is looking at the front face of the tape.
     # Its UP is +Y_tape. This perfectly matches the 2D sheet.
-    R_desired = R_tape.T
+    R_desired = R_tape
 
     # Manim's camera R = rotz(gamma) @ rotx(-phi) @ rotz(-theta - 90)
     # Scipy intrinsic ZXZ: R = rotz(a) @ rotx(b) @ rotz(c)
@@ -116,6 +116,10 @@ def get_tape_straight_above_angles(wt: "WorldTransform") -> tuple[float, float, 
     except Exception:
         return 0.0, -90.0, 0.0
 
+
+
+def _closest_angle(current: float, target: float) -> float:
+    return current + (target - current + 180.0) % 360.0 - 180.0
 
 class CameraController:
     """Pan, zoom, and optional tilt over the XY sheet at z = 0."""
@@ -513,6 +517,9 @@ class CameraController:
                 phi, theta, gamma = self._phi.get_value(), self._theta.get_value(), self._gamma.get_value()
                 if tape and getattr(tape, "world_transform", None):
                     phi, theta, gamma = get_tape_straight_above_angles(tape.world_transform)
+                    phi = _closest_angle(self._phi.get_value(), phi)
+                    theta = _closest_angle(self._theta.get_value(), theta)
+                    gamma = _closest_angle(self._gamma.get_value(), gamma)
 
                 local_x = self.tape_center_x  # 0 for content center; focus drives per-elem x
 
@@ -577,6 +584,9 @@ class CameraController:
             if is_face_on and target_transform:
                 self.camera.use_orthographic_projection = True
                 phi, theta, gamma = get_tape_straight_above_angles(target_transform)
+                phi = _closest_angle(self._phi.get_value(), phi)
+                theta = _closest_angle(self._theta.get_value(), theta)
+                gamma = _closest_angle(self._gamma.get_value(), gamma)
                 self.scene.play(
                     self._x.animate(rate_func=rate_func, run_time=run_time).set_value(x),
                     self._y.animate(rate_func=rate_func, run_time=run_time).set_value(y),

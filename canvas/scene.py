@@ -72,6 +72,10 @@ from .measure import build_mobject, make_render_surface, _OBJECT_KINDS
 from .registry import MobjectRegistry
 
 
+
+def _closest_angle(current: float, target: float) -> float:
+    return current + (target - current + 180.0) % 360.0 - 180.0
+
 class CanvasScene(ThreeDScene):
     """Main driver scene for Matemium's infinite canvas.
 
@@ -201,9 +205,9 @@ class CanvasScene(ThreeDScene):
                 self.camera.use_orthographic_projection = True
                 if wt:
                     phi, theta, gamma = get_tape_straight_above_angles(wt)
-                    self.camera_ctl._phi.set_value(phi)
-                    self.camera_ctl._theta.set_value(theta)
-                    self.camera_ctl._gamma.set_value(gamma)
+                    self.camera_ctl._phi.set_value(_closest_angle(self.camera_ctl._phi.get_value(), phi))
+                    self.camera_ctl._theta.set_value(_closest_angle(self.camera_ctl._theta.get_value(), theta))
+                    self.camera_ctl._gamma.set_value(_closest_angle(self.camera_ctl._gamma.get_value(), gamma))
                 # Force an immediate sync so scene camera reflects the initial pose before first reveal
                 try:
                     dummy = getattr(self.camera_ctl, "_dummy", None)
@@ -372,7 +376,10 @@ class CanvasScene(ThreeDScene):
                 self.camera.use_orthographic_projection = True
                 phi, theta, gamma = self.camera_ctl._phi.get_value(), self.camera_ctl._theta.get_value(), self.camera_ctl._gamma.get_value()
                 if active_tape and getattr(active_tape, "world_transform", None):
-                    phi, theta, gamma = get_tape_straight_above_angles(active_tape.world_transform)
+                    t_phi, t_theta, t_gamma = get_tape_straight_above_angles(active_tape.world_transform)
+                    phi = _closest_angle(phi, t_phi)
+                    theta = _closest_angle(theta, t_theta)
+                    gamma = _closest_angle(gamma, t_gamma)
                 self.play(
                     self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=run_time).set_value(wpos[0]),
                     self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=run_time).set_value(wpos[1]),
@@ -552,9 +559,9 @@ class CanvasScene(ThreeDScene):
             if self.root_tape and getattr(self.root_tape, "world_transform", None):
                 try:
                     phi, theta, gamma = get_tape_straight_above_angles(self.root_tape.world_transform)
-                    self.camera_ctl._phi.set_value(phi)
-                    self.camera_ctl._theta.set_value(theta)
-                    self.camera_ctl._gamma.set_value(gamma)
+                    self.camera_ctl._phi.set_value(_closest_angle(self.camera_ctl._phi.get_value(), phi))
+                    self.camera_ctl._theta.set_value(_closest_angle(self.camera_ctl._theta.get_value(), theta))
+                    self.camera_ctl._gamma.set_value(_closest_angle(self.camera_ctl._gamma.get_value(), gamma))
                     self.camera_ctl._view_mode = "inspect"
                     self.camera_ctl.camera.use_orthographic_projection = True
                 except Exception:
@@ -582,9 +589,9 @@ class CanvasScene(ThreeDScene):
         self._active_scroll_tape = None
         if self.camera_ctl:
             # reset to default sheet orientation when leaving tape mode
-            self.camera_ctl._phi.set_value(0.0)
-            self.camera_ctl._theta.set_value(-90.0)
-            self.camera_ctl._gamma.set_value(0.0)
+            self.camera_ctl._phi.set_value(_closest_angle(self.camera_ctl._phi.get_value(), 0.0))
+            self.camera_ctl._theta.set_value(_closest_angle(self.camera_ctl._theta.get_value(), -90.0))
+            self.camera_ctl._gamma.set_value(_closest_angle(self.camera_ctl._gamma.get_value(), 0.0))
             if hasattr(self.camera_ctl, "camera"):
                 self.camera_ctl.camera.use_orthographic_projection = True
 
@@ -808,12 +815,16 @@ class CanvasScene(ThreeDScene):
             local_z = float(elem.canvas_position[2]) if len(elem.canvas_position) > 2 else 0.0
             local_point = tuple(getattr(elem, 'canvas_position', (0.0, target_y, 0.0))[:3])
             wpos = local_to_world_point(local_point, active_tape.world_transform)
+            print(f"FOCUS ON POSED TAPE! {elem.id} wpos={wpos}")
             self.registry.pause_far_updaters(current_y, buffer=5.0)
             self.camera_ctl._view_mode = "inspect"
             self.camera.use_orthographic_projection = True
             phi, theta, gamma = self.camera_ctl._phi.get_value(), self.camera_ctl._theta.get_value(), self.camera_ctl._gamma.get_value()
             if active_tape and getattr(active_tape, "world_transform", None):
-                phi, theta, gamma = get_tape_straight_above_angles(active_tape.world_transform)
+                t_phi, t_theta, t_gamma = get_tape_straight_above_angles(active_tape.world_transform)
+                phi = _closest_angle(phi, t_phi)
+                theta = _closest_angle(theta, t_theta)
+                gamma = _closest_angle(gamma, t_gamma)
             self.play(
                 self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=run_time).set_value(wpos[0]),
                 self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=run_time).set_value(wpos[1]),

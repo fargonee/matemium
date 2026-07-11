@@ -31,6 +31,16 @@ interface Collection {
   projectIds: string[];
 }
 
+function getAuthorInitials(author?: string) {
+  if (!author) return "M";
+  return author
+    .split(" ")
+    .map((w) => w.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
 function ProjectThumbnail({ previewVideo, sceneClass }: { previewVideo?: string | null; sceneClass: string }) {
   if (previewVideo) {
     return (
@@ -76,6 +86,7 @@ export function ProjectsLanding({
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<GalleryItem | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<{id: string, name: string} | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Collections state
@@ -91,6 +102,9 @@ export function ProjectsLanding({
   const [showNewCollectionModal, setShowNewCollectionModal] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState("");
   const [managingProjectId, setManagingProjectId] = useState<string | null>(null);
+  
+  // Naming Modal Collection Target
+  const [targetCollectionId, setTargetCollectionId] = useState<string | null>(null);
 
   // Helper to save collections
   const saveCollections = useCallback((updated: Collection[]) => {
@@ -119,6 +133,9 @@ export function ProjectsLanding({
     if (activeCollectionId === id) {
       setActiveCollectionId(null);
     }
+    if (targetCollectionId === id) {
+      setTargetCollectionId(null);
+    }
   };
 
   const handleToggleProjectInCollection = useCallback(
@@ -144,23 +161,25 @@ export function ProjectsLanding({
     [collections, saveCollections],
   );
 
-  // Auto-associate newly created project with active collection
+  // Auto-associate newly created project with the selected target collection
   const projectsRef = useRef<string[]>(projects.map((p) => p.id));
   const [prevProjectsCount, setPrevProjectsCount] = useState(projects.length);
+  const pendingCollectionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (projects.length > prevProjectsCount) {
-      if (activeCollectionId) {
+      if (pendingCollectionIdRef.current) {
         const prevIds = new Set(projectsRef.current);
         const newProject = projects.find((p) => !prevIds.has(p.id));
         if (newProject) {
-          handleToggleProjectInCollection(activeCollectionId, newProject.id, true);
+          handleToggleProjectInCollection(pendingCollectionIdRef.current, newProject.id, true);
         }
       }
+      pendingCollectionIdRef.current = null;
     }
     setPrevProjectsCount(projects.length);
     projectsRef.current = projects.map((p) => p.id);
-  }, [projects, activeCollectionId, prevProjectsCount, handleToggleProjectInCollection]);
+  }, [projects, prevProjectsCount, handleToggleProjectInCollection]);
 
   // Gallery Loader
   const loadGallery = useCallback(async (q?: string) => {
@@ -237,6 +256,12 @@ export function ProjectsLanding({
     ? projects.filter((p) => activeCollection.projectIds.includes(p.id))
     : projects;
 
+  // Editorial Featured vs Trending Split
+  const hasInspiration = filteredGallery.length > 0;
+  const isDefaultView = searchQuery === "";
+  const featuredItem = hasInspiration && isDefaultView ? filteredGallery[0] : null;
+  const listItems = hasInspiration && isDefaultView ? filteredGallery.slice(1) : filteredGallery;
+
   return (
     <div className="projects-landing-page-modern" onClick={() => setManagingProjectId(null)}>
       {/* 1. Stunning Hero Section */}
@@ -307,6 +332,7 @@ export function ProjectsLanding({
               className="project-card-modern create-new-card-modern"
               onClick={(e) => {
                 e.stopPropagation();
+                setTargetCollectionId(activeCollectionId);
                 setShowCreateModal(true);
               }}
               title="Click to start a new mathematical project"
@@ -396,7 +422,7 @@ export function ProjectsLanding({
                   disabled={busy}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onDelete(project.id);
+                    setProjectToDelete({ id: project.id, name: project.name });
                   }}
                 >
                   ✕
@@ -410,12 +436,12 @@ export function ProjectsLanding({
         <section className="inspiration-pane-modern">
           <div className="pane-header-modern">
             <div className="pane-header-title-container">
-              <h3 className="pane-title-modern">Community Inspiration</h3>
-              <span className="live-indicator-modern">● LIVE FEED</span>
+              <h3 className="pane-title-modern">Inspiration Feed</h3>
+              <span className="live-indicator-modern">● LIVE HUB</span>
             </div>
             <input
               type="text"
-              placeholder="Search inspiration..."
+              placeholder="Search equations, tags..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="inspiration-search-input-modern"
@@ -424,7 +450,7 @@ export function ProjectsLanding({
 
           {error && (
             <div style={{ color: "var(--text-muted)", fontSize: "0.74rem", marginBottom: "12px", background: "rgba(255,255,255,0.02)", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border-subtle)" }}>
-              Offline mode. Showing featured creations.
+              Offline mode. Showing cached featured creations.
             </div>
           )}
 
@@ -434,55 +460,120 @@ export function ProjectsLanding({
               <span>Connecting to Matemium hub...</span>
             </div>
           ) : (
-            <div className="inspiration-grid-modern">
-              {filteredGallery.map((item) => {
-                const yt = item.youtube_id || (item as any).youtubeId || "";
-                const tags = item.tags || [];
-                const author = item.author_name || (item as any).author;
-                return (
-                  <div
-                    key={item.id}
-                    className="inspiration-card-modern"
-                    onClick={() => setSelectedVideo(item)}
-                    title="Click to watch this community math creation"
-                  >
-                    <div className="inspiration-thumb-container-modern">
-                      {yt && (
-                        <img
-                          src={`https://img.youtube.com/vi/${yt}/hqdefault.jpg`}
-                          alt={item.title}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180'%3E%3Crect width='100%25' height='100%25' fill='%2310141e'/%3E%3Ctext x='50%25' y='50%25' fill='%235c6cf0' font-size='14' font-weight='600' font-family='sans-serif' text-anchor='middle'%3EMatemium Showcase%3C/text%3E%3C/svg%3E";
-                          }}
-                        />
-                      )}
-                      <div className="inspiration-play-overlay-modern">
-                        <div className="play-triangle-modern">▶</div>
-                      </div>
-                    </div>
-                    <div className="inspiration-card-body-modern">
-                      <h4>{item.title}</h4>
-                      <p className="inspiration-desc-modern">{item.description}</p>
-                      <div className="inspiration-card-footer-modern">
-                        <div className="inspiration-tags-modern">
-                          {tags.slice(0, 2).map((tag) => (
-                            <span key={tag} className="inspiration-tag-badge-modern">
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-                        {author && <span className="inspiration-author-modern">by {author}</span>}
+            <div className="inspiration-content-scroll-modern">
+              {/* editorial featured showcase of the week */}
+              {featuredItem && (
+                <div 
+                  className="inspiration-featured-card-modern"
+                  onClick={() => setSelectedVideo(featuredItem)}
+                  title="Watch Selection of the Week"
+                >
+                  <div className="featured-banner-badge-modern">
+                    <span className="star-icon-modern">★</span> EDITORIAL CHOICE OF THE WEEK
+                  </div>
+                  <div className="featured-thumb-container-modern">
+                    {featuredItem.youtube_id && (
+                      <img
+                        src={`https://img.youtube.com/vi/${featuredItem.youtube_id}/hqdefault.jpg`}
+                        alt={featuredItem.title}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180'%3E%3Crect width='100%25' height='100%25' fill='%2310141e'/%3E%3Ctext x='50%25' y='50%25' fill='%235c6cf0' font-size='14' font-weight='600' font-family='sans-serif' text-anchor='middle'%3EMatemium Featured%3C/text%3E%3C/svg%3E";
+                        }}
+                      />
+                    )}
+                    <div className="inspiration-play-overlay-modern">
+                      <div className="play-button-ring-modern featured-play-ring-modern">
+                        <svg viewBox="0 0 24 24" width="28" height="28" className="svg-play-triangle-modern">
+                          <path fill="currentColor" d="M8 5v14l11-7z" />
+                        </svg>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-              {filteredGallery.length === 0 && (
-                <div className="inspiration-empty-modern">
-                  No matches for "{searchQuery}". Try searching for calculus, algebra, geometry or physics.
+                  <div className="featured-body-modern">
+                    <div className="featured-meta-row-modern">
+                      <h4>{featuredItem.title}</h4>
+                      {featuredItem.author_name && (
+                        <div className="author-row-badge-modern">
+                          <span className="avatar-circle-modern">{getAuthorInitials(featuredItem.author_name)}</span>
+                          <span className="author-name-text-modern">{featuredItem.author_name}</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="featured-desc-modern">{featuredItem.description}</p>
+                    <div className="featured-tags-row-modern">
+                      {featuredItem.tags?.slice(0, 3).map((tag) => (
+                        <span key={tag} className="inspiration-tag-badge-modern">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
+
+              {/* regular showcase listing */}
+              {featuredItem && <h4 className="trending-header-title-modern">Trending Animations</h4>}
+              
+              <div className="inspiration-grid-modern">
+                {listItems.map((item) => {
+                  const yt = item.youtube_id || (item as any).youtubeId || "";
+                  const tags = item.tags || [];
+                  const author = item.author_name || (item as any).author;
+                  return (
+                    <div
+                      key={item.id}
+                      className="inspiration-card-modern"
+                      onClick={() => setSelectedVideo(item)}
+                      title="Click to watch this community math creation"
+                    >
+                      <div className="inspiration-thumb-container-modern">
+                        {yt && (
+                          <img
+                            src={`https://img.youtube.com/vi/${yt}/hqdefault.jpg`}
+                            alt={item.title}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180'%3E%3Crect width='100%25' height='100%25' fill='%2310141e'/%3E%3Ctext x='50%25' y='50%25' fill='%235c6cf0' font-size='14' font-weight='600' font-family='sans-serif' text-anchor='middle'%3EMatemium Showcase%3C/text%3E%3C/svg%3E";
+                            }}
+                          />
+                        )}
+                        <div className="inspiration-play-overlay-modern">
+                          <div className="play-button-ring-modern">
+                            <svg viewBox="0 0 24 24" width="16" height="16" className="svg-play-triangle-modern">
+                              <path fill="currentColor" d="M8 5v14l11-7z" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="inspiration-card-body-modern">
+                        <h4>{item.title}</h4>
+                        <p className="inspiration-desc-modern">{item.description}</p>
+                        <div className="inspiration-card-footer-modern">
+                          <div className="inspiration-tags-modern">
+                            {tags.slice(0, 2).map((tag) => (
+                              <span key={tag} className="inspiration-tag-badge-modern">
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                          {author && (
+                            <span className="inspiration-author-modern">
+                              <span className="avatar-circle-small-modern">{getAuthorInitials(author)}</span>
+                              {author}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {filteredGallery.length === 0 && (
+                  <div className="inspiration-empty-modern">
+                    No matches for "{searchQuery}". Try searching for calculus, algebra, geometry or physics.
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </section>
@@ -503,6 +594,7 @@ export function ProjectsLanding({
                 onChange={(e) => onNewNameChange(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && newName.trim() && !busy && !readinessMessage) {
+                    pendingCollectionIdRef.current = targetCollectionId;
                     onCreate();
                     setShowCreateModal(false);
                   }
@@ -510,6 +602,27 @@ export function ProjectsLanding({
                 className="create-input-modern create-modal-input-modern"
                 autoFocus
               />
+
+              {collections.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label style={{ fontSize: "0.76rem", color: "var(--text-secondary)", fontWeight: 500 }}>
+                    Add to Collection (Optional)
+                  </label>
+                  <select
+                    value={targetCollectionId || ""}
+                    onChange={(e) => setTargetCollectionId(e.target.value || null)}
+                    className="create-input-modern create-modal-input-modern"
+                    style={{ cursor: "pointer", backgroundColor: "rgba(10, 12, 20, 0.7)" }}
+                  >
+                    <option value="">No Collection</option>
+                    {collections.map((coll) => (
+                      <option key={coll.id} value={coll.id}>
+                        {coll.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
               {readinessMessage && (
                 <div className="readiness-banner-modern" style={{ marginTop: "8px" }}>
@@ -530,6 +643,7 @@ export function ProjectsLanding({
                   className="btn btn-primary create-modal-submit-btn-modern"
                   disabled={busy || !newName.trim() || !!readinessMessage}
                   onClick={() => {
+                    pendingCollectionIdRef.current = targetCollectionId;
                     onCreate();
                     setShowCreateModal(false);
                   }}
@@ -620,6 +734,42 @@ export function ProjectsLanding({
             </div>
             <div className="meta-footer" style={{ marginTop: "16px" }}>
               <span>Public community animation • Powered by YouTube • Works fully before local engines are set up</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {projectToDelete && (
+        <div className="gallery-modal" onClick={() => setProjectToDelete(null)}>
+          <div className="modal-content create-modal-content-modern" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setProjectToDelete(null)}>✕</button>
+            <h3 className="create-modal-title-modern">Delete Project</h3>
+            <p className="create-modal-subtitle-modern" style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>
+              Are you sure you want to permanently delete <strong>{projectToDelete.name}</strong>? This action cannot be undone.
+            </p>
+            
+            <div className="create-modal-actions-modern" style={{ marginTop: "24px" }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setProjectToDelete(null)}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary create-modal-submit-btn-modern"
+                disabled={busy}
+                onClick={() => {
+                  onDelete(projectToDelete.id);
+                  setProjectToDelete(null);
+                }}
+                style={{ background: "var(--error)", borderColor: "var(--error)", color: "#fff" }}
+              >
+                Delete Project
+              </button>
             </div>
           </div>
         </div>
