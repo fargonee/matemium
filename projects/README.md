@@ -43,6 +43,7 @@ with b.in_object_space(tid):
 b.add_object("Solid3D", id="cube", position=(2,0,3), ...)
 
 b.observe_object("cube")          # normal 3D view (cinematic)
+b.observe_object("cube", framing="face_on") # perfectly aligned 2D view
 b.scroll_tape(local_y=4.0)        # tape-scroll mode (classic internal logic)
 b.observe_object(tid)             # 3D view of secondary tape
 ```

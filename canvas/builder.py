@@ -977,6 +977,7 @@ class CanvasBuilder:
         anchor: str = "center",
         run_time: float = 2.0,
         rate_func: str = "smooth",
+        framing: str = "cinematic",
         **params: Any,
     ) -> "CanvasBuilder":
         """High-level sugar for normal cinematic 3D observation of any object.
@@ -984,9 +985,10 @@ class CanvasBuilder:
         Works for free 3D objects AND for TapeObjects (treated as 3D planes,
         no internal tape logic activated).
         Use scroll_tape() to activate classic tape scroll + reveal on a tape.
+        Use framing="face_on" to align the camera perfectly with the object's local plane.
         """
         from .dsl import ObjectAnchor
-        target = ObjectAnchor(object_id=object_id, anchor=anchor)
+        target = ObjectAnchor(object_id=object_id, anchor=anchor, framing=framing)
         return self.add_camera_keyframe(
             target=target,
             duration=run_time,

@@ -446,6 +446,8 @@ class CameraController:
         run_time: float = 2.0,
         rate_func: RateFunction = smooth,
         tape: Optional["TapeObject"] = None,
+        target_transform: Optional["WorldTransform"] = None,
+        target_pos_world: Optional[tuple[float, float, float]] = None,
     ) -> None:
         """Observe a target using the clarified 3D world model.
 
@@ -539,7 +541,12 @@ class CameraController:
         else:
             # === NORMAL 3D OBSERVATION (default for WorldPoint + ObjectAnchor on tapes or free 3D objects) ===
             # Treat the tape (if targeted) exactly like any other 3D object. No internal tape logic.
-            if hasattr(target, "position"):
+            is_face_on = False
+            if target_pos_world is not None:
+                pos = target_pos_world
+                if isinstance(target, ObjectAnchor) and getattr(target, "framing", "cinematic") == "face_on":
+                    is_face_on = True
+            elif hasattr(target, "position"):
                 pos = target.position
             elif isinstance(target, ObjectAnchor):
                 # Phase 1 basic resolution: if targeting the passed tape, use its anchor + world transform
@@ -551,11 +558,15 @@ class CameraController:
                             (local_anchor.x, local_anchor.y, local_anchor.z),
                             tape.world_transform
                         )
+                        if target_transform is None:
+                            target_transform = tape.world_transform
                     except Exception:
                         pos = (0., 0., 0.)
                 else:
                     # Generic or unknown object anchor: center at origin for now (full registry resolution later)
                     pos = (0., 0., 0.)
+                if getattr(target, "framing", "cinematic") == "face_on":
+                    is_face_on = True
             else:
                 pos = (0., 0., 0.)
 
@@ -565,18 +576,33 @@ class CameraController:
 
             # Animate into inspect/3D view
             self._view_mode = "inspect"
-            self.camera.use_orthographic_projection = False
-
-            self.scene.play(
-                self._x.animate(rate_func=rate_func, run_time=run_time).set_value(x),
-                self._y.animate(rate_func=rate_func, run_time=run_time).set_value(y),
-                self._inspect_x.animate(rate_func=rate_func, run_time=run_time).set_value(x),
-                self._inspect_y.animate(rate_func=rate_func, run_time=run_time).set_value(y),
-                self._inspect_z.animate(rate_func=rate_func, run_time=run_time).set_value(z),
-                self._phi.animate(rate_func=rate_func, run_time=run_time).set_value(60),
-                self._theta.animate(rate_func=rate_func, run_time=run_time).set_value(-45),
-                run_time=run_time,
-            )
+            
+            if is_face_on and target_transform:
+                self.camera.use_orthographic_projection = True
+                phi, theta, gamma = get_tape_straight_above_angles(target_transform)
+                self.scene.play(
+                    self._x.animate(rate_func=rate_func, run_time=run_time).set_value(x),
+                    self._y.animate(rate_func=rate_func, run_time=run_time).set_value(y),
+                    self._inspect_x.animate(rate_func=rate_func, run_time=run_time).set_value(x),
+                    self._inspect_y.animate(rate_func=rate_func, run_time=run_time).set_value(y),
+                    self._inspect_z.animate(rate_func=rate_func, run_time=run_time).set_value(z),
+                    self._phi.animate(rate_func=rate_func, run_time=run_time).set_value(phi),
+                    self._theta.animate(rate_func=rate_func, run_time=run_time).set_value(theta),
+                    self._gamma.animate(rate_func=rate_func, run_time=run_time).set_value(gamma),
+                    run_time=run_time,
+                )
+            else:
+                self.camera.use_orthographic_projection = False
+                self.scene.play(
+                    self._x.animate(rate_func=rate_func, run_time=run_time).set_value(x),
+                    self._y.animate(rate_func=rate_func, run_time=run_time).set_value(y),
+                    self._inspect_x.animate(rate_func=rate_func, run_time=run_time).set_value(x),
+                    self._inspect_y.animate(rate_func=rate_func, run_time=run_time).set_value(y),
+                    self._inspect_z.animate(rate_func=rate_func, run_time=run_time).set_value(z),
+                    self._phi.animate(rate_func=rate_func, run_time=run_time).set_value(60),
+                    self._theta.animate(rate_func=rate_func, run_time=run_time).set_value(-45),
+                    run_time=run_time,
+                )
             self.camera.frame_center = np.array([x, y, z or SHEET_PLANE_Z])
 
 

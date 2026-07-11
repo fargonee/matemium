@@ -645,10 +645,25 @@ class CanvasScene(ThreeDScene):
                     pass
 
         # Phase 5: wire observe= hook from register_object_kind for custom kinds
+        target_transform = None
+        target_pos_world = None
         if isinstance(target, ObjectAnchor):
             obj_id = target.object_id
             # Resolve the element/kind for this anchor
             elem = self._element_specs.get(obj_id)
+            if elem:
+                target_transform = getattr(elem, 'world_transform', None)
+                mob = self.registry.get(obj_id)
+                if mob:
+                    center = mob.get_center()
+                    target_pos_world = (float(center[0]), float(center[1]), float(center[2]))
+                else:
+                    local_pt = tuple(getattr(elem, 'canvas_position', (0.0, 0.0, 0.0))[:3])
+                    if target_transform:
+                        target_pos_world = local_to_world_point(local_pt, target_transform)
+                    else:
+                        target_pos_world = local_pt
+                        
             kind = getattr(elem, 'type', None) if elem else None
             if kind and kind in _OBJECT_KINDS:
                 obs_fn = _OBJECT_KINDS[kind].get("observe")
@@ -671,6 +686,8 @@ class CanvasScene(ThreeDScene):
                 run_time=getattr(kf, "duration", getattr(kf, "run_time", 2.0)),
                 rate_func=self._get_rate_func(getattr(kf, "rate_func", "smooth")),
                 tape=tape_for_observe,
+                target_transform=target_transform,
+                target_pos_world=target_pos_world,
             )
 
     # ------------------- Tape-scroll dimming helpers -------------------

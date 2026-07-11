@@ -180,6 +180,7 @@ class WorldPoint:
 class ObjectAnchor:
     object_id: str
     anchor: str = "center"  # "center", "top", "local_y:xx" etc.
+    framing: str = "cinematic"  # "cinematic" or "face_on"
 
 @dataclass
 class TapeScroll:
@@ -211,7 +212,7 @@ class CameraKeyframe:
         if isinstance(self.target, WorldPoint):
             d["target"] = {"kind": "world_point", "position": self.target.position}
         elif isinstance(self.target, ObjectAnchor):
-            d["target"] = {"kind": "object_anchor", "object_id": self.target.object_id, "anchor": self.target.anchor}
+            d["target"] = {"kind": "object_anchor", "object_id": self.target.object_id, "anchor": self.target.anchor, "framing": getattr(self.target, "framing", "cinematic")}
         elif isinstance(self.target, TapeScroll):
             d["target"] = {"kind": "tape_scroll", "tape_id": self.target.tape_id, "local_y": self.target.local_y, "framing_mode": self.target.framing_mode}
         return d
@@ -677,7 +678,11 @@ class SheetDSL:
                 if kind == "world_point":
                     tgt = WorldPoint(position=tuple(target_data.get("position", (0,0,0))))
                 elif kind == "object_anchor":
-                    tgt = ObjectAnchor(object_id=target_data.get("object_id", ""), anchor=target_data.get("anchor", "center"))
+                    tgt = ObjectAnchor(
+                        object_id=target_data.get("object_id", ""), 
+                        anchor=target_data.get("anchor", "center"),
+                        framing=target_data.get("framing", "cinematic")
+                    )
                 elif kind == "tape_scroll":
                     tgt = TapeScroll(
                         tape_id=target_data.get("tape_id", ""),

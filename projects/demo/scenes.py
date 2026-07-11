@@ -342,6 +342,9 @@ class Space3DDemo(CanvasScene):
         # === Camera tour using newest patterns ===
         # Normal 3D: observe_object (cinematic, no tape logic)
         builder.observe_object("cube1", run_time=3.0)
+        
+        # Face-on: perfectly align camera to an object's face
+        builder.observe_object("info_card", framing="face_on", run_time=2.0)
 
         # Tape-scroll mode: scroll_tape (internal tape logic)
         builder.scroll_tape(local_y=4.0, run_time=4.0)

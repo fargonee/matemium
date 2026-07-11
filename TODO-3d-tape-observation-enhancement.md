@@ -87,6 +87,13 @@
 - [x] Performance: reveal/focus/container logic already gated to TAPE_SCROLL mode (from prior phases); prebuild only for non-default poses.
 - [x] Camera following for moving/posed tapes improved via world_transform in transforms and 3D observation paths (full dynamic follower would use updaters in future).
 
+### 9. Face-On Camera Alignment (Implemented)
+- [x] Evaluated the "WritableSurface container" blueprint vs "FaceOn" observation mode.
+- [x] Added `framing` attribute to `ObjectAnchor` with support for `cinematic` (default) and `face_on`.
+- [x] Updated `observe_object` in `builder.py` to expose the `framing` parameter.
+- [x] Updated `_handle_camera_keyframe` in `scene.py` to resolve the `target_pos_world` and `target_transform` from the requested object and pass them down to the camera.
+- [x] Updated `observe_target` in `camera.py`'s NORMAL 3D OBSERVATION path. When `framing="face_on"`, it automatically switches the camera to orthographic projection and uses `get_tape_straight_above_angles` derived from the object's `WorldTransform`. This allows the camera to orient correctly based on the target's up/down and front/back parameters natively.
+
 Note: Attaching/moving beyond static keyframes is supported structurally; full runtime camera tracking of animated tapes can be extended via state behaviors + updaters.
 
 ## Success Criteria
