@@ -114,8 +114,7 @@ class CanvasScene(ThreeDScene):
         self._dimmed_opacities: dict[str, float] = {}
         self._current_dim_tape_id: Optional[str] = None
         self._current_dim_opacity: float = 0.15
-        all_tapes = [self.root_tape] if self.root_tape else []
-        all_tapes += getattr(self.dsl, 'additional_tapes', []) or []
+        all_tapes = getattr(self.dsl, 'tapes', []) or []
         for t in all_tapes:
             if t and getattr(t, "local_elements", None):
                 for el in t.local_elements:
@@ -226,7 +225,7 @@ class CanvasScene(ThreeDScene):
         # per-element (and group) centering. This fulfills "no manual scroll_tape interleaving".
         # Explicit non-tape CameraKeyframes (observe_object etc) will override to NORMAL_3D as encountered.
         if not getattr(self, "_active_scroll_tape", None) and getattr(self, "_tape_content_ids", None):
-            self._active_scroll_tape = self.root_tape
+            self._active_scroll_tape = None
             self._observation_mode = ObservationMode.TAPE_SCROLL
             if self.camera_ctl:
                 self.camera_ctl.tape_center_x = 0.0
@@ -468,12 +467,12 @@ class CanvasScene(ThreeDScene):
                     active_for_flex = self._element_tape_map[e.id]
                     break
             if not active_for_flex:
-                active_for_flex = getattr(self, "_active_scroll_tape", None) or getattr(self, "root_tape", None)
+                active_for_flex = getattr(self, "_active_scroll_tape", None)
             if active_for_flex:
                 container = self._tape_containers.get(getattr(active_for_flex, "id", None))
                 has_tape_pose_flex = bool( getattr(active_for_flex, "world_transform", None) )
         else:
-            active_for_flex = getattr(self, "_active_scroll_tape", None) or getattr(self, "root_tape", None)
+            active_for_flex = getattr(self, "_active_scroll_tape", None)
 
         prepared: List[Tuple[CanvasElement, Mobject, bool]] = []
         for elem in elements:
@@ -551,7 +550,7 @@ class CanvasScene(ThreeDScene):
 
         # Legacy CameraMove treated as tape-scroll for compat (on root tape)
         self._observation_mode = ObservationMode.TAPE_SCROLL
-        self._active_scroll_tape = self.root_tape
+        self._active_scroll_tape = None
         if self.camera_ctl:
             self.camera_ctl.tape_center_x = 0.0
             self.camera_ctl._x.set_value(0.0)
@@ -735,7 +734,7 @@ class CanvasScene(ThreeDScene):
             return
 
         owning_tape = self._element_tape_map.get(elem.id)
-        active_tape = owning_tape or getattr(self, "_active_scroll_tape", None) or getattr(self, "root_tape", None)
+        active_tape = owning_tape or getattr(self, "_active_scroll_tape", None)
         local_x = float(elem.canvas_position[0]) if len(elem.canvas_position) > 0 else 0.0
         is_posed_tape = False
         if active_tape and getattr(active_tape, "world_transform", None):
@@ -754,11 +753,14 @@ class CanvasScene(ThreeDScene):
             # For posed tape in scroll mode, compute the look point on the tape plane using the element's full local position (x, y)
             # and the (owning) tape transform. This makes the camera "scroll" along the tape to center the element exactly.
             local_x = float(elem.canvas_position[0]) if len(elem.canvas_position) > 0 else 0.0
-            local_y = target_y
-            local_z = float(elem.canvas_position[2]) if len(elem.canvas_position) > 2 else 0.0
-            local_point = tuple(getattr(elem, 'canvas_position', (0.0, target_y, 0.0))[:3])
-            wpos = local_to_world_point(local_point, active_tape.world_transform)
-            print(f"FOCUS ON POSED TAPE! {elem.id} wpos={wpos}")
+            wt_el = getattr(elem, "world_transform", None)
+            if wt_el and hasattr(wt_el, "position"):
+                px, py, pz = wt_el.position.as_tuple() if hasattr(wt_el.position, "as_tuple") else (wt_el.position.x, wt_el.position.y, wt_el.position.z)
+                wpos = (float(px), float(py), float(pz))
+            else:
+                local_point = tuple(getattr(elem, 'canvas_position', (0.0, target_y, 0.0))[:3])
+                wpos = local_to_world_point(local_point, active_tape.world_transform)
+                
             self.registry.pause_far_updaters(current_y, buffer=5.0)
             self.camera_ctl._view_mode = "inspect"
             self.camera.use_orthographic_projection = True
@@ -824,7 +826,7 @@ class CanvasScene(ThreeDScene):
         # This ensures secondary tapes' content get their own rotation/pose applied, even if
         # revealed before a scroll_tape/observe for that tape.
         owning_tape = self._element_tape_map.get(elem.id)
-        active_tape = owning_tape or getattr(self, "_active_scroll_tape", None) or getattr(self, "root_tape", None)
+        active_tape = owning_tape or getattr(self, "_active_scroll_tape", None)
         has_tape_pose = bool(
             is_tape_content and active_tape and getattr(active_tape, "world_transform", None)
         )

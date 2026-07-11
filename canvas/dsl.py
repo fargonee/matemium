@@ -591,9 +591,8 @@ class SheetDSL:
     """
     canvas_settings: CanvasSettings = field(default_factory=CanvasSettings)
     timeline: List[TimelineItem] = field(default_factory=list)
-    root_tape: Optional["TapeObject"] = None  # Phase 2 (default/primary tape)
-    root_objects: List["WorldObject"] = field(default_factory=list)  # Phase 5
-    additional_tapes: List["TapeObject"] = field(default_factory=list)  # Phase 8: multiple top-level tapes as first-class citizens
+    root_objects: List["WorldObject"] = field(default_factory=list)
+    tapes: List["TapeObject"] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SheetDSL":
@@ -763,13 +762,21 @@ class SheetDSL:
                 continue
 
         dsl = cls(canvas_settings=settings, timeline=timeline)
-        # Phase 2: attach conceptual root tape
-        dsl.root_tape = TapeObject(
-            id="root_tape",
-            world_transform=WorldTransform(),
-            local_elements=[e for e in timeline if isinstance(e, CanvasElement)],
-            local_canvas_settings=settings,
-        )
+        
+        tapes_data = data.get("tapes", [])
+        if "additional_tapes" in data:
+            tapes_data.extend(data["additional_tapes"])
+        if "root_tape" in data and data["root_tape"]:
+            tapes_data.insert(0, data["root_tape"])
+            
+        for tdata in tapes_data:
+            t = TapeObject(
+                id=tdata.get("id", "tape"),
+                world_transform=WorldTransform.from_dict(tdata.get("world_transform", {})),
+                local_elements=[], # Timeline reconstructs local_elements in Scene
+                local_canvas_settings=CanvasSettings(**tdata.get("local_canvas_settings", {})),
+            )
+            dsl.tapes.append(t)
 
         # Phase 5: support root_objects for general 3D
         root_objs_data = data.get("root_objects", [])
@@ -792,7 +799,7 @@ class SheetDSL:
         d = {
             "canvas_settings": asdict(self.canvas_settings),
             "timeline": [item.to_dict() if hasattr(item, "to_dict") else asdict(item) for item in self.timeline],
-            "root_tape": self.root_tape.to_dict() if self.root_tape else None,
+            "tapes": [t.to_dict() for t in self.tapes],
         }
         if self.root_objects:
             d["root_objects"] = [o.to_dict() for o in self.root_objects]

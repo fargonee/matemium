@@ -11,13 +11,14 @@ class PortraitDemo(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Portrait Demo")
-        builder.add_heading("Matemium — Portrait Demo")
+        tape = builder.add_tape("main")
+        tape.add_heading("Matemium — Portrait Demo")
         tape.add_math(
             r"\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}",
             style={"margin-bottom": 1.0},
         )
-        builder.add_3d("z = x^2 - y^2", pitch=50)
-        builder.add_text(
+        tape.add_3d("z = x^2 - y^2", pitch=50)
+        tape.add_text(
             "The canvas is infinite. The reasoning continues forever.",
             after_3d=True,
         )
@@ -35,22 +36,23 @@ class LandscapeDemo(CanvasScene):
     def __init__(self, **kwargs):
         settings = CanvasSettings.for_youtube(title="Landscape Demo")
         builder = CanvasBuilder(title="Landscape Demo", canvas_settings=settings)
-        builder.add_heading("Matemium")
-        builder.add_text("Now in landscape for YouTube", style={"margin-bottom": 1.0})
+        tape = builder.add_tape("main")
+        tape.add_heading("Matemium")
+        tape.add_text("Now in landscape for YouTube", style={"margin-bottom": 1.0})
         tape.add_math(
             r"\nabla \times \vec{E} = -\frac{\partial \vec{B}}{\partial t}",
             style={"margin-bottom": 1.2},
         )
-        builder.add_flex_row(
+        tape.add_flex_row(
             [
-                builder.text_spec("Side-by-side: ", style={"align": "right"}),
-                builder.math_spec(r"a^2 + b^2 = c^2", style={"width": 3.2}),
+                tape.text_spec("Side-by-side: ", style={"align": "right"}),
+                tape.math_spec(r"a^2 + b^2 = c^2", style={"width": 3.2}),
             ],
             gap=0.7,
             justify_content="center",
             style={"margin-bottom": 1.5, "align": "center"},
         )
-        builder.add_3d("z = x^2 - y^2", pitch=42, style={"width": 4.8})
+        tape.add_3d("z = x^2 - y^2", pitch=42, style={"width": 4.8})
         super().__init__(dsl=builder.build(), **kwargs)
 
 
@@ -62,36 +64,37 @@ class BuilderDemo(CanvasScene):
             title="Builder Demo",
             background_color="#0a0a0a",
         )
-        builder.add_heading("Matemium — Builder Demo", style={"align": "center"})
+        tape = builder.add_tape("main")
+        tape.add_heading("Matemium — Builder Demo", style={"align": "center"})
         tape.add_math(
             r"\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}",
             style={"margin-bottom": 1.4, "width": 6.5, "align": "left"},
         )
-        builder.add_flex_row(
+        tape.add_flex_row(
             [
-                builder.text_spec("Flex: ", style={"align": "left"}),
-                builder.math_spec(r"\sin^2 + \cos^2 = 1", style={"width": 3.8}),
+                tape.text_spec("Flex: ", style={"align": "left"}),
+                tape.math_spec(r"\sin^2 + \cos^2 = 1", style={"width": 3.8}),
             ],
             gap=0.9,
             justify_content="space-between",
             style={"margin-bottom": 1.8},
         )
-        builder.add_flex_row(
+        tape.add_flex_row(
             [
-                builder.text_spec("Step 1", style={"width": 1.6, "align": "center"}),
-                builder.text_spec("Observe", style={"width": 1.8, "align": "center"}),
-                builder.text_spec("Derive", style={"width": 1.6, "align": "center"}),
-                builder.text_spec("Verify", style={"width": 1.5, "align": "center"}),
+                tape.text_spec("Step 1", style={"width": 1.6, "align": "center"}),
+                tape.text_spec("Observe", style={"width": 1.8, "align": "center"}),
+                tape.text_spec("Derive", style={"width": 1.6, "align": "center"}),
+                tape.text_spec("Verify", style={"width": 1.5, "align": "center"}),
             ],
             gap=0.2,
             justify_content="space-between",
             style={"margin-bottom": 1.6},
         )
-        builder.add_3d(
+        tape.add_3d(
             r"z = \sin(x) \cos(y)",
             style={"margin": "0.3 0 1.8 0", "width": 5.2, "align": "center"},
         )
-        builder.add_text(
+        tape.add_text(
             "The canvas is infinite. The reasoning continues forever.",
             style={"margin-top": 0.8, "align": "right"},
         )
@@ -109,17 +112,17 @@ def _ttt_scenario(
 ) -> None:
     """One tutorial beat: heading → flex(board|notes) → moves → punchline."""
     board_id = f"board_{section}"
-    builder.add_heading(title, style={"margin-top": 0.6, "margin-bottom": 0.35})
-    builder.add_flex_row(
+    tape.add_heading(title, style={"margin-top": 0.6, "margin-bottom": 0.35})
+    tape.add_flex_row(
         [
-            builder.grid_board_spec(
+            tape.grid_board_spec(
                 rows=3,
                 cols=3,
                 cell_size=0.9,
                 id=board_id,
                 style={"width": 2.7},
             ),
-            builder.text_spec(commentary, style={"width": 3.6, "wrap": True}),
+            tape.text_spec(commentary, style={"width": 3.6, "wrap": True}),
         ],
         gap=0.85,
         justify_content="center",
@@ -136,20 +139,21 @@ class TicTacToeTutorial(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Tic-Tac-Toe Tutorial")
+        tape = builder.add_tape("main")
 
         # ---- Intro (rules) ----
-        builder.add_heading("Tic-Tac-Toe Tutorial", style={"align": "center", "margin-bottom": 0.5})
+        tape.add_heading("Tic-Tac-Toe Tutorial", style={"align": "center", "margin-bottom": 0.5})
         tape.add_body(
             "Two players — X and O — take turns on a 3×3 grid. "
             "First to get three in a row (horizontal, vertical, or diagonal) wins. "
             "Perfect play always ends in a draw, but mistakes are punishable.",
             style={"margin-bottom": 0.6},
         )
-        builder.add_flex_row(
+        tape.add_flex_row(
             [
-                builder.text_spec("Row 0 = top", style={"width": 2.2, "align": "center"}),
-                builder.text_spec("Col 0 = left", style={"width": 2.2, "align": "center"}),
-                builder.text_spec("Center = (1,1)", style={"width": 2.4, "align": "center"}),
+                tape.text_spec("Row 0 = top", style={"width": 2.2, "align": "center"}),
+                tape.text_spec("Col 0 = left", style={"width": 2.2, "align": "center"}),
+                tape.text_spec("Center = (1,1)", style={"width": 2.4, "align": "center"}),
             ],
             gap=0.4,
             justify_content="space-between",
@@ -238,13 +242,13 @@ class TicTacToeTutorial(CanvasScene):
         )
 
         # ---- Outro (final scroll target) ----
-        builder.add_heading("Summary", style={"align": "center", "margin-top": 0.4})
-        builder.add_flex_column(
+        tape.add_heading("Summary", style={"align": "center", "margin-top": 0.4})
+        tape.add_flex_column(
             [
-                builder.text_spec("① Center first when you can", style={"width": 5.5}),
-                builder.text_spec("② Watch for forks — block early", style={"width": 5.5}),
-                builder.text_spec("③ Corners beat edges in the opening", style={"width": 5.5}),
-                builder.text_spec("④ Perfect play → draw", style={"width": 5.5}),
+                tape.text_spec("① Center first when you can", style={"width": 5.5}),
+                tape.text_spec("② Watch for forks — block early", style={"width": 5.5}),
+                tape.text_spec("③ Corners beat edges in the opening", style={"width": 5.5}),
+                tape.text_spec("④ Perfect play → draw", style={"width": 5.5}),
             ],
             gap=0.35,
             align_items="center",
@@ -285,10 +289,10 @@ class Space3DDemo(CanvasScene):
 
         # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
         # mode will automatically look straight down the local normal (from above).
-        builder.set_tape_pose(rotation=(35, 15, 0))  # pitch ~35°, yaw 15°
+        tape = builder.add_tape("main_tape")
+        tape.set_pose(rotation=(35, 15, 0))  # pitch ~35°, yaw 15°
 
         # Tape content in its local space (old sheet ergonomics preserved)
-        tape = builder.tape
         tape.add_heading("3D World Demo", style={"align": "center"})
         tape.add_body(
             "The infinite tape is now a TapeObject inside 3D space. "
@@ -317,7 +321,7 @@ class Space3DDemo(CanvasScene):
             type="Text",
             content="3D object in world space",
         )
-        builder.add_relative(
+        tape.add_relative(
             "cube1",
             label_solid,
             local_offset=(0, 2.0, 0),

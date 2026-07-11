@@ -63,6 +63,26 @@ class TapeBuilder:
     def add_quadratic_plot(self, *args, **kwargs): return self._with_tape(self._builder.add_quadratic_plot, *args, **kwargs)
     def add_quadratic_compare(self, *args, **kwargs): return self._with_tape(self._builder.add_quadratic_compare, *args, **kwargs)
     def add_plot_trace(self, *args, **kwargs): return self._with_tape(self._builder.add_plot_trace, *args, **kwargs)
+    def add_3d(self, *args, **kwargs): return self._with_tape(self._builder.add_3d, *args, **kwargs)
+    def add_solid(self, *args, **kwargs): return self._with_tape(self._builder.add_solid, *args, **kwargs)
+    def add_solid_lift(self, *args, **kwargs): return self._with_tape(self._builder.add_solid_lift, *args, **kwargs)
+    def add_solid_rotate(self, *args, **kwargs): return self._with_tape(self._builder.add_solid_rotate, *args, **kwargs)
+    def add_solid_rotation(self, *args, **kwargs): return self._with_tape(self._builder.add_solid_rotation, *args, **kwargs)
+    def add_camera_inspect(self, *args, **kwargs): return self._with_tape(self._builder.add_camera_inspect, *args, **kwargs)
+    def add_camera_focus(self, *args, **kwargs): return self._with_tape(self._builder.add_camera_focus, *args, **kwargs)
+    def add_relative(self, *args, **kwargs): return self._with_tape(self._builder.add_relative, *args, **kwargs)
+    def add_raw(self, *args, **kwargs): return self._with_tape(self._builder.add_raw, *args, **kwargs)
+    def add_camera_move(self, *args, **kwargs): return self._with_tape(self._builder.add_camera_move, *args, **kwargs)
+    def set_pose(self, position=(0,0,0), rotation=(0,0,0), scale=1.0):
+        t = self._builder._tapes[self.tape_id]
+        from .coords import WorldTransform, Vector3
+        t.world_transform = WorldTransform(position=Vector3(*position), rotation=Vector3(*rotation), scale=scale)
+        return self
+    def text_spec(self, *args, **kwargs): return self._builder.text_spec(*args, **kwargs)
+    def math_spec(self, *args, **kwargs): return self._builder.math_spec(*args, **kwargs)
+    def grid_board_spec(self, *args, **kwargs): return self._builder.grid_board_spec(*args, **kwargs)
+    def grid_mark_spec(self, *args, **kwargs): return self._builder.grid_mark_spec(*args, **kwargs)
+    def grid_moves_spec(self, *args, **kwargs): return self._builder.grid_moves_spec(*args, **kwargs)
     def add_space(self, height: float = 1.0):
         layout = self._builder._layouts.get(self.tape_id)
         if layout:
@@ -73,10 +93,6 @@ class TapeBuilder:
 class CanvasBuilder:
     """Fluent builder for the canvas tape/sheet."""
 
-    @property
-    def tape(self) -> "TapeBuilder":
-        return TapeBuilder(self, "root_tape")
-
     def __init__(self, title: str = "Matemium", **settings_kwargs: Any):
         canvas_settings = settings_kwargs.pop("canvas_settings", None)
         if canvas_settings is not None:
@@ -84,26 +100,11 @@ class CanvasBuilder:
         else:
             self.settings = CanvasSettings.for_reels(title=title, **settings_kwargs)
         self.dsl = SheetDSL(canvas_settings=self.settings)
-        # Phase 2: the builder's content conceptually lives inside an implicit root TapeObject.
-        # This makes the tape a first-class object in the 3D world model, while
-        # preserving 100% backward compat for existing code (timeline == local_elements).
-        self.root_tape = TapeObject(
-            id="root_tape",
-            world_transform=WorldTransform(),
-            local_elements=[],  # populated in _add (only CanvasElements)
-            local_canvas_settings=self.settings,
-        )
-        self.dsl.root_tape = self.root_tape  # Phase 2
-        self._tapes: Dict[str, TapeObject] = {"root_tape": self.root_tape}
-        self._current_tape: Optional[TapeObject] = self.root_tape
+        self._tapes: Dict[str, TapeObject] = {}
+        self._current_tape: Optional[TapeObject] = None
         self._layouts: Dict[str, LayoutEngine] = {}
-        self._layout = LayoutEngine(
-            frame_width=self.settings.frame_width,
-            frame_height=self.settings.frame_height,
-            scope=self.root_tape,  # Phase 6: scoped to the tape object
-        )
-        self._layouts["root_tape"] = self._layout
-        self._current_layout = self._layout
+        self._layout = None
+        self._current_layout = None
         self._counter = 0
         self._boards: Dict[str, CanvasElement] = {}
         self._last_flex_ids: List[str] = []
@@ -118,7 +119,9 @@ class CanvasBuilder:
         # Phase 2/3: elements live in the current tape context (root_tape by default).
         # Supports multiple tapes via in_object_space("tape_id") or add_tape + scoping.
         # Also populates timeline for backward compat.
-        current_tape = getattr(self, "_current_tape", None) or getattr(self, "root_tape", None)
+        current_tape = getattr(self, "_current_tape", None)
+        if not current_tape:
+            raise RuntimeError("Cannot add 2D element without an active TapeObject context. Use builder.add_tape().")
         if current_tape:
             current_tape.local_elements.append(el)
             # Phase 4: compose with the current tape's world transform
@@ -1078,11 +1081,9 @@ class CanvasBuilder:
             scope=new_tape,
         )
         self._layouts[tape_id] = tape_layout
-        
-        return TapeBuilder(self, tape_id)
 
         # Phase 8: store as first-class additional tape
-        self.dsl.additional_tapes.append(new_tape)
+        self.dsl.tapes.append(new_tape)
 
         # Also add WorldObject for 3D graph/positioning compatibility
         wo = WorldObject(
@@ -1095,7 +1096,7 @@ class CanvasBuilder:
         self._placed_transforms[tape_id] = new_tape.world_transform
         self._placed_objects[tape_id] = new_tape
 
-        return tape_id
+        return TapeBuilder(self, tape_id)
 
     def add_world_object(self, wo: WorldObject) -> str:
         """Phase 5/6: place a top-level WorldObject in the 3D world (outside default tape).
@@ -1109,6 +1110,7 @@ class CanvasBuilder:
             )
             # etc, but for now just place
         self.dsl.root_objects.append(wo)
+        return wo.id
         return wo.id
 
     def add_object(
@@ -1162,6 +1164,7 @@ class CanvasBuilder:
         # place as world object
         wo = WorldObject(id=elem.id, element=elem, transform=wt)
         self.dsl.root_objects.append(wo)
+        return wo.id
         self._placed_transforms[elem.id] = wt
         self._placed_objects[elem.id] = wo
         return elem.id
@@ -1181,7 +1184,7 @@ class CanvasBuilder:
         prev_tape = getattr(self, '_current_tape', None)
         prev_layout = getattr(self, '_current_layout', self._layout)
         prev_active_layout = self._layout
-        obj = self._placed_objects.get(obj_id) or self._tapes.get(obj_id) or self.root_tape
+        obj = self._placed_objects.get(obj_id) or self._tapes.get(obj_id)
         if obj and hasattr(obj, 'local_elements'):
             self._current_tape = obj
             self._current_layout = self._layouts.get(obj_id, self._layout)
@@ -1236,6 +1239,8 @@ class CanvasBuilder:
             type="rel",
             world_transform=WorldTransform(position=rel),
         )
+        if getattr(self, '_current_tape', None):
+            self._add(el)
         return el
 
     def add_relative(
