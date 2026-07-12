@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Iterator, Type
+from typing import Any, Iterator
 
 from .paths import ensure_on_path
 

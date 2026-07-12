@@ -14,7 +14,6 @@ from .models import (
     ProjectSession,
 )
 from .script_parser import extract_div_markers
-from .separation import build_decoupled_artifacts
 
 WORD_TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:'[A-Za-z]+)?")
 

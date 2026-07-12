@@ -33,7 +33,6 @@ async def chat_completions(
     provider = body.llm_provider
 
     # Resolve early to know the mode (without exposing key to client)
-    from ..services.supabase import get_supabase_service
     supabase = get_supabase_service()
     personal = await supabase.get_user_personal_key(user.id, provider) if use_personal else None
     using_platform = not personal

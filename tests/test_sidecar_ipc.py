@@ -6,7 +6,6 @@ import json
 from io import StringIO
 from pathlib import Path
 
-import pytest
 
 from matemium.ipc.duration import estimate_timeline_duration
 from matemium.ipc.events import EventEmitter

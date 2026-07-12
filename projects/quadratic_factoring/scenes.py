@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from canvas import CanvasScene
 from canvas.builder import CanvasBuilder
-from canvas.dsl import WorldPoint
 
 
 class QuadraticFactoring(CanvasScene):

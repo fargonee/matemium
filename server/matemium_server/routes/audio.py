@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from fastapi.responses import StreamingResponse
 
 from ..config import settings
 from ..deps import AuthUser, require_user

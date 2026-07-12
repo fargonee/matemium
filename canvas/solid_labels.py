@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Sequence
 
-from manim import Mobject, Text, VGroup, WHITE
+from manim import Mobject, Text, VGroup
 
 _BILLBOARD_ATTR = "_matemium_billboard_labels"
 _DEFAULT_FONT_SIZE = 22

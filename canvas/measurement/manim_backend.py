@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from ..measure import measure_element as _measure_element
-from . import MeasuredSize, MeasurementBackend, BoundingBox3D
+from . import MeasuredSize, BoundingBox3D
 
 
 class ManimMeasurementBackend:

@@ -9,7 +9,6 @@ from __future__ import annotations
 import contextlib
 from typing import Any, Dict, List, Optional, Tuple, Union, Iterator
 
-from manim import WHITE
 
 from .dsl import (
     CameraFocus,

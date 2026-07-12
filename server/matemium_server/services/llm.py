@@ -69,7 +69,6 @@ async def resolve_llm_for_user(
     - Else → pick one of our platform llm_providers.
     Never accepts raw keys from client.
     """
-    from . import llm_management  # avoid circular
     from .supabase import get_supabase_service
 
     supabase = get_supabase_service()

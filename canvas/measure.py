@@ -14,7 +14,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, TYPE_CHECKING
 
-import numpy as np
 from manim import UP, MathTex, Mobject, Text, VGroup, WHITE
 
 from .diagrams import (
@@ -37,7 +36,7 @@ from .solids import make_solid, make_solid_group, parse_solid_content, solid_foo
 from .surfaces import make_surface_from_equation
 
 if TYPE_CHECKING:
-    from .measurement import MeasurementBackend, MeasuredSize, BoundingBox3D
+    from .measurement import MeasurementBackend, BoundingBox3D
 from .measurement import BoundingBox3D
 
 DEFAULT_TEXT_FONT_SIZE = 36

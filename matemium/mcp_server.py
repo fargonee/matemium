@@ -33,13 +33,8 @@ except ImportError:
     print("MCP SDK not installed. Install with: pip install 'matemium[intelligence]' or 'mcp'", file=sys.stderr)
     sys.exit(1)
 
-from .ipc.handlers import (
-    handle_retrieve,
-    dispatch as sidecar_dispatch,
-)
 from .ipc.events import EventEmitter
-from .ipc.protocol import Request, Response
-from .workspace_project import resolve_workspace
+from .ipc.protocol import Request
 
 # Simple in-memory emitter for MCP context
 class SimpleEmitter(EventEmitter):

@@ -6,7 +6,6 @@ is still fully functional (no regressions from modeling work).
 Real 3D space tests will be added in later phases.
 """
 
-import pytest
 
 # These imports must continue to work exactly as before.
 from canvas import CanvasBuilder, CanvasScene
@@ -103,7 +102,7 @@ def test_camera_keyframe_phase3():
 
 def test_phase4_relative_and_anchors():
     """Phase 4: relative positioning, anchors, tape pose."""
-    from canvas import CanvasBuilder, CanvasElement, Vector3
+    from canvas import CanvasBuilder, CanvasElement
     b = CanvasBuilder()
     t = b.add_tape("t1")
     base = CanvasElement(id='base', type='Text', content='base', canvas_position=(0,0,0))
@@ -119,7 +118,7 @@ def test_phase4_relative_and_anchors():
 
 def test_phase9_registration_and_add_object():
     """Phase 9: registration and high-level add_object / context."""
-    from canvas import register_object_kind, CanvasBuilder, CanvasElement, WorldTransform, Vector3
+    from canvas import register_object_kind, CanvasBuilder
     from canvas.measure import _OBJECT_KINDS
 
     def my_build(elem, wrap, tw, factory):
@@ -159,7 +158,7 @@ def test_phase10_mixed_3d_render_smoke():
 
 def test_phase5_dsl_and_builder_mix():
     """Phase 5: DSL and builder support mix of tape and world objects."""
-    from canvas import CanvasBuilder, WorldObject, WorldTransform, Vector3, CanvasElement
+    from canvas import CanvasBuilder, WorldObject, WorldTransform, Vector3
     b = CanvasBuilder()
     t = b.add_tape("t1")
     t.add_text("tape content")
@@ -184,7 +183,7 @@ def test_phase10_builtins_auto_registered():
 
 def test_phase10_resolve_world_and_anchors():
     """Phase 10: resolve_world_position + anchors on tape and objects."""
-    from canvas import CanvasBuilder, CanvasElement, Vector3, WorldTransform, resolve_world_position
+    from canvas import CanvasBuilder, CanvasElement, Vector3, resolve_world_position
     b = CanvasBuilder()
     t = b.add_tape("t1")
     el = CanvasElement(id="base", type="Text", content="base")
@@ -307,7 +306,6 @@ def disabled_test_phase6_tapesroll_on_rotated_tape_and_mixed():
 def test_phase6_classic_cameramove_still_works():
     """Phase 6: Classic CameraMove on default tape continues to work for full backward compat."""
     from canvas.builder import CanvasBuilder
-    from canvas.dsl import CameraMove
 
     b = CanvasBuilder()
     t = b.add_tape("t1")
@@ -334,7 +332,7 @@ def disabled_test_phase6_scene_mode_flags_distinction():
     dsl = b.build()
     s = CanvasScene(dsl)  # init only; we will drive handlers
 
-    from canvas.dsl import CameraKeyframe, CameraMove, ObservationMode
+    from canvas.dsl import ObservationMode
 
     # Provide minimal dummies so handlers don't explode
     class _DummyCam:

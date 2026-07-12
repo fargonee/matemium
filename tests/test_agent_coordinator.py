@@ -61,7 +61,6 @@ from matemium.agent.stubs import (
 )
 from matemium.agent.writer import (
     PatchAmbiguousError,
-    PatchBlock,
     PatchNotFoundError,
     SEARCH_MARKER,
     apply_patch,

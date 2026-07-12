@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import numpy as np
 from manim import (
-    Animation,
     DEGREES,
     Dot,
     ThreeDCamera,
@@ -27,10 +26,8 @@ from .coords import (
     frame_center_for_inspect,
     frame_center_for_scroll,
     WorldTransform,
-    Vector3,
     SHEET_PLANE_Z,
     local_to_world_point,
-    get_rotation_matrix,
 )
 from .inspect_path import CameraPose
 
@@ -46,7 +43,6 @@ ViewMode = Literal["sheet", "tilt", "inspect"]
 SHEET_PHI_DEG = 0.0
 SHEET_THETA_DEG = -90.0
 
-import numpy as np  # ensure
 
 def _rot_z(a):
     c, s = np.cos(a), np.sin(a)

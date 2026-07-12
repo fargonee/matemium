@@ -297,7 +297,6 @@ def handle_render_project(params: dict[str, Any], events: EventEmitter) -> dict[
     from ..workspace_project import (
         instantiate_scene,
         load_scene_class,
-        resolve_scene_name,
     )
 
     workspace = _require_workspace(params)
@@ -622,7 +621,6 @@ def handle_get_preview_data(params: dict[str, Any], events: EventEmitter) -> dic
         workspace_context,
     )
     # Canvas classes for serializers (loaded by ensure)
-    from canvas.dsl import CameraKeyframe, CanvasElement
 
     if params.get("workspace"):
         workspace = resolve_workspace(params)

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from canvas import CanvasScene
 from canvas.builder import CanvasBuilder
 
 

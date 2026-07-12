@@ -25,7 +25,6 @@ from .stubs import (
     WhisperTranscript,
     default_compile_success,
     default_visual_qc,
-    sidecar_compile_for,
     stub_director_agent,
     stub_engineer_agent,
     stub_tts,

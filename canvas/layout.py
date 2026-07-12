@@ -10,10 +10,10 @@ Future: optional layout tree before coordinate resolution.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
-    from .dsl import TapeObject
+    pass
 
 from .coords import z_for_element
 from .dsl import CanvasElement, LayoutBox

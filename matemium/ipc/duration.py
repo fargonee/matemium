@@ -23,7 +23,6 @@ def estimate_timeline_duration(dsl: Any) -> float:
         CameraMove,
         CanvasElement,
         PlotTrace,
-        SheetDSL,
         SolidLift,
         SolidRotate,
         TransformElement,

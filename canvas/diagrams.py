@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
-from manim import Circle, Line, Mobject, Text, VGroup, WHITE
+from manim import Circle, Line, Mobject, Text, VGroup
 
 
 def grid_dimensions(rows: int, cols: int, cell_size: float) -> tuple[float, float]:

@@ -13,13 +13,10 @@ from matemium.paths import discover_root
 
 from .debug import build_debug_payload, write_debug_log
 from .guard import apply_guard_to_project
-from .models import CriticResult, Phase, ProjectSession
+from .models import CriticResult, ProjectSession
 from .sidecar_outcome import (
-    PYTHON_MANIM_ERROR_MARKERS,
     SidecarIpcResult,
     compile_outcome_from_sidecar,
-    contains_python_or_manim_error,
-    format_compile_error,
     ipc_failure_result,
     merge_ipc_results,
 )

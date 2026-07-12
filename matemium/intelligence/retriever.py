@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any
 
 try:
     import lancedb

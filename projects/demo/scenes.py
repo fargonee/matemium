@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from canvas import CanvasScene, CanvasSettings
 from canvas.builder import CanvasBuilder
+from canvas.dsl import CanvasElement, WorldPoint
 
 
 class PortraitDemo(CanvasScene):
@@ -103,6 +104,7 @@ class BuilderDemo(CanvasScene):
 
 def _ttt_scenario(
     builder: CanvasBuilder,
+    tape,
     *,
     section: str,
     title: str,
@@ -162,6 +164,7 @@ class TicTacToeTutorial(CanvasScene):
         # ---- Scenario 1: Center opening ----
         _ttt_scenario(
             builder,
+            tape,
             section="center",
             title="1. Take the center",
             commentary=(
@@ -176,6 +179,7 @@ class TicTacToeTutorial(CanvasScene):
         # ---- Scenario 2: Corner fork ----
         _ttt_scenario(
             builder,
+            tape,
             section="fork",
             title="2. The fork (two threats)",
             commentary=(
@@ -190,6 +194,7 @@ class TicTacToeTutorial(CanvasScene):
         # ---- Scenario 3: Blocking ----
         _ttt_scenario(
             builder,
+            tape,
             section="block",
             title="3. Block the threat",
             commentary=(
@@ -204,6 +209,7 @@ class TicTacToeTutorial(CanvasScene):
         # ---- Scenario 4: Diagonal win ----
         _ttt_scenario(
             builder,
+            tape,
             section="win",
             title="4. Finish the diagonal",
             commentary=(
@@ -224,6 +230,7 @@ class TicTacToeTutorial(CanvasScene):
         # ---- Scenario 5: Draw (cat's game) ----
         _ttt_scenario(
             builder,
+            tape,
             section="draw",
             title="5. Perfect play = draw",
             commentary=(
@@ -270,7 +277,6 @@ FlexTicTacToeDemo = TicTacToeTutorial
 
 
 # --- 3D World Demo ---
-from canvas.dsl import WorldObject, WorldTransform, Vector3, CanvasElement, WorldPoint
 
 
 class Space3DDemo(CanvasScene):
