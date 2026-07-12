@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 from manim import (
+    Animation,
     DEGREES,
     Dot,
     ThreeDCamera,
@@ -64,62 +65,149 @@ def _camera_rotation_from_angles(phi_deg: float, theta_deg: float, gamma_deg: fl
     return _rot_z(gamma) @ _rot_x(beta) @ _rot_z(alpha)
 
 def get_tape_straight_above_angles(wt: "WorldTransform") -> tuple[float, float, float]:
-    """Return (phi, theta, gamma) in degrees so that when frame_center is set to a point
-    on the tape plane, the camera looks straight down the tape's local normal (from above),
-    with roll aligned to the tape's local Y. This makes the tape's internal coords the
-    'natural' sheet for the camera in tape-scroll mode.
-    """
-    if wt is None:
-        return 0.0, -90.0, 0.0
-        
-    try:
-        from scipy.spatial.transform import Rotation as _Rot
-    except ImportError:
-        # Fallback if scipy is not installed (though Manim usually requires it)
-        rot = getattr(wt, "rotation", None)
-        if not rot:
-            return 0.0, -90.0, 0.0
-        return float(rot.x), float(-rot.y - 90.0), float(-rot.z)
-
+    import numpy as np
+    if wt is None: return 0.0, -90.0, 0.0
     R_tape = get_rotation_matrix(wt)
-    # We want R_cam = R_tape.T (so camera axes match tape axes).
-    # Since camera looks along its -Z, it will look from +Z_tape towards -Z_tape,
-    # which is looking at the front face of the tape.
-    # Its UP is +Y_tape. This perfectly matches the 2D sheet.
-    R_desired = R_tape
-
-    # Manim's camera R = rotz(gamma) @ rotx(-phi) @ rotz(-theta - 90)
-    # Scipy intrinsic ZXZ: R = rotz(a) @ rotx(b) @ rotz(c)
-    try:
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            rot = _Rot.from_matrix(R_desired)
-            zxz = rot.as_euler('ZXZ', degrees=True)
-            
-        gamma = zxz[0]
-        phi = -zxz[1]
-        theta = -zxz[2] - 90.0
-
-        # Manim clamps phi to [0, PI]. If phi is negative, we can find the equivalent 
-        # Euler angles with positive phi by flipping signs and adding 180.
-        if phi < 0:
-            phi = -phi
-            theta -= 180.0
-            gamma += 180.0
-            
-        # Normalize to nice ranges
-        theta = (theta + 180) % 360 - 180
-        gamma = (gamma + 180) % 360 - 180
-
-        return float(phi), float(theta), float(gamma)
-    except Exception:
-        return 0.0, -90.0, 0.0
+    phi, theta, gamma = mat_to_manim_euler(R_tape)
+    return np.degrees(phi), np.degrees(theta), np.degrees(gamma)
 
 
+def mat_to_quat(R: "np.ndarray") -> "np.ndarray":
+    import numpy as np
+    m = R
+    tr = m[0, 0] + m[1, 1] + m[2, 2]
+    if tr > 0:
+        S = np.sqrt(tr + 1.0) * 2
+        w = 0.25 * S
+        x = (m[2, 1] - m[1, 2]) / S
+        y = (m[0, 2] - m[2, 0]) / S
+        z = (m[1, 0] - m[0, 1]) / S
+    elif m[0, 0] > m[1, 1] and m[0, 0] > m[2, 2]:
+        S = np.sqrt(1.0 + m[0, 0] - m[1, 1] - m[2, 2]) * 2
+        w = (m[2, 1] - m[1, 2]) / S
+        x = 0.25 * S
+        y = (m[0, 1] + m[1, 0]) / S
+        z = (m[0, 2] + m[2, 0]) / S
+    elif m[1, 1] > m[2, 2]:
+        S = np.sqrt(1.0 + m[1, 1] - m[0, 0] - m[2, 2]) * 2
+        w = (m[0, 2] - m[2, 0]) / S
+        x = (m[0, 1] + m[1, 0]) / S
+        y = 0.25 * S
+        z = (m[1, 2] + m[2, 1]) / S
+    else:
+        S = np.sqrt(1.0 + m[2, 2] - m[0, 0] - m[1, 1]) * 2
+        w = (m[1, 0] - m[0, 1]) / S
+        x = (m[0, 2] + m[2, 0]) / S
+        y = (m[1, 2] + m[2, 1]) / S
+        z = 0.25 * S
+    q = np.array([w, x, y, z])
+    return q / np.linalg.norm(q)
 
-def _closest_angle(current: float, target: float) -> float:
-    return current + (target - current + 180.0) % 360.0 - 180.0
+def quat_to_mat(q: "np.ndarray") -> "np.ndarray":
+    import numpy as np
+    w, x, y, z = q
+    return np.array([
+        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w),     2 * (x * z + y * w)],
+        [2 * (x * y + z * w),     1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+        [2 * (x * z - y * w),     2 * (y * z + x * w),     1 - 2 * (x * x + y * y)],
+    ])
+
+def slerp(q0: "np.ndarray", q1: "np.ndarray", t: float) -> "np.ndarray":
+    import numpy as np
+    q0 = q0 / np.linalg.norm(q0)
+    q1 = q1 / np.linalg.norm(q1)
+    dot = float(np.dot(q0, q1))
+    if dot < 0.0:
+        q1 = -q1
+        dot = -dot
+    dot = np.clip(dot, -1.0, 1.0)
+    if dot > 0.9995:
+        result = q0 + t * (q1 - q0)
+        return result / np.linalg.norm(result)
+    omega = np.arccos(dot)
+    sin_omega = np.sin(omega)
+    if sin_omega < 1e-6:
+        result = q0 + t * (q1 - q0)
+        return result / np.linalg.norm(result)
+    a = np.sin((1 - t) * omega) / sin_omega
+    b = np.sin(t * omega) / sin_omega
+    return a * q0 + b * q1
+
+def mat_to_manim_euler(R: "np.ndarray") -> tuple[float, float, float]:
+    import numpy as np
+    r22 = float(np.clip(R[2, 2], -1.0, 1.0))
+    phi = np.arccos(r22)
+    sin_phi = np.sqrt(max(0.0, 1.0 - r22 * r22))
+
+    if sin_phi < 1e-6:
+        theta = 0.0
+        gamma = np.arctan2(R[0, 0], R[0, 1])
+    else:
+        theta = np.arctan2(R[2, 1], R[2, 0])
+        gamma = np.arctan2(-R[0, 2], R[1, 2])
+
+    return phi, theta, gamma
+
+def manim_euler_to_mat(phi: float, theta: float, gamma: float) -> "np.ndarray":
+    import numpy as np
+    def Rz(a):
+        c, s = np.cos(a), np.sin(a)
+        return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+
+    def Rx(a):
+        c, s = np.cos(a), np.sin(a)
+        return np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
+
+    return Rz(gamma) @ Rx(-phi) @ Rz(-theta - np.pi / 2)
+
+def unwrap_start_euler(theta_start: float, gamma_start: float, theta_target: float) -> tuple[float, float]:
+    gamma_new = gamma_start + (theta_target - theta_start)
+    return theta_target, gamma_new
+
+class GeodesicCameraTransition(Animation):
+    def __init__(self, camera_ctl: "CameraController", target_rotation_matrix, target_inspect_center, **kwargs):
+        import numpy as np
+        self.camera_ctl = camera_ctl
+        self.R_end = np.array(target_rotation_matrix, dtype=float)
+        self.center_end = np.array(target_inspect_center, dtype=float)
+        super().__init__(camera_ctl._inspect_x, **kwargs)
+
+    def begin(self):
+        import numpy as np
+        theta0 = np.radians(self.camera_ctl._theta.get_value())
+        phi0 = np.radians(self.camera_ctl._phi.get_value())
+        gamma0 = np.radians(self.camera_ctl._gamma.get_value())
+
+        if phi0 < 1e-4:
+            _, theta_target, _ = mat_to_manim_euler(self.R_end)
+            theta0, gamma0 = unwrap_start_euler(theta0, gamma0, theta_target)
+            self.camera_ctl._theta.set_value(np.degrees(theta0))
+            self.camera_ctl._gamma.set_value(np.degrees(gamma0))
+
+        self.R_start = manim_euler_to_mat(phi0, theta0, gamma0)
+        self.center_start = np.array([
+            self.camera_ctl._inspect_x.get_value(),
+            self.camera_ctl._inspect_y.get_value(),
+            self.camera_ctl._inspect_z.get_value()
+        ], dtype=float)
+        self.q0 = mat_to_quat(self.R_start)
+        self.q1 = mat_to_quat(self.R_end)
+        super().begin()
+
+    def interpolate_mobject(self, alpha: float) -> None:
+        import numpy as np
+        q = slerp(self.q0, self.q1, alpha)
+        R_t = quat_to_mat(q)
+        phi, theta, gamma = mat_to_manim_euler(R_t)
+        self.camera_ctl._phi.set_value(np.degrees(phi))
+        self.camera_ctl._theta.set_value(np.degrees(theta))
+        self.camera_ctl._gamma.set_value(np.degrees(gamma))
+        
+        center = (1 - alpha) * self.center_start + alpha * self.center_end
+        self.camera_ctl._inspect_x.set_value(center[0])
+        self.camera_ctl._inspect_y.set_value(center[1])
+        self.camera_ctl._inspect_z.set_value(center[2])
+
 
 class CameraController:
     """Pan, zoom, and optional tilt over the XY sheet at z = 0."""
@@ -611,5 +699,4 @@ class CameraController:
                     run_time=run_time,
                 )
             self.camera.frame_center = np.array([x, y, z or SHEET_PLANE_Z])
-
 
