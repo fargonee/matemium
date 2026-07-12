@@ -95,7 +95,6 @@ class CanvasElement:
 
     # Phase 1: World 3D transform for the unified space model.
     # The tape (legacy sheet) is implicitly a TapeObject at identity for now.
-    world_transform: WorldTransform = field(default_factory=WorldTransform)
 
     # Optional: which parent object this lives under (for relative positioning later)
     parent_object_id: Optional[str] = None
@@ -388,17 +387,12 @@ class WorldObject:
 
 @dataclass
 class TapeObject:
-    """TapeObject represents the legacy infinite 'sheet' or 'tape' as a first-class
-    object inside the 3D world.
-
-    It has a world_transform (so the tape plane can be positioned/rotated in 3D space),
-    but its content (local_elements) lives in a local 2D coordinate system where the
-    existing LayoutEngine, CSS-like styling, flex, lazy reveal etc. apply.
-
-    In Phase 2, the builder's content is conceptually the local content of a root TapeObject.
+    """TapeObject represents an isolated 2D infinite layout canvas.
+    Content (local_elements) lives in a local 2D coordinate system where the
+    existing LayoutEngine, CSS-like styling, flex, and lazy reveal apply.
+    Tapes are strictly 2D and context-switched in real-time with the 3D world.
     """
     id: str
-    world_transform: WorldTransform = field(default_factory=WorldTransform)
     local_elements: List[CanvasElement] = field(default_factory=list)
     local_canvas_settings: Optional[CanvasSettings] = None
     # Future: local size, surface for 3D rendering, etc.

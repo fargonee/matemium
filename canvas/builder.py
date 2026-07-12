@@ -1040,16 +1040,10 @@ class CanvasBuilder:
         *,
         frame_width: Optional[float] = None,
         frame_height: Optional[float] = None,
-    ) -> str:
-        """Create a new TapeObject as a first-class object in the 3D world.
+    ) -> "TapeBuilder":
+        """Create a new TapeObject (2D canvas context).
 
-        Returns the tape's id. You can then:
-        - Use with in_object_space(tape_id) to author content inside its local 2D space.
-        - Use set_tape_pose(..., tape_id=...) to position/rotate it.
-        - Use scroll_tape(local_y, tape_id=...) for classic tape experience.
-        - Use observe_object(tape_id) for normal 3D view of the plane.
-
-        The tape is added to root_objects so it participates in the 3D scene graph.
+        Returns a TapeBuilder instance to author content inside its local 2D space.
         """
         tape_id = id or self._get_id("tape")
         tape_settings = CanvasSettings(
@@ -1070,17 +1064,10 @@ class CanvasBuilder:
         )
         self._layouts[tape_id] = tape_layout
 
-        # Phase 8: store as first-class additional tape
+        # Store as first-class tape canvas
         self.dsl.tapes.append(new_tape)
 
-        # Also add WorldObject for 3D graph/positioning compatibility
-        wo = WorldObject(
-            id=tape_id,
-            transform=new_tape.world_transform,
-        )
-        self.dsl.root_objects.append(wo)
-
-        # Track for placement, anchors, and scoping
+        # Track for placement and scoping
         self._placed_objects[tape_id] = new_tape
 
         return TapeBuilder(self, tape_id)
