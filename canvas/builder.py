@@ -46,7 +46,7 @@ class TapeBuilder:
         tape = self._builder._tapes.get(self.tape_id)
         if tape:
             with self._builder.in_object_space(tape.id):
-                func(*args, **kwargs)
+                return func(*args, **kwargs)
         return self
 
     def add_text(self, *args, **kwargs): return self._with_tape(self._builder.add_text, *args, **kwargs)

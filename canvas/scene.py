@@ -563,7 +563,7 @@ class CanvasScene(ThreeDScene):
         distance = abs(target_y - current_y)
         run_time = min(2.0, max(0.45, 0.3 + distance * 0.11))
         is_tape = elem.id in getattr(self, "_tape_content_ids", set())
-        if distance < 0.12 and not is_tape:
+        if distance < 0.12:
             return
 
         local_x = float(elem.canvas_position[0]) if len(elem.canvas_position) > 0 else 0.0
