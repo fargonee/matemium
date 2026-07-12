@@ -64,11 +64,20 @@ export function RenderModal({
         await onPrepare();
         // Always fetch fresh scenes list so stale "MyScene" from new project metadata doesn't cause issues after overwriting scenes.py
         const listRes = await api.sidecarListScenes(projectId);
-        if (!cancelled) {
-          const fresh = listRes.scenes || [];
-          setLocalScenes(fresh);
+        if (cancelled) return;
+
+        const fresh = listRes.scenes || [];
+        setLocalScenes(fresh);
+
+        let activeScene = scene;
+        if (fresh.length > 0 && !fresh.includes(scene)) {
+          activeScene = fresh[0];
+          onSceneChange(activeScene);
+          // Stop here: the parent will re-render and trigger this effect again with the correct scene
+          return;
         }
-        const result = await api.sidecarCheck(projectId, scene || undefined);
+
+        const result = await api.sidecarCheck(projectId, activeScene || undefined);
         if (!cancelled) {
           setCheck(result);
         }
@@ -87,7 +96,7 @@ export function RenderModal({
     return () => {
       cancelled = true;
     };
-  }, [onPrepare, isOpen, projectId, scene]);
+  }, [onPrepare, isOpen, projectId, scene, onSceneChange]);
 
   if (!isOpen) return null;
 
