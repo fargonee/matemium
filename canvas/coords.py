@@ -67,10 +67,18 @@ class WorldTransform:
     def from_dict(cls, d: dict) -> "WorldTransform":
         if not d:
             return cls()
+        
+        def _parse_vec(v):
+            if isinstance(v, dict):
+                return Vector3(float(v.get('x', 0)), float(v.get('y', 0)), float(v.get('z', 0)))
+            if isinstance(v, (list, tuple)):
+                return Vector3.from_tuple(v)
+            return Vector3()
+
         return cls(
-            position=Vector3.from_tuple(d.get("position")),
-            rotation=Vector3.from_tuple(d.get("rotation")),
-            scale=float(d.get("scale", 1.0)),
+            position=_parse_vec(d.get("position")),
+            rotation=_parse_vec(d.get("rotation")),
+            scale=d.get("scale", 1.0),
         )
 
     def copy(self) -> "WorldTransform":

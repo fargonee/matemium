@@ -98,6 +98,7 @@ class CanvasElement:
 
     # Optional: which parent object this lives under (for relative positioning later)
     parent_object_id: Optional[str] = None
+    world_transform: WorldTransform = field(default_factory=WorldTransform)
 
     layout: Optional[LayoutBox] = None
     entry_animation: Optional[EntryAnimation] = None
@@ -148,8 +149,7 @@ class CanvasElement:
             d.pop("entry_animation", None)
         if self.state_behavior is None:
             d.pop("state_behavior", None)
-        # Include world_transform explicitly (it uses its own to_dict inside asdict? but ensure)
-        d["world_transform"] = self.world_transform.to_dict()
+
         return d
 
 
@@ -428,7 +428,6 @@ class TapeObject:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
-            "world_transform": self.world_transform.to_dict(),
             "local_elements": [e.to_dict() if hasattr(e, 'to_dict') else e for e in self.local_elements],
             # omit settings for brevity
         }

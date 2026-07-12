@@ -120,16 +120,8 @@ class CanvasBuilder:
             raise RuntimeError("Cannot add 2D element without an active TapeObject context. Use builder.add_tape().")
         if current_tape:
             current_tape.local_elements.append(el)
-            # Phase 4: compose with the current tape's world transform
-            tape_wt = current_tape.world_transform
-            el_wt = getattr(el, 'world_transform', None) or WorldTransform()
-            local = Vector3.from_tuple(getattr(el, 'canvas_position', (0,0,0))) if not (el_wt.position.x or el_wt.position.y) else el_wt.position
-            composed = resolve_world_position(local.as_tuple(), relative_to=tape_wt)
-            el.world_transform = WorldTransform(position=composed, rotation=tape_wt.rotation, scale=tape_wt.scale)
         self.dsl.add_element(el)
-        # Phase 4: record for relative/anchor resolution
-        wt = getattr(el, 'world_transform', None) or WorldTransform()
-        self._placed_transforms[el.id] = wt
+        self._placed_objects[el.id] = el
         self._placed_objects[el.id] = el
         return self
 
@@ -1040,7 +1032,14 @@ class CanvasBuilder:
         *,
         frame_width: Optional[float] = None,
         frame_height: Optional[float] = None,
+        **kwargs: Any,
     ) -> "TapeBuilder":
+        if "position" in kwargs or "rotation" in kwargs or "scale" in kwargs:
+            raise ValueError(
+                "Tapes are now purely 2D layout canvases and do not exist in 3D space. "
+                "Arguments 'position', 'rotation', and 'scale' are no longer supported in add_tape(). "
+                "To place objects in the 3D world, use add_object() instead."
+            )
         """Create a new TapeObject (2D canvas context).
 
         Returns a TapeBuilder instance to author content inside its local 2D space.
@@ -1073,16 +1072,9 @@ class CanvasBuilder:
         return TapeBuilder(self, tape_id)
 
     def add_world_object(self, wo: WorldObject) -> str:
-        """Phase 5/6: place a top-level WorldObject in the 3D world (outside default tape).
-        For objects with local content (e.g. another tape), use scoped layout.
-        """
+        """Phase 5/6: place a top-level WorldObject in the 3D world."""
         if wo.element and getattr(wo.element, 'type', None) in ('Tape', 'tape'):
-            # for sub-tape, scope layout
-            sub_layout = LayoutEngine(
-                frame_width=9.0, frame_height=16.0,
-                scope=wo.element  # if it has
-            )
-            # etc, but for now just place
+            raise ValueError("Tapes can no longer be added as WorldObjects. Use add_tape() instead.")
         self.dsl.root_objects.append(wo)
         return wo.id
         return wo.id
@@ -1123,6 +1115,9 @@ class CanvasBuilder:
             else:
                 wt.position = resolve_world_position(wt.position.as_tuple(), relative_to=base)
 
+        if type.lower() == "tape":
+            raise ValueError("Cannot create a Tape via add_object(). Tapes are 2D canvases, not 3D objects. Use add_tape() instead.")
+            
         if type in _OBJECT_KINDS and _OBJECT_KINDS[type].get("build"):
             # use registered build to create element
             fake_elem = CanvasElement(id=self._get_id(type.lower()), type=type, content=content or {}, world_transform=wt)
@@ -1133,7 +1128,6 @@ class CanvasBuilder:
                 id=self._get_id(type.lower()),
                 type=type,
                 content=content,
-                world_transform=wt,
             )
         # place as world object
         wo = WorldObject(id=elem.id, element=elem, transform=wt)
@@ -1242,28 +1236,6 @@ class CanvasBuilder:
         self._add(element)
         self._placed_transforms[element.id] = element.world_transform
         return element.id
-
-    def set_tape_pose(
-        self,
-        tape_id: str = "root_tape",
-    ) -> "CanvasBuilder":
-        """Phase 3: position/rotate a tape (default root_tape) in 3D world space.
-
-        Use this to make the tape a positioned/rotated 3D object.
-        Content inside it uses its local 2D space.
-        To observe it as normal 3D, use observe_object(tape_id).
-        To use classic scroll/reveal, use scroll_tape(local_y) or TapeScroll keyframe.
-        """
-        tape = self._tapes.get(tape_id) or self.root_tape
-        if tape:
-            tape.world_transform = WorldTransform(
-                position=Vector3(*position),
-                rotation=Vector3(*rotation),
-                scale=scale,
-            )
-            # update placed
-            self._placed_transforms[tape_id] = tape.world_transform
-        return self
 
     # ---------------- Escape hatches ----------------
 

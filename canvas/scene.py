@@ -240,50 +240,16 @@ class CanvasScene(ThreeDScene):
             return
         run_time = min(2.0, max(0.45, 0.3 + distance * 0.11))
 
-        # For posed tape, use 3D focus on first element's world pos
-        first = elements[0]
-        active_tape = getattr(self, "_active_scroll_tape", None) or getattr(self, "root_tape", None)
-        is_posed = False
-        if active_tape and getattr(active_tape, "world_transform", None):
-            wt = active_tape.world_transform
-            px, py, pz = (wt.position.as_tuple() if hasattr(wt.position, "as_tuple") else (getattr(wt.position, "x", 0), getattr(wt.position, "y", 0), getattr(wt.position, "z", 0)))
-            rx, ry, rz = (wt.rotation.as_tuple() if hasattr(wt.rotation, "as_tuple") else (getattr(wt.rotation, "x", 0), getattr(wt.rotation, "y", 0), getattr(wt.rotation, "z", 0)))
-            sc = float(getattr(wt, "scale", 1.0))
-            is_posed = (abs(float(px)) > 1e-9 or abs(float(py)) > 1e-9 or abs(float(pz)) > 1e-9 or
-                        abs(float(rx)) > 1e-9 or abs(float(ry)) > 1e-9 or abs(float(rz)) > 1e-9 or
-                        abs(sc - 1.0) > 1e-9)
-
-        if is_posed:
-            wt = getattr(first, "world_transform", None)
-            if wt and hasattr(wt, "position"):
-                p = wt.position
-                wpos = p.as_tuple() if hasattr(p, "as_tuple") else (float(getattr(p, "x", 0)), float(getattr(p, "y", 0)), float(getattr(p, "z", 0)))
-                # For groups on posed tapes use the visual bounding center (like non-posed)
-                group_local_x = _group_visual_center_x(elements)
-                self.camera_ctl._view_mode = "inspect"
-                self.play(
-                    self.camera_ctl._x.animate(rate_func=smooth, run_time=run_time).set_value(group_local_x),
-                    self.camera_ctl._y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
-                    run_time=run_time,
-                )
-                return
-
-        self.registry.pause_far_updaters(current_y, buffer=5.0)
-        # Re-compute using visual center (in case not set early, or for safety)
-        group_x = _group_visual_center_x(elements)
         self.camera_ctl._x.set_value(group_x)
         self.camera_ctl._inspect_x.set_value(group_x)
         self.camera_ctl._inspect_y.set_value(target_y)
-        if getattr(self.camera_ctl, "_view_mode", "sheet") == "inspect":
-            self.play(
-                self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=run_time).set_value(group_x),
-                self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
-                self.camera_ctl._x.animate(rate_func=smooth, run_time=run_time).set_value(group_x),
-                self.camera_ctl._y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
-                run_time=run_time,
-            )
-        else:
-            self.camera_ctl.pan_to(target_y, run_time=run_time)
+        
+        current_y = self.camera_ctl.current_y
+        distance = abs(target_y - current_y)
+        if distance < 0.12: return
+        run_time = min(2.0, max(0.45, 0.3 + distance * 0.11))
+        
+        self.camera_ctl.pan_to(target_y, run_time=run_time)
         self.registry.pause_far_updaters(target_y, buffer=3.5)
 
     def _handle_flex_group_reveal(
@@ -600,78 +566,14 @@ class CanvasScene(ThreeDScene):
         if distance < 0.12 and not is_tape:
             return
 
-        owning_tape = self._element_tape_map.get(elem.id)
-        active_tape = owning_tape or getattr(self, "_active_scroll_tape", None)
         local_x = float(elem.canvas_position[0]) if len(elem.canvas_position) > 0 else 0.0
-        is_posed_tape = False
-        if active_tape and getattr(active_tape, "world_transform", None):
-            wt = active_tape.world_transform
-            p = wt.position
-            r = wt.rotation
-            px, py, pz = p.as_tuple() if hasattr(p, "as_tuple") else (getattr(p, "x", 0), getattr(p, "y", 0), getattr(p, "z", 0))
-            rx, ry, rz = r.as_tuple() if hasattr(r, "as_tuple") else (getattr(r, "x", 0), getattr(r, "y", 0), getattr(r, "z", 0))
-            sc = float(getattr(wt, "scale", 1.0))
-            is_posed_tape = (abs(float(px)) > 1e-9 or abs(float(py)) > 1e-9 or abs(float(pz)) > 1e-9 or
-                             abs(float(rx)) > 1e-9 or abs(float(ry)) > 1e-9 or abs(float(rz)) > 1e-9 or
-                             abs(sc - 1.0) > 1e-9)
+        
+        self.camera_ctl._x.set_value(local_x)
+        self.camera_ctl._inspect_x.set_value(local_x)
+        self.camera_ctl._inspect_y.set_value(target_y)
+        self.camera_ctl.pan_to(target_y, run_time=run_time)
+        self.registry.pause_far_updaters(target_y, buffer=3.5)
 
-        wt = getattr(elem, "world_transform", None)
-        if is_posed_tape and active_tape and getattr(active_tape, "world_transform", None):
-            # For posed tape in scroll mode, compute the look point on the tape plane using the element's full local position (x, y)
-            # and the (owning) tape transform. This makes the camera "scroll" along the tape to center the element exactly.
-            local_x = float(elem.canvas_position[0]) if len(elem.canvas_position) > 0 else 0.0
-            wt_el = getattr(elem, "world_transform", None)
-            if wt_el and hasattr(wt_el, "position"):
-                px, py, pz = wt_el.position.as_tuple() if hasattr(wt_el.position, "as_tuple") else (wt_el.position.x, wt_el.position.y, wt_el.position.z)
-                wpos = (float(px), float(py), float(pz))
-            else:
-                local_point = tuple(getattr(elem, 'canvas_position', (0.0, target_y, 0.0))[:3])
-                wpos = local_to_world_point(local_point, active_tape.world_transform)
-                
-            self.registry.pause_far_updaters(current_y, buffer=5.0)
-            self.camera_ctl._view_mode = "inspect"
-            self.camera.use_orthographic_projection = True
-            from .camera import get_rotation_matrix
-            if active_tape and getattr(active_tape, "world_transform", None):
-                wpos_scene = self.R_world @ np.array(wpos, dtype=float)
-                self.play(
-                    self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=run_time).set_value(wpos_scene[0]),
-                    self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=run_time).set_value(wpos_scene[1]),
-                    self.camera_ctl._inspect_z.animate(rate_func=smooth, run_time=run_time).set_value(wpos_scene[2]),
-                    self.camera_ctl._x.animate(rate_func=smooth, run_time=run_time).set_value(local_x),
-                    self.camera_ctl._y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
-                    run_time=run_time,
-                )
-            else:
-                self.play(
-                    self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=run_time).set_value(wpos[0]),
-                    self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=run_time).set_value(wpos[1]),
-                    self.camera_ctl._inspect_z.animate(rate_func=smooth, run_time=run_time).set_value(wpos[2]),
-                    self.camera_ctl._x.animate(rate_func=smooth, run_time=run_time).set_value(local_x),
-                    self.camera_ctl._y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
-                    run_time=run_time,
-                )
-            self.registry.pause_far_updaters(target_y, buffer=3.5)
-        else:
-            # Classic sheet scroll or non-posed tape.
-            # Drive both _x/_y (for sheet mode) and inspect_* (for cases where
-            # view_mode=inspect because root 3D objects were added; keeps tape
-            # scrolling working even in mixed 3D+tape scenes).
-            self.camera_ctl._x.set_value(local_x)
-            self.camera_ctl._inspect_x.set_value(local_x)
-            self.camera_ctl._inspect_y.set_value(target_y)
-            self.registry.pause_far_updaters(current_y, buffer=5.0)
-            if getattr(self.camera_ctl, "_view_mode", "sheet") == "inspect":
-                self.play(
-                    self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=run_time).set_value(local_x),
-                    self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
-                    self.camera_ctl._x.animate(rate_func=smooth, run_time=run_time).set_value(local_x),
-                    self.camera_ctl._y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
-                    run_time=run_time,
-                )
-            else:
-                self.camera_ctl.pan_to(target_y, run_time=run_time)
-            self.registry.pause_far_updaters(target_y, buffer=3.5)
 
     def _handle_element_reveal(self, elem: CanvasElement, play_animation: bool = True):
         """Reveal an element lazily: create + (optionally) play entry animation."""
