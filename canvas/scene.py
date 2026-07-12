@@ -681,7 +681,7 @@ class CanvasScene(ThreeDScene):
                 pos = np.array(local_pos, dtype=float)
                 mob.move_to(pos)
             else:
-                if wt and hasattr(wt, 'position'):
+                if not is_tape_content and wt and hasattr(wt, 'position'):
                     p = wt.position
                     pos = np.array(p.as_tuple() if hasattr(p, 'as_tuple') else p, dtype=float)
                 else:
@@ -691,6 +691,8 @@ class CanvasScene(ThreeDScene):
                     pos = mob.get_center()
                 else:
                     mob.move_to(pos)
+            with open("overlap_log.txt", "a") as lf:
+                lf.write(f"PLACED {elem.id} ({getattr(elem, 'content', '')}) AT POS: {pos}. Actual mob center: {mob.get_center()}\n")
             # Register early ...
             self.registry.register(elem.id, mob, pos[1] if len(pos)>1 else 0, tuple(pos))
 
