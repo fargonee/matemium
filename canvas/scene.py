@@ -261,31 +261,11 @@ class CanvasScene(ThreeDScene):
                 # For groups on posed tapes use the visual bounding center (like non-posed)
                 group_local_x = _group_visual_center_x(elements)
                 self.camera_ctl._view_mode = "inspect"
-                self.camera.use_orthographic_projection = True
-                from .camera import get_rotation_matrix
-                if active_tape and getattr(active_tape, "world_transform", None):
-                    R_target = get_rotation_matrix(active_tape.world_transform).T
-                    self.play(
-                        GeodesicWorldRotation(
-                            self.camera_ctl,
-                            target_rotation_matrix=R_target,
-                            target_inspect_center=(wpos[0], wpos[1], wpos[2] if len(wpos) > 2 else 0),
-                            rate_func=smooth,
-                            run_time=run_time
-                        ),
-                        self.camera_ctl._x.animate(rate_func=smooth, run_time=run_time).set_value(group_local_x),
-                        self.camera_ctl._y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
-                        run_time=run_time,
-                    )
-                else:
-                    self.play(
-                        self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=run_time).set_value(wpos[0]),
-                        self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=run_time).set_value(wpos[1]),
-                        self.camera_ctl._inspect_z.animate(rate_func=smooth, run_time=run_time).set_value(wpos[2] if len(wpos) > 2 else 0),
-                        self.camera_ctl._x.animate(rate_func=smooth, run_time=run_time).set_value(group_local_x),
-                        self.camera_ctl._y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
-                        run_time=run_time,
-                    )
+                self.play(
+                    self.camera_ctl._x.animate(rate_func=smooth, run_time=run_time).set_value(group_local_x),
+                    self.camera_ctl._y.animate(rate_func=smooth, run_time=run_time).set_value(target_y),
+                    run_time=run_time,
+                )
                 return
 
         self.registry.pause_far_updaters(current_y, buffer=5.0)
@@ -548,6 +528,8 @@ class CanvasScene(ThreeDScene):
         self._current_dim_opacity = 0.0
         anims = []
         
+        from manim import FadeOut, FadeIn
+        
         all_mobs = {}
         if self.registry:
             for uid, entry in list(self.registry._store.items()):
@@ -558,34 +540,30 @@ class CanvasScene(ThreeDScene):
         for uid, mob in all_mobs.items():
             if uid in active_ids:
                 if uid in self._dimmed_opacities:
-                    orig_op = self._dimmed_opacities.pop(uid)
-                    try:
-                        anims.append(mob.animate.set_opacity(orig_op))
-                    except: pass
+                    self._dimmed_opacities.pop(uid)
+                    if mob not in getattr(self, "mobjects", []):
+                        self.add(mob)
+                        anims.append(FadeIn(mob))
             else:
                 if uid not in self._dimmed_opacities:
-                    try:
-                        self._dimmed_opacities[uid] = float(getattr(mob, "get_opacity", lambda: 1.0)())
-                    except:
-                        self._dimmed_opacities[uid] = 1.0
-                try:
-                    if float(getattr(mob, "get_opacity", lambda: 1.0)()) > 0.01:
-                        anims.append(mob.animate.set_opacity(0.0))
-                except: pass
+                    self._dimmed_opacities[uid] = 1.0
+                if mob in getattr(self, "mobjects", []):
+                    anims.append(FadeOut(mob))
+                    # Manim's FadeOut will automatically remove it from the scene at the end of the animation
         return anims
 
     def _get_restore_animations(self) -> list:
         """Returns a list of animations to restore all hidden/dimmed objects."""
+        from manim import FadeIn
         anims = []
         for uid, orig in list(self._dimmed_opacities.items()):
             mob = self.registry.get(uid) if self.registry else None
             if mob is None:
                 mob = getattr(self, "_world_objects", {}).get(uid)
             if mob is not None:
-                try:
-                    if float(getattr(mob, "get_opacity", lambda: 1.0)()) < orig - 0.01:
-                        anims.append(mob.animate.set_opacity(orig))
-                except: pass
+                if mob not in getattr(self, "mobjects", []):
+                    self.add(mob)
+                    anims.append(FadeIn(mob))
         self._dimmed_opacities.clear()
         self._current_dim_tape_id = None
         self._current_dim_opacity = 0.15
