@@ -1038,9 +1038,6 @@ class CanvasBuilder:
         self,
         id: Optional[str] = None,
         *,
-        position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-        scale: float = 1.0,
         frame_width: Optional[float] = None,
         frame_height: Optional[float] = None,
     ) -> str:
@@ -1084,7 +1081,6 @@ class CanvasBuilder:
         self.dsl.root_objects.append(wo)
 
         # Track for placement, anchors, and scoping
-        self._placed_transforms[tape_id] = new_tape.world_transform
         self._placed_objects[tape_id] = new_tape
 
         return TapeBuilder(self, tape_id)
@@ -1108,9 +1104,6 @@ class CanvasBuilder:
         self,
         type: str,
         *,
-        position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-        scale: float = 1.0,
         relative_to: Optional[str] = None,
         anchor: str = "center",
         content: Optional[Any] = None,
@@ -1122,6 +1115,9 @@ class CanvasBuilder:
         If type is registered, uses its builder.
         Otherwise, creates a CanvasElement or WorldObject with the given transform.
         """
+        position = kwargs.get("position", (0.0, 0.0, 0.0))
+        rotation = kwargs.get("rotation", (0.0, 0.0, 0.0))
+        scale = kwargs.get("scale", 1.0)
         wt = WorldTransform(
             position=Vector3(*position),
             rotation=Vector3(*rotation),
@@ -1228,7 +1224,6 @@ class CanvasBuilder:
         el = CanvasElement(
             id=self._get_id("rel"),
             type="rel",
-            world_transform=WorldTransform(position=rel),
         )
         if getattr(self, '_current_tape', None):
             self._add(el)
@@ -1263,9 +1258,6 @@ class CanvasBuilder:
 
     def set_tape_pose(
         self,
-        position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-        rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-        scale: float = 1.0,
         tape_id: str = "root_tape",
     ) -> "CanvasBuilder":
         """Phase 3: position/rotate a tape (default root_tape) in 3D world space.

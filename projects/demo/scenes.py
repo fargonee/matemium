@@ -336,11 +336,7 @@ class Space3DDemo(CanvasScene):
         )
 
         # Demonstrate a second top-level tape as a first-class 3D object
-        info_tape = builder.add_tape(
-            "info_card",
-            position=( -4.2, 2.8, 1.5 ),
-            rotation=( 12, -35, 8 ),
-        )
+        info_tape = builder.add_tape("info_card")
         with builder.in_object_space(info_tape):
             tape.add_body("Tilted secondary tape", style={"align": "center"})
 

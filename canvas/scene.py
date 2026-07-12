@@ -75,86 +75,6 @@ def _closest_angle(current: float, target: float) -> float:
     return current + (target - current + 180.0) % 360.0 - 180.0
 
 
-def mat_to_quat(R: "np.ndarray") -> "np.ndarray":
-    import numpy as np
-    m = R
-    tr = m[0, 0] + m[1, 1] + m[2, 2]
-    if tr > 0:
-        S = np.sqrt(tr + 1.0) * 2
-        w = 0.25 * S
-        x = (m[2, 1] - m[1, 2]) / S
-        y = (m[0, 2] - m[2, 0]) / S
-        z = (m[1, 0] - m[0, 1]) / S
-    elif m[0, 0] > m[1, 1] and m[0, 0] > m[2, 2]:
-        S = np.sqrt(1.0 + m[0, 0] - m[1, 1] - m[2, 2]) * 2
-        w = (m[2, 1] - m[1, 2]) / S
-        x = 0.25 * S
-        y = (m[0, 1] + m[1, 0]) / S
-        z = (m[0, 2] + m[2, 0]) / S
-    elif m[1, 1] > m[2, 2]:
-        S = np.sqrt(1.0 + m[1, 1] - m[0, 0] - m[2, 2]) * 2
-        w = (m[0, 2] - m[2, 0]) / S
-        x = (m[0, 1] + m[1, 0]) / S
-        y = 0.25 * S
-        z = (m[1, 2] + m[2, 1]) / S
-    else:
-        S = np.sqrt(1.0 + m[2, 2] - m[0, 0] - m[1, 1]) * 2
-        w = (m[1, 0] - m[0, 1]) / S
-        x = (m[0, 2] + m[2, 0]) / S
-        y = (m[1, 2] + m[2, 1]) / S
-        z = 0.25 * S
-    q = np.array([w, x, y, z])
-    return q / np.linalg.norm(q)
-
-def quat_to_mat(q: "np.ndarray") -> "np.ndarray":
-    import numpy as np
-    w, x, y, z = q
-    return np.array([
-        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w),     2 * (x * z + y * w)],
-        [2 * (x * y + z * w),     1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
-        [2 * (x * z - y * w),     2 * (y * z + x * w),     1 - 2 * (x * x + y * y)],
-    ])
-
-def slerp(q0: "np.ndarray", q1: "np.ndarray", t: float) -> "np.ndarray":
-    import numpy as np
-    q0 = q0 / np.linalg.norm(q0)
-    q1 = q1 / np.linalg.norm(q1)
-    dot = float(np.dot(q0, q1))
-    if dot < 0.0:
-        q1 = -q1
-        dot = -dot
-    dot = np.clip(dot, -1.0, 1.0)
-    if dot > 0.9995:
-        result = q0 + t * (q1 - q0)
-        return result / np.linalg.norm(result)
-    omega = np.arccos(dot)
-    sin_omega = np.sin(omega)
-    if sin_omega < 1e-6:
-        result = q0 + t * (q1 - q0)
-        return result / np.linalg.norm(result)
-    a = np.sin((1 - t) * omega) / sin_omega
-    b = np.sin(t * omega) / sin_omega
-    return a * q0 + b * q1
-
-from manim import Animation, VectorizedPoint
-class GeodesicWorldRotation(Animation):
-    def __init__(self, world_group, R_end_delta, pivot_point, **kwargs):
-        import numpy as np
-        self.world_group = world_group
-        self.R_end = np.array(R_end_delta, dtype=float)
-        self.pivot = np.array(pivot_point, dtype=float)
-        self.q0 = mat_to_quat(np.eye(3))
-        self.q1 = mat_to_quat(self.R_end)
-        self._applied_so_far = np.eye(3)
-        super().__init__(VectorizedPoint(), **kwargs)
-
-    def interpolate_mobject(self, alpha: float) -> None:
-        import numpy as np
-        q = slerp(self.q0, self.q1, alpha)
-        R_t = quat_to_mat(q)
-        delta = R_t @ self._applied_so_far.T
-        self.world_group.apply_matrix(delta, about_point=self.pivot)
-        self._applied_so_far = R_t
 
 class CanvasScene(ThreeDScene):
     """Main driver scene for Matemium's infinite canvas.
@@ -208,9 +128,6 @@ class CanvasScene(ThreeDScene):
 
     def construct(self):
         import numpy as np
-        self.world_group = VGroup()
-        self.add(self.world_group)
-        self.R_world = np.eye(3)
 
         self.camera_ctl = CameraController(
             self,
@@ -496,20 +413,20 @@ class CanvasScene(ThreeDScene):
         for elem, mob, first_time in prepared:
             if first_time:
                 if has_tape_pose_flex:
-                    if mob not in self.world_group.submobjects:
-                        self.world_group.add(mob)
+                    if mob not in getattr(self, "mobjects", []):
+                        self.add(mob)
                 elif container is not None:
                     container.add(mob)
                 elif not (getattr(self, "_world_objects", None) and elem.id in getattr(self, "_world_objects", {})):
-                    if mob not in self.world_group.submobjects:
-                        self.world_group.add(mob)
+                    if mob not in getattr(self, "mobjects", []):
+                        self.add(mob)
 
         anims = []
         run_time = 0.6
         for elem, mob, first_time in prepared:
             if not first_time:
-                if mob not in self.world_group.submobjects:
-                    self.world_group.add(mob)
+                if mob not in getattr(self, "mobjects", []):
+                    self.add(mob)
                 continue
             if elem.entry_animation:
                 anims.append(get_entry_animation(mob, elem.entry_animation))
@@ -811,8 +728,7 @@ class CanvasScene(ThreeDScene):
                 self._dim_non_active_for_tape(active_tape, dim_opacity=0.15)
                 
                 # Transition camera BEFORE playing the element animation
-                wt = getattr(active_tape, "world_transform", None)
-                if wt:
+                if True:
                     # Determine target x, y, z by checking the element's actual position
                     # so we fly directly to the element rather than the tape origin
                     el_local_y = getattr(elem, "canvas_position", (0, 0, 0))[1]
@@ -821,38 +737,23 @@ class CanvasScene(ThreeDScene):
                     except Exception:
                         el_x, el_y, el_z = 0., 0., 0.
                         
-                    from .camera import get_rotation_matrix
-                    R_tape = get_rotation_matrix(wt)
-                    R_world_new = R_tape.T
-                    R_end_delta = R_world_new @ self.R_world.T
+                    # --- CONTEXT SWITCH TO 2D TAPE ---
+                    el_local_y = getattr(elem, "canvas_position", (0, 0, 0))[1]
                     
-                    try:
-                        from .coords import local_to_world_point
-                        el_canonical = np.array(local_to_world_point((0, el_local_y, 0), wt), dtype=float)
-                    except Exception:
-                        el_canonical = np.zeros(3)
-                        
-                    pivot = self.R_world @ el_canonical
-                    
-                    self.camera_ctl._view_mode = "inspect"
+                    self.camera_ctl._view_mode = "sheet"
                     self.camera.use_orthographic_projection = True
                     
+                    # Hard snap angles back to top-down 2D
+                    self.camera.set_phi(0)
+                    self.camera.set_theta(-np.pi/2)
+                    self.camera.set_gamma(0)
+                    
+                    # Smooth 2D pan to the target
                     self.play(
-                        GeodesicWorldRotation(
-                            self.world_group,
-                            R_end_delta=R_end_delta,
-                            pivot_point=pivot,
-                            rate_func=smooth,
-                            run_time=2.0
-                        ),
-                        self.camera_ctl._inspect_x.animate(rate_func=smooth, run_time=2.0).set_value(pivot[0]),
-                        self.camera_ctl._inspect_y.animate(rate_func=smooth, run_time=2.0).set_value(pivot[1]),
-                        self.camera_ctl._inspect_z.animate(rate_func=smooth, run_time=2.0).set_value(pivot[2]),
-                        self.camera_ctl._x.animate(rate_func=smooth, run_time=2.0).set_value(0.0),
-                        self.camera_ctl._y.animate(rate_func=smooth, run_time=2.0).set_value(el_local_y),
-                        run_time=2.0
+                        self.camera_ctl._x.animate(rate_func=smooth, run_time=1.0).set_value(0.0),
+                        self.camera_ctl._y.animate(rate_func=smooth, run_time=1.0).set_value(el_local_y),
+                        run_time=1.0
                     )
-                    self.R_world = R_world_new
                     setattr(self, "_just_transitioned", True)
 
         # --- END AUTO-TRANSITION ---
@@ -956,11 +857,11 @@ class CanvasScene(ThreeDScene):
             # Static path (exports etc.): add in final rendered state, no entry anims played,
             # no camera transition plays (export will override camera/mobs for snapshot anyway).
             if first_time:
-                self.world_group.add(mob)
+                self.add(mob)
                 self._setup_state_behavior(elem, mob)
                 self._apply_billboard_labels(elem, mob)
-            elif mob not in self.world_group.submobjects:
-                self.world_group.add(mob)
+            elif mob not in getattr(self, "mobjects", []):
+                self.add(mob)
             return
 
         # === Animated reveal path (the main video "as it scrolls" case) ===
@@ -999,7 +900,7 @@ class CanvasScene(ThreeDScene):
                     self.camera_ctl.return_to_sheet(run_time=0.6)
 
         if first_time:
-            # Do NOT self.world_group.add(mob) before the play! Adding the fully-built mobject
+            # Do NOT self.add(mob) before the play! Adding the fully-built mobject
             # first would make it pop in instantly (final state). The entry animation
             # (Write / FadeIn) is what introduces it with effect. This fixes the
             # "appears without animation, then re-animated" symptom.
@@ -1012,7 +913,7 @@ class CanvasScene(ThreeDScene):
                 container.add(mob)
             elif not (getattr(self, '_world_objects', None) and elem.id in self._world_objects):
                 # avoid double add for prebuilts
-                self.world_group.add(mob)
+                self.add(mob)
 
             if elem.entry_animation:
                 anim = get_entry_animation(mob, elem.entry_animation)
@@ -1027,8 +928,8 @@ class CanvasScene(ThreeDScene):
             # (already registered above)
         else:
             # Already revealed earlier in timeline; just ensure it's present (no re-anim).
-            if mob not in self.world_group.submobjects:
-                self.world_group.add(mob)
+            if mob not in getattr(self, "mobjects", []):
+                self.add(mob)
 
     def _apply_billboard_labels(self, elem: CanvasElement, mob: Mobject) -> None:
         """Solid3D point labels always face the camera during inspect."""
@@ -1075,8 +976,8 @@ class CanvasScene(ThreeDScene):
         if part is None:
             return
 
-        if mob not in self.world_group.submobjects:
-            self.world_group.add(mob)
+        if mob not in getattr(self, "mobjects", []):
+            self.add(mob)
 
         x_from = float(trace.x_from)
         x_to = float(trace.x_to)
@@ -1132,8 +1033,8 @@ class CanvasScene(ThreeDScene):
         mob = self.registry.get(action.element_id)
         if mob is None:
             return
-        if mob not in self.world_group.submobjects:
-            self.world_group.add(mob)
+        if mob not in getattr(self, "mobjects", []):
+            self.add(mob)
         RotationEngine(self).apply(action, mob)
 
     def _handle_camera_inspect(self, inspect: CameraInspect) -> None:
@@ -1205,7 +1106,7 @@ class CanvasScene(ThreeDScene):
                 if hasattr(mob, 'rotate') and wt.rotation:
                     # simple apply, manim 3d rotation
                     pass  # extend as needed
-                self.world_group.add(mob)
+                self.add(mob)
                 self._world_objects[wo.id] = mob
                 self.registry.register(wo.id, mob, pos[1] if len(pos)>1 else 0, pos)
                 if wo.element:

@@ -7,7 +7,7 @@ class MultiTape3DTest(CanvasScene):
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Multi Tape 3D Test")
 
-        tape_a = builder.tape
+        tape_a = builder.add_tape('tape_a')
         tape_a.add_heading("Tape A - Horizontal")
         tape_a.add_body("This is the primary horizontal tape.")
         tape_a.add_math(r"\sin^2 \theta + \cos^2 \theta = 1")
