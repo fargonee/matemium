@@ -18,25 +18,25 @@ class QuadraticGraphs(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Quadratic Graphs")
+        tape = builder.add_tape("main")
 
         # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
-        # mode will automatically look straight down the local normal (from above).
-        builder.set_tape_pose(rotation=(22, 8, 0))
+        # mode will automatically look straight down the local normal (from above).)
 
-        builder.add_heading("Graphs of quadratics", style={"align": "center", "margin-bottom": 0.45})
-        builder.add_math(
+        tape.add_heading("Graphs of quadratics", style={"align": "center", "margin-bottom": 0.45})
+        tape.add_math(
             r"ax^2 + bx + c = 0",
             style={"align": "center", "margin-bottom": 0.55},
         )
-        builder.add_body(
+        tape.add_body(
             "The same formula can look very different on a graph. "
             "Each coefficient moves the parabola in a predictable way — "
             "compare pairs side by side and watch y change as x moves.",
             style={"margin-bottom": 0.65},
         )
 
-        builder.add_heading("Effect of a", style={"margin-top": 0.35, "margin-bottom": 0.3})
-        plot_a_pos, plot_a_neg = add_compare_row(
+        tape.add_heading("Effect of a", style={"margin-top": 0.35, "margin-bottom": 0.3})
+        plot_a_pos, plot_a_neg = add_compare_row(tape, 
             builder,
             (1, -2, 1),
             (-1, 2, 1),
@@ -47,7 +47,7 @@ class QuadraticGraphs(CanvasScene):
             right_kwargs={"x_range": (-1, 3), "x_start": 0, "color": "#ff8a65"},
         )
 
-        builder.add_body(
+        tape.add_body(
             "a > 0: opens upward (blue).  a < 0: opens downward (orange). "
             "The sign of a is the single biggest shape difference.",
             style={"margin-bottom": 0.45},
@@ -60,13 +60,11 @@ class QuadraticGraphs(CanvasScene):
         builder.add_object("Axes", position=(-2, 0, 3), scale=0.6)
 
         # Create a floating "notes" tape using the new first-class add_tape API
-        notes = builder.add_tape("graph_notes", position=(5, 1.5, -1), rotation=(5, 50, 0))
-        with builder.in_object_space(notes):
-            builder.add_body("a controls width", style={"align": "center"})
+        notes = builder.add_tape("graph_notes")
+        notes.add_body("a controls width", style={"align": "center"})
 
         # Use new modes to animate the presentation
-        builder.observe_object("Axes", run_time=2.0)  # normal 3D
-        builder.scroll_tape(local_y=4.0, run_time=3.0)  # enter tape scroll on main rotated tape
+        builder.observe_object("Axes", run_time=2.0)  # normal 3D  # enter tape scroll on main rotated tape
         builder.observe_object(notes, run_time=2.0)   # look at secondary tape in 3D
         builder.add_camera_keyframe(target=WorldPoint(position=(1, 4, 6)), duration=2.0)
 

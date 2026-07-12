@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import * as api from "../api/tauri";
+import config from "../config.json";
 import type { Settings } from "../api/types";
 import { formatError } from "../utils/errors";
 
@@ -67,7 +68,7 @@ export function SettingsModal({
         <div style={{ marginBottom: 12 }}>
           <label style={{ fontSize: '0.78rem', color: '#9aa0a6', display: 'block', marginBottom: 3 }}>Server URL</label>
           <input id="server-url" value={settings.serverUrl} onChange={(e) => onChange({ ...settings, serverUrl: e.target.value })} />
-          <div style={{ fontSize: '0.7rem', color: '#7c8595', marginTop: 2 }}>Live server: https://p01--math--zjvwyx4fjqbn.code.run</div>
+          <div style={{ fontSize: '0.7rem', color: '#7c8595', marginTop: 2 }}>Live server: {config.serverUrl}</div>
         </div>
 
         <div style={{ marginBottom: 12 }}>
@@ -109,7 +110,7 @@ export function SettingsModal({
           <div style={{ fontSize: '0.7rem', color: '#9aa0a6' }}>
             Manage keys &amp; buy credits in the web dashboard. Desktop just picks the mode.
           </div>
-          <button type="button" className="btn" style={{ marginTop: 6, fontSize: '0.75rem' }} onClick={() => window.open('https://p01--math--zjvwyx4fjqbn.code.run/dashboard', '_blank')}>
+          <button type="button" className="btn" style={{ marginTop: 6, fontSize: '0.75rem' }} onClick={() => window.open(`${config.serverUrl}/dashboard`, '_blank')}>
             Open web dashboard →
           </button>
         </div>

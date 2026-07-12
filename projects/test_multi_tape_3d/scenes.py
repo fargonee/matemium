@@ -6,7 +6,7 @@ from canvas.builder import CanvasBuilder
 class MultiTape3DTest(CanvasScene):
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Multi Tape 3D Test")
-
+        
         tape_a = builder.add_tape('tape_a')
         tape_a.add_heading("Tape A - Horizontal")
         tape_a.add_body("This is the primary horizontal tape.")

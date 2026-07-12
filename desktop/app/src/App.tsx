@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import * as api from "./api/tauri";
+import config from "./config.json";
 import type {
   ChatMessage,
   CodeEdit,
@@ -90,7 +91,7 @@ export default function App() {
   const [pendingEdit, setPendingEdit] = useState<CodeEdit | null>(null);
 
   const [settings, setSettings] = useState<Settings>({
-    serverUrl: "https://p01--math--zjvwyx4fjqbn.code.run",
+    serverUrl: config.serverUrl,
     apiToken: null,
     bottomDockDefault: "progress",
     usePersonalLlm: false,

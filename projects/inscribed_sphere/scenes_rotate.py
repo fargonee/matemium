@@ -20,16 +20,16 @@ class InscribedSphereRotate(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Solid Rotation")
+        tape = builder.add_tape("main")
 
         # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
-        # mode will automatically look straight down the local normal (from above).
-        builder.set_tape_pose(rotation=(18, 22, 0))
+        # mode will automatically look straight down the local normal (from above).)
 
-        builder.add_heading(
+        tape.add_heading(
             "Rotate on the tape",
             style={"align": "center", "margin-bottom": 0.4},
         )
-        builder.add_body(
+        tape.add_body(
             "The solid turns about its center — z anchor unchanged. "
             "Each step can hold so learners read labels and faces.",
             style={"margin-bottom": 0.5},
@@ -61,7 +61,7 @@ class InscribedSphereRotate(CanvasScene):
             return_to_sheet=True,
         )
 
-        builder.add_observation(
+        tape.add_body(
             "Rotation and inspect compose: turn the object, pause, then walk the camera.",
             style={"margin-top": 0.3},
         )

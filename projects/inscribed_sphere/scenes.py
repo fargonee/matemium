@@ -24,20 +24,20 @@ class InscribedSphere(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Inscribed Sphere")
+        tape = builder.add_tape("main")
 
         # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
-        # mode will automatically look straight down the local normal (from above).
-        builder.set_tape_pose(rotation=(18, 22, 0))
+        # mode will automatically look straight down the local normal (from above).)
 
-        builder.add_heading(
+        tape.add_heading(
             "Sphere inscribed in a cube",
             style={"align": "center", "margin-bottom": 0.45},
         )
-        builder.add_math(
+        tape.add_math(
             r"2r = s \quad\Rightarrow\quad r = \frac{s}{2}",
             style={"align": "center", "margin-bottom": 0.55},
         )
-        builder.add_body(
+        tape.add_body(
             "A sphere is inscribed in a cube when it touches every face — "
             "no gaps, no overlap. The sphere's diameter must equal the cube's side length.",
             style={"margin-bottom": 0.65},
@@ -50,7 +50,7 @@ class InscribedSphere(CanvasScene):
             style={"align": "center", "margin-bottom": 0.4},
         )
 
-        builder.add_body(
+        tape.add_body(
             "On the tape the solid straddles z = 0. Lift it, then we walk a multi-act "
             "camera path — face holds, corner zooms, and a sweeping finale.",
             style={"margin-bottom": 0.5},
@@ -66,7 +66,7 @@ class InscribedSphere(CanvasScene):
             return_to_sheet=False,
         )
 
-        builder.add_body(
+        tape.add_body(
             "Six faces, six tangent points — the sphere kisses each face at exactly one spot.",
             style={"margin-bottom": 0.45},
         )
@@ -80,7 +80,7 @@ class InscribedSphere(CanvasScene):
             return_to_sheet=False,
         )
 
-        builder.add_body(
+        tape.add_body(
             "At every edge the sphere is tangent to two faces; at every vertex, to three. "
             "Zoom and offset shots make those contacts visible without any formulas.",
             style={"margin-bottom": 0.45},
@@ -95,16 +95,16 @@ class InscribedSphere(CanvasScene):
             return_run_time=1.2,
         )
 
-        builder.add_observation(
+        tape.add_body(
             "The orange sphere touches all six faces of the blue cube — "
             "that is exactly what inscribed means.",
             style={"margin-top": 0.35, "margin-bottom": 0.45},
         )
-        builder.add_math(
+        tape.add_math(
             r"V_{\text{sphere}} = \frac{4}{3}\pi r^3 = \frac{\pi}{6}\,s^3",
             style={"align": "center", "margin-bottom": 0.35},
         )
-        builder.add_math(
+        tape.add_math(
             r"\frac{V_{\text{sphere}}}{V_{\text{cube}}} = \frac{\pi}{6} \approx 0.524",
             style={"align": "center"},
         )
@@ -116,7 +116,6 @@ class InscribedSphere(CanvasScene):
         builder.observe_object("demo_cube", run_time=2.2)
 
         # Enter tape scroll mode on the posed tape
-        builder.scroll_tape(local_y=5.0, run_time=2.8)
 
         super().__init__(dsl=builder.build(), **kwargs)
 
@@ -126,13 +125,13 @@ class InscribedSphereFullTour(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Inscribed Sphere — Full Tour")
+        tape = builder.add_tape("main")
 
         # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
-        # mode will automatically look straight down the local normal (from above).
-        builder.set_tape_pose(rotation=(18, 22, 0))
+        # mode will automatically look straight down the local normal (from above).)
 
-        builder.add_heading("Sphere inscribed in a cube", style={"align": "center", "margin-bottom": 0.4})
-        builder.add_body(
+        tape.add_heading("Sphere inscribed in a cube", style={"align": "center", "margin-bottom": 0.4})
+        tape.add_body(
             "Single continuous camera path — tangency, corners, sweep — no cuts.",
             style={"margin-bottom": 0.55},
         )
@@ -146,7 +145,7 @@ class InscribedSphereFullTour(CanvasScene):
             return_to_sheet=True,
             return_run_time=1.4,
         )
-        builder.add_math(r"2r = s", style={"align": "center"})
+        tape.add_math(r"2r = s", style={"align": "center"})
 
         super().__init__(dsl=builder.build(), **kwargs)
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import * as api from "../api/tauri";
+import config from "../config.json";
 import type { Settings } from "../api/types";
 import { formatError } from "../utils/errors";
 
@@ -102,7 +103,7 @@ export function SettingsScreen({
                 placeholder="https://..."
               />
               <div className="settings-hint">
-                Live server: https://p01--math--zjvwyx4fjqbn.code.run
+                Live server: {config.serverUrl}
               </div>
             </div>
 
@@ -265,7 +266,7 @@ export function SettingsScreen({
                   className="btn settings-btn-block"
                   onClick={() =>
                     window.open(
-                      "https://p01--math--zjvwyx4fjqbn.code.run/dashboard",
+                      `${config.serverUrl}/dashboard`,
                       "_blank"
                     )
                   }

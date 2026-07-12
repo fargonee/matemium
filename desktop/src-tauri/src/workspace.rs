@@ -32,7 +32,9 @@ pub struct Settings {
 }
 
 fn default_server_url() -> String {
-    "https://p01--math--zjvwyx4fjqbn.code.run".to_string()
+    let json_str = include_str!("../../app/src/config.json");
+    let v: serde_json::Value = serde_json::from_str(json_str).expect("invalid config.json");
+    v["serverUrl"].as_str().expect("missing serverUrl in config.json").to_string()
 }
 
 fn default_bottom_dock_default() -> String {

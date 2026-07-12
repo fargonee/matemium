@@ -21,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* http://localhost:* https://* https://p01--math--zjvwyx4fjqbn.code.run; media-src 'self' asset: http://asset.localhost https://asset.localhost blob: data:; img-src 'self' asset: http://asset.localhost https://asset.localhost blob: data:",
+      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* http://localhost:* https://*; media-src 'self' asset: http://asset.localhost https://asset.localhost blob: data:; img-src 'self' asset: http://asset.localhost https://asset.localhost blob: data:",
       "assetProtocol": {
         "enable": true,
         "scope": {

@@ -65,7 +65,7 @@ def quadratic_plot_flex_spec(
     )
 
 
-def add_compare_row(
+def add_compare_row(tape, 
     builder: CanvasBuilder,
     left: tuple[float, float, float],
     right: tuple[float, float, float],
@@ -80,7 +80,7 @@ def add_compare_row(
 ) -> List[str]:
     """Side-by-side quadratic plots — separate elements, shared flex reveal."""
     ps = plot_style or {"width": 3.2}
-    builder.add_flex_row(
+    tape.add_flex_row(
         [
             quadratic_plot_flex_spec(
                 builder, *left, id=left_id, style=ps, **(left_kwargs or {})

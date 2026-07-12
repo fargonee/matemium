@@ -17,16 +17,16 @@ class InscribedSphereLabels(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Billboard Labels")
+        tape = builder.add_tape("main")
 
         # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
-        # mode will automatically look straight down the local normal (from above).
-        builder.set_tape_pose(rotation=(18, 22, 0))
+        # mode will automatically look straight down the local normal (from above).)
 
-        builder.add_heading(
+        tape.add_heading(
             "Labels face the camera",
             style={"align": "center", "margin-bottom": 0.4},
         )
-        builder.add_body(
+        tape.add_body(
             "Point labels on the 3D solid stay front-facing as the inspect path moves — "
             "no twisted or edge-on text.",
             style={"margin-bottom": 0.5},
@@ -48,7 +48,7 @@ class InscribedSphereLabels(CanvasScene):
             return_run_time=0.9,
         )
 
-        builder.add_observation(
+        tape.add_body(
             "Tangent, face, and center markers remain legible from every inspect angle.",
             style={"margin-top": 0.3},
         )

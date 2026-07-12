@@ -12,19 +12,17 @@ from __future__ import annotations
 from canvas import CanvasScene
 from canvas.builder import CanvasBuilder
 
-
 # ---DIV: Scene parts---
-def part_intro(b: CanvasBuilder) -> None:
-    b.add_heading("Your title here")
-    b.add_body("Start your mathematical reasoning...")
-    b.add_math(r"x^2 - 5x + 6 = 0")
-    b.add_observation("We look for two numbers that multiply to 6 and add to -5.")
+def part_intro(tape) -> None:
+    tape.add_heading("Your title here")
+    tape.add_body("Start your mathematical reasoning...")
+    tape.add_math(r"x^2 - 5x + 6 = 0")
 
 
-def part_conclusion(b: CanvasBuilder) -> None:
-    b.add_math(r"x^2 - 5x + 6 = (x-2)(x-3)")
-    b.add_3d("z = x^2 - y^2")
-    b.add_text("Conclusion: x = 2 or x = 3", after_3d=True)
+def part_conclusion(tape, b: CanvasBuilder) -> None:
+    tape.add_math(r"x^2 - 5x + 6 = (x-2)(x-3)")
+    b.add_object("Solid3D", id="demo_cube", position=(3, 0, 1), content={"shape": "cube"})
+    tape.add_text("Conclusion: x = 2 or x = 3")
 
 
 # ---DIV: Main scene---
@@ -33,20 +31,14 @@ class MyVideo(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="MyVideo")
-        # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
-        # mode will automatically look straight down the local normal (from above).
-        builder.set_tape_pose(rotation=(20, 10, 0))
+        tape = builder.add_tape("main")
 
-        part_intro(builder)
-        part_conclusion(builder)
+        part_intro(tape)
+        part_conclusion(tape, builder)
 
-        # Example secondary tape + mixed observation (newest patterns)
-        info = builder.add_tape("side_panel", position=(4, 0, 0), rotation=(0, 30, 0))
-        with builder.in_object_space(info):
-            builder.add_body("Side notes (local to tilted tape)")
-
-        # Switch behaviors explicitly:
-        builder.observe_object(info, run_time=1.5)  # pure 3D view of secondary tape
-        builder.scroll_tape(local_y=2.0)            # tape-scroll on main (posed) tape
+        # Example secondary tape
+        info = builder.add_tape("side_panel")
+        info.add_heading("Side notes")
+        info.add_body("This cleanly context-switches the entire layout!")
 
         super().__init__(dsl=builder.build(), **kwargs)
