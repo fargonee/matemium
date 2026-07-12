@@ -71,8 +71,6 @@ from .registry import MobjectRegistry
 
 
 
-def _closest_angle(current: float, target: float) -> float:
-    return current + (target - current + 180.0) % 360.0 - 180.0
 
 
 
@@ -455,9 +453,6 @@ class CanvasScene(ThreeDScene):
             if self.root_tape and getattr(self.root_tape, "world_transform", None):
                 try:
                     phi, theta, gamma = get_tape_straight_above_angles(self.root_tape.world_transform)
-                    self.camera_ctl._phi.set_value(_closest_angle(self.camera_ctl._phi.get_value(), phi))
-                    self.camera_ctl._theta.set_value(_closest_angle(self.camera_ctl._theta.get_value(), theta))
-                    self.camera_ctl._gamma.set_value(_closest_angle(self.camera_ctl._gamma.get_value(), gamma))
                     self.camera_ctl._view_mode = "inspect"
                     self.camera_ctl.camera.use_orthographic_projection = True
                 except Exception:
@@ -479,17 +474,14 @@ class CanvasScene(ThreeDScene):
 
         # Restore dimming when leaving tape-scroll mode
         if self._observation_mode == ObservationMode.TAPE_SCROLL:
-            self._restore_dimmed_objects()
+            restore_anims = self._get_restore_animations()
+            if restore_anims:
+                self.play(*restore_anims, run_time=1.0)
 
         self._observation_mode = ObservationMode.NORMAL_3D
         self._active_scroll_tape = None
         if self.camera_ctl:
-            # reset to default sheet orientation when leaving tape mode
-            self.camera_ctl._phi.set_value(_closest_angle(self.camera_ctl._phi.get_value(), 0.0))
-            self.camera_ctl._theta.set_value(_closest_angle(self.camera_ctl._theta.get_value(), -90.0))
-            self.camera_ctl._gamma.set_value(_closest_angle(self.camera_ctl._gamma.get_value(), 0.0))
-            if hasattr(self.camera_ctl, "camera"):
-                self.camera_ctl.camera.use_orthographic_projection = True
+            pass
 
         if isinstance(target, ObjectAnchor):
             obj_id = target.object_id
@@ -547,61 +539,57 @@ class CanvasScene(ThreeDScene):
             ids.add(tape.id)
         return ids
 
-    def _dim_non_active_for_tape(self, tape: "TapeObject", dim_opacity: float = 0.15):
-        """Dim all revealed mobjects that do not belong to this tape (and its content).
-        Called when entering TAPE_SCROLL for a specific tape (if dim_others=True).
-        """
-        if not tape or not self.registry:
-            return
-        active = self._get_active_ids(tape)
-        self._current_dim_tape_id = getattr(tape, "id", None)
-        self._current_dim_opacity = dim_opacity
-
-        for uid, entry in list(self.registry._store.items()):
-            if uid in active:
-                continue
-            mob = entry.mobject
-            if mob is None:
-                continue
-            try:
-                curr = float(getattr(mob, "get_opacity", lambda: 1.0)())
-            except Exception:
-                curr = 1.0
-            if uid not in self._dimmed_opacities:
-                self._dimmed_opacities[uid] = curr
-            try:
-                mob.set_opacity(dim_opacity)
-            except Exception:
-                pass
-
-        # Dim free world objects too (other 3D solids, etc.)
+    def _get_context_switch_animations(self, active_tape) -> list:
+        """Returns a list of animations to fade in the active tape and fade out everything else."""
+        if not active_tape:
+            return []
+        active_ids = self._get_active_ids(active_tape)
+        self._current_dim_tape_id = getattr(active_tape, "id", None)
+        self._current_dim_opacity = 0.0
+        anims = []
+        
+        all_mobs = {}
+        if self.registry:
+            for uid, entry in list(self.registry._store.items()):
+                if entry.mobject: all_mobs[uid] = entry.mobject
         for uid, mob in list(getattr(self, "_world_objects", {}).items()):
-            if uid in active or uid in self._dimmed_opacities:
-                continue
-            try:
-                curr = float(getattr(mob, "get_opacity", lambda: 1.0)())
-            except Exception:
-                curr = 1.0
-            self._dimmed_opacities[uid] = curr
-            try:
-                mob.set_opacity(dim_opacity)
-            except Exception:
-                pass
+            if mob: all_mobs[uid] = mob
 
-    def _restore_dimmed_objects(self):
-        """Restore opacities when leaving a tape-scroll focus that dimmed others."""
+        for uid, mob in all_mobs.items():
+            if uid in active_ids:
+                if uid in self._dimmed_opacities:
+                    orig_op = self._dimmed_opacities.pop(uid)
+                    try:
+                        anims.append(mob.animate.set_opacity(orig_op))
+                    except: pass
+            else:
+                if uid not in self._dimmed_opacities:
+                    try:
+                        self._dimmed_opacities[uid] = float(getattr(mob, "get_opacity", lambda: 1.0)())
+                    except:
+                        self._dimmed_opacities[uid] = 1.0
+                try:
+                    if float(getattr(mob, "get_opacity", lambda: 1.0)()) > 0.01:
+                        anims.append(mob.animate.set_opacity(0.0))
+                except: pass
+        return anims
+
+    def _get_restore_animations(self) -> list:
+        """Returns a list of animations to restore all hidden/dimmed objects."""
+        anims = []
         for uid, orig in list(self._dimmed_opacities.items()):
             mob = self.registry.get(uid) if self.registry else None
             if mob is None:
                 mob = getattr(self, "_world_objects", {}).get(uid)
             if mob is not None:
                 try:
-                    mob.set_opacity(orig)
-                except Exception:
-                    pass
+                    if float(getattr(mob, "get_opacity", lambda: 1.0)()) < orig - 0.01:
+                        anims.append(mob.animate.set_opacity(orig))
+                except: pass
         self._dimmed_opacities.clear()
         self._current_dim_tape_id = None
         self._current_dim_opacity = 0.15
+        return anims
 
     def _should_auto_focus(self, elem: CanvasElement) -> bool:
         """Overlays (e.g. grid marks) stay on an already-framed board — no re-pan."""
@@ -723,38 +711,30 @@ class CanvasScene(ThreeDScene):
                 self._observation_mode = ObservationMode.TAPE_SCROLL
                 self._active_scroll_tape = active_tape
                 
-                # Dimming logic
-                self._restore_dimmed_objects()
-                self._dim_non_active_for_tape(active_tape, dim_opacity=0.15)
+                # Get the animations to fade in the tape and fade out everything else
+                fade_anims = self._get_context_switch_animations(active_tape)
                 
-                # Transition camera BEFORE playing the element animation
-                if True:
-                    # Determine target x, y, z by checking the element's actual position
-                    # so we fly directly to the element rather than the tape origin
-                    el_local_y = getattr(elem, "canvas_position", (0, 0, 0))[1]
-                    try:
-                                                el_x, el_y, el_z = local_to_world_point((0, el_local_y, 0), wt)
-                    except Exception:
-                        el_x, el_y, el_z = 0., 0., 0.
-                        
-                    # --- CONTEXT SWITCH TO 2D TAPE ---
-                    el_local_y = getattr(elem, "canvas_position", (0, 0, 0))[1]
-                    
-                    self.camera_ctl._view_mode = "sheet"
-                    self.camera.use_orthographic_projection = True
-                    
-                    # Hard snap angles back to top-down 2D
-                    self.camera.set_phi(0)
-                    self.camera.set_theta(-np.pi/2)
-                    self.camera.set_gamma(0)
-                    
-                    # Smooth 2D pan to the target
-                    self.play(
-                        self.camera_ctl._x.animate(rate_func=smooth, run_time=1.0).set_value(0.0),
-                        self.camera_ctl._y.animate(rate_func=smooth, run_time=1.0).set_value(el_local_y),
-                        run_time=1.0
-                    )
-                    setattr(self, "_just_transitioned", True)
+                el_local_y = getattr(elem, "canvas_position", (0, 0, 0))[1]
+                
+                # We want a smooth camera transition back to the 2D plane if we were in 3D
+                if self.camera_ctl._view_mode == "inspect":
+                    # Sync trackers so the transition starts from the current frame center
+                    self.camera_ctl._x.set_value(self.camera.frame_center[0])
+                    self.camera_ctl._y.set_value(self.camera.frame_center[1])
+                
+                self.camera_ctl._view_mode = "sheet"
+                self.camera.use_orthographic_projection = True
+                
+                cam_anims = [
+                    self.camera_ctl._phi.animate(rate_func=smooth).set_value(0.0),
+                    self.camera_ctl._theta.animate(rate_func=smooth).set_value(-90.0),
+                    self.camera_ctl._gamma.animate(rate_func=smooth).set_value(0.0),
+                    self.camera_ctl._x.animate(rate_func=smooth).set_value(0.0),
+                    self.camera_ctl._y.animate(rate_func=smooth).set_value(el_local_y)
+                ]
+                
+                self.play(*(fade_anims + cam_anims), run_time=1.5)
+                setattr(self, "_just_transitioned", True)
 
         # --- END AUTO-TRANSITION ---
 
