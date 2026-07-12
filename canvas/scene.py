@@ -61,7 +61,6 @@ from .dsl import (
 )
 from .solids import place_solid_on_tape
 from .coords import local_to_world_point, _rotation_matrix_from_euler_deg
-from .camera import get_tape_straight_above_angles
 from .focus import FocusEngine
 from .inspect_engine import InspectEngine
 from .rotation_engine import RotationEngine
@@ -228,119 +227,6 @@ class CanvasScene(ThreeDScene):
         # Content is kept lazy (revealed on timeline) to preserve narrative "writing".
         # Tape internal content lazy unless in tape-scroll-mode.
         # Default identity root tape keeps full legacy lazy path.
-        has_root_objs = bool(getattr(self.dsl, 'root_objects', None))
-        tape = getattr(self, 'root_tape', None)
-        tape_non_default = False
-        if tape:
-            wt = tape.world_transform or WorldTransform()
-            tape_non_default = (
-                any(abs(float(c)) > 1e-9 for c in wt.position.as_tuple()) or
-                any(abs(float(c)) > 1e-9 for c in wt.rotation.as_tuple()) or
-                abs(float(wt.scale) - 1.0) > 1e-9
-            )
-
-        do_3d_prebuild = has_root_objs or tape_non_default
-        if do_3d_prebuild:
-            if has_root_objs:
-                for wo in self.dsl.root_objects:
-                    self._build_world_object(wo)
-            # Phase 8: support containers for root + additional non-default tapes
-            tapes_for_container = []
-            if tape and tape_non_default:
-                tapes_for_container.append(tape)
-            for atape in getattr(self.dsl, 'additional_tapes', []) or []:
-                if atape:
-                    wt = atape.world_transform or WorldTransform()
-                    at_non_default = (
-                        any(abs(float(c)) > 1e-9 for c in wt.position.as_tuple()) or
-                        any(abs(float(c)) > 1e-9 for c in wt.rotation.as_tuple()) or
-                        abs(float(wt.scale) - 1.0) > 1e-9
-                    )
-                    if at_non_default:
-                        tapes_for_container.append(atape)
-            for t in tapes_for_container:
-                self._build_tape_container(t)  # container only; children lazy on reveal
-
-            # 3D camera for non-default world content.
-            # For tape-scroll content we will override to ortho + straight-above in the seed + focus paths.
-            self.camera_ctl._view_mode = "inspect"
-            self.camera.use_orthographic_projection = False
-
-            # Always prepare a sensible horizontal center for the root tape view.
-            # Layout puts centered content at local x=0 (see _horizontal_center).
-            # So the default "center" for tape scroll is 0 (not frame/2).
-            if tape and self._tape_content_ids:
-                self.camera_ctl.tape_center_x = 0.0
-
-            # Seed the inspect trackers at the (first) posed tape so initial view is on the tape plane
-            # rather than default sheet. Subsequent per-element focus will auto "scroll" to center new content.
-            init_tape = tape if (tape and tape_non_default) else None
-            if not init_tape and tapes_for_container:
-                init_tape = tapes_for_container[0]
-            if init_tape:
-                wt = getattr(init_tape, "world_transform", None) or WorldTransform()
-                p = wt.position
-                px, py, pz = p.as_tuple() if hasattr(p, "as_tuple") else (getattr(p, "x", 0), getattr(p, "y", 0), getattr(p, "z", 0))
-                initial_local_x = self.camera_ctl.tape_center_x
-                initial_w = local_to_world_point((initial_local_x, 0.0, 0.0), wt)
-                self.camera_ctl._inspect_x.set_value(float(initial_w[0]))
-                self.camera_ctl._inspect_y.set_value(float(initial_w[1]))
-                self.camera_ctl._inspect_z.set_value(float(initial_w[2]))
-                self.camera_ctl._x.set_value(self.camera_ctl.tape_center_x)
-                self.camera_ctl._y.set_value(0.0)
-                self.camera.frame_center = np.array(initial_w)
-                self.camera.use_orthographic_projection = True
-                if wt:
-                    phi, theta, gamma = get_tape_straight_above_angles(wt)
-                    self.camera_ctl._phi.set_value(_closest_angle(self.camera_ctl._phi.get_value(), phi))
-                    self.camera_ctl._theta.set_value(_closest_angle(self.camera_ctl._theta.get_value(), theta))
-                    self.camera_ctl._gamma.set_value(_closest_angle(self.camera_ctl._gamma.get_value(), gamma))
-                # Force an immediate sync so scene camera reflects the initial pose before first reveal
-                try:
-                    dummy = getattr(self.camera_ctl, "_dummy", None)
-                    if dummy is not None:
-                        self.camera_ctl._sync_camera(dummy, 0)
-                except Exception:
-                    pass
-
-            # For posed tapes with content, start in TAPE_SCROLL so flex guards + behaviors treat initial
-            # authoring reveals as tape context (automatic centering). Explicit observe_* later can switch out.
-            if tape and tape_non_default:
-                self._active_scroll_tape = tape
-                self._observation_mode = ObservationMode.TAPE_SCROLL
-        # else: default tape at identity -> full legacy lazy path (play counts, reveals preserved)
-
-        # Default authoring for any tape content: start assuming tape-scroll context for automatic
-        # per-element (and group) centering. This fulfills "no manual scroll_tape interleaving".
-        # Explicit non-tape CameraKeyframes (observe_object etc) will override to NORMAL_3D as encountered.
-        if not getattr(self, "_active_scroll_tape", None) and getattr(self, "_tape_content_ids", None):
-            self._active_scroll_tape = None
-            self._observation_mode = ObservationMode.TAPE_SCROLL
-            if self.camera_ctl:
-                self.camera_ctl.tape_center_x = 0.0
-                self.camera_ctl._x.set_value(0.0)
-                # also seed the inspect trackers for initial tape view centering (in case no posed seed)
-                # (we keep view_mode as "sheet" for default tape so _x/_y drive + ortho is preserved)
-                try:
-                    self.camera_ctl._inspect_x.set_value(0.0)
-                    self.camera_ctl._inspect_y.set_value(0.0)
-                    self.camera_ctl._inspect_z.set_value(0.0)
-                    self.camera.frame_center = np.array([0.0, 0.0, 0.0])
-                except Exception:
-                    pass
-
-        # For 3D model: objects pre-built with transforms.
-        # Execute full timeline; element reveals will skip build if pre-added (only for the prebuilt ones)
-
-        # IMPORTANT: No pre-instantiation of elements. (legacy sheet path)
-        # Elements are LAZILY created and added only when their entry appears in the timeline.
-        # This is a core feature of Matemium:
-        #   - Content materializes ("is written") as the narrative/camera reaches it.
-        #   - Not a pre-laid-out static sheet that the camera merely scrolls over (like a PDF viewer).
-        #   - Better performance for long canvases (heavy 3D objects etc. created on demand).
-        #   - The registry only holds elements that have been revealed so far.
-        # The timeline explicitly controls the order and timing of reveals.
-
         # Execute the timeline in order (the "compiler")
         for kind, payload in self._iter_timeline_batches():
             if kind == "flex_group":

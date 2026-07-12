@@ -105,7 +105,7 @@ def test_phase4_relative_and_anchors():
     """Phase 4: relative positioning, anchors, tape pose."""
     from canvas import CanvasBuilder, CanvasElement, Vector3
     b = CanvasBuilder()
-    t = b.add_tape("t1", rotation=(30, 0, 0))
+    t = b.add_tape("t1")
     base = CanvasElement(id='base', type='Text', content='base', canvas_position=(0,0,0))
     t.add_raw(base)
     rel = CanvasElement(id='rel', type='Text', content='rel')
@@ -186,7 +186,7 @@ def test_phase10_resolve_world_and_anchors():
     """Phase 10: resolve_world_position + anchors on tape and objects."""
     from canvas import CanvasBuilder, CanvasElement, Vector3, WorldTransform, resolve_world_position
     b = CanvasBuilder()
-    t = b.add_tape('t1', position=(1, 2, 0), rotation=(0, 0, 0))
+    t = b.add_tape("t1")
     el = CanvasElement(id="base", type="Text", content="base")
     t.add_raw(el)
     # place an object via add_object
@@ -205,7 +205,7 @@ def test_phase10_mixed_builder_add_object():
     """Phase 10: add_object via registry + add_relative + set_tape_pose produces correct DSL."""
     from canvas import CanvasBuilder, ObjectAnchor
     b = CanvasBuilder()
-    t = b.add_tape('t1', rotation=(10, 20, 0))
+    t = b.add_tape("t1")
     eid = b.add_object("Solid3D", position=(1,2,3), content={"shape": "sphere", "size": 0.8})
     assert eid
     assert len(b.dsl.root_objects) >= 1

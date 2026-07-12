@@ -64,13 +64,6 @@ def _camera_rotation_from_angles(phi_deg: float, theta_deg: float, gamma_deg: fl
     # rotz(gamma) @ rotx(-phi) @ rotz(-theta-90)
     return _rot_z(gamma) @ _rot_x(beta) @ _rot_z(alpha)
 
-def get_tape_straight_above_angles(wt: "WorldTransform") -> tuple[float, float, float]:
-    import numpy as np
-    if wt is None: return 0.0, -90.0, 0.0
-    R_tape = get_rotation_matrix(wt)
-    phi, theta, gamma = mat_to_manim_euler(R_tape.T)
-    return np.degrees(phi), np.degrees(theta), np.degrees(gamma)
-
 class CameraController:
     """Pan, zoom, and optional tilt over the XY sheet at z = 0."""
 
@@ -378,17 +371,6 @@ class CameraController:
     # === Phase 3 additions: generalized 3D observation (per clarified model) ===
     # Default for any target (WorldPoint, ObjectAnchor on tape or other) is normal cinematic 3D.
     # Only explicit TapeScroll activates tape-scroll-mode (internal tape logic + local measurements).
-
-    def _compute_tape_scroll_world_pos(self, tape: "TapeObject", local_y: float) -> tuple[float, float, float]:
-        """Compute the world-space point on the tape corresponding to local_y.
-        Uses tape_center_x (0 by default) + per-reveal focus using each element's
-        canvas_position[0] (which is 0 for centered content) to keep camera centered.
-        """
-        if not tape or not getattr(tape, "world_transform", None):
-            return (0.0, float(local_y), 0.0)
-        local_x = self.tape_center_x
-        local_point = (local_x, float(local_y), 0.0)
-        return local_to_world_point(local_point, tape.world_transform)
 
     def observe_target(
         self,

@@ -290,7 +290,7 @@ class Space3DDemo(CanvasScene):
         # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
         # mode will automatically look straight down the local normal (from above).
         tape = builder.add_tape("main_tape")
-        tape.set_pose(rotation=(35, 15, 0))  # pitch ~35°, yaw 15°
+        
 
         # Tape content in its local space (old sheet ergonomics preserved)
         tape.add_heading("3D World Demo", style={"align": "center"})

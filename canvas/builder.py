@@ -73,11 +73,7 @@ class TapeBuilder:
     def add_relative(self, *args, **kwargs): return self._with_tape(self._builder.add_relative, *args, **kwargs)
     def add_raw(self, *args, **kwargs): return self._with_tape(self._builder.add_raw, *args, **kwargs)
     def add_camera_move(self, *args, **kwargs): return self._with_tape(self._builder.add_camera_move, *args, **kwargs)
-    def set_pose(self, position=(0,0,0), rotation=(0,0,0), scale=1.0):
-        t = self._builder._tapes[self.tape_id]
-        from .coords import WorldTransform, Vector3
-        t.world_transform = WorldTransform(position=Vector3(*position), rotation=Vector3(*rotation), scale=scale)
-        return self
+
     def text_spec(self, *args, **kwargs): return self._builder.text_spec(*args, **kwargs)
     def math_spec(self, *args, **kwargs): return self._builder.math_spec(*args, **kwargs)
     def grid_board_spec(self, *args, **kwargs): return self._builder.grid_board_spec(*args, **kwargs)
@@ -1065,11 +1061,6 @@ class CanvasBuilder:
         )
         new_tape = TapeObject(
             id=tape_id,
-            world_transform=WorldTransform(
-                position=Vector3(*position),
-                rotation=Vector3(*rotation),
-                scale=scale,
-            ),
             local_elements=[],
             local_canvas_settings=tape_settings,
         )

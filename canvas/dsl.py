@@ -772,7 +772,6 @@ class SheetDSL:
         for tdata in tapes_data:
             t = TapeObject(
                 id=tdata.get("id", "tape"),
-                world_transform=WorldTransform.from_dict(tdata.get("world_transform", {})),
                 local_elements=[], # Timeline reconstructs local_elements in Scene
                 local_canvas_settings=CanvasSettings(**tdata.get("local_canvas_settings", {})),
             )

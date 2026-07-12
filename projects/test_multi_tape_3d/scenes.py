@@ -13,11 +13,7 @@ class MultiTape3DTest(CanvasScene):
         tape_a.add_math(r"\sin^2 \theta + \cos^2 \theta = 1")
         tape_a.add_observation("We switch between horizontal tape, vertical tape, and scattered 3D objects.")
 
-        tape_b = builder.add_tape(
-            "tape_b",
-            position=(0, 0, -2.5),
-            rotation=(90, 0, 0)
-        )
+        tape_b = builder.add_tape("tape_b")
         tape_b.add_heading("Tape B - Vertical")
         tape_b.add_body("This tape stands vertically. Its content is local to the upright plane.")
         tape_b.add_math(r"\nabla \cdot \vec{B} = 0")
