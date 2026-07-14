@@ -14,6 +14,7 @@ export interface PanelLayout {
   bottomHeight: number;
   bottomPanelOpen: boolean;
   editorOpen: boolean;
+  sidebarOpen?: boolean;
 }
 
 const DEFAULT_LAYOUT: PanelLayout = {
@@ -22,9 +23,10 @@ const DEFAULT_LAYOUT: PanelLayout = {
   bottomHeight: 200,
   bottomPanelOpen: true,
   editorOpen: true,
+  sidebarOpen: true,
 };
 
-type NumericLayoutKey = Exclude<keyof PanelLayout, "bottomPanelOpen" | "editorOpen">;
+type NumericLayoutKey = Exclude<keyof PanelLayout, "bottomPanelOpen" | "editorOpen" | "sidebarOpen">;
 
 const LIMITS: Record<NumericLayoutKey, { min: number; max: number }> = {
   sidebarWidth: { min: 180, max: 480 },
@@ -60,6 +62,7 @@ function loadLayout(): PanelLayout {
       bottomPanelOpen:
         parsed.bottomPanelOpen ?? parsed.logPanelOpen ?? DEFAULT_LAYOUT.bottomPanelOpen,
       editorOpen: parsed.editorOpen ?? DEFAULT_LAYOUT.editorOpen,
+      sidebarOpen: parsed.sidebarOpen ?? DEFAULT_LAYOUT.sidebarOpen,
     };
   } catch {
     return DEFAULT_LAYOUT;
@@ -308,9 +311,14 @@ export function usePanelLayout() {
     });
   }, []);
 
+  const setSidebarOpen = useCallback((open: boolean) => {
+    setLayout((prev) => ({ ...prev, sidebarOpen: open }));
+  }, []);
+
   return {
     layout,
     setBottomPanelOpen,
+    setSidebarOpen,
     setContainerWidth,
     setEditorRegionHeight,
     setChatWidthFromPointer,

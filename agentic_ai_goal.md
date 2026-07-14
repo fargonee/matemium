@@ -1,134 +1,82 @@
-## 1. System Vision & Objective
+# Specification: Evolving Matemium into an Autonomous ReAct Agent
 
-Matemium’s AI subsystem is not a passive code autocomplete tool. It is an **Autonomous Elite Director & Mathematical Animator**. It transforms weak, incomplete user ideas into high-fidelity, visually stunning, educational motion art.
-
-The agent operates across two distinct user tiers (Token-Based Core and Multi-Modal Loop Premium) to maximize revenue, manage compute efficiency, and consistently deliver production-grade 9:16 and 16:9 animations.
+This specification outlines the architecture, principles, and implementation roadmap required to transition the Matemium AI assistant from a rigid, phase-based workflow into a dynamic, true ReAct (Reasoning + Acting) autonomous agent.
 
 ---
 
-## 2. Multi-Agent Lifecycle Architecture
+## 1. The Core Paradigm Shift
 
-```
- ┌────────────────────────────────────────────────────────┐
- │ 1. THE DIRECTOR AGENT (Creative Brainstorming & DSL)   │
- └───────────────────────────┬────────────────────────────┘
-                             │ Finalized Script & Mode Config
-                             ▼
-               { User Selected Mode? }
-              /                       \
-      (Audio Mode)                 (Mute Mode)
-            /                           \
- ┌─────────▼───────────────┐     ┌───────▼────────────────┐
- │ 2A. NARRATION PIPELINE  │     │ 2B. BEAT-CADENCE MAP   │
- │ Renders audio first;    │     │ Assigns standard pacing│
- │ extracts word-level     │     │ delays to narrative block│
- │ timestamps (Whisper JSON│     │ segments mathematically│
- └─────────┬───────────────┘     └───────┬────────────────┘
-           \                             /
-            └──────────────┬────────────┘
-                           │ Precise Timing Blueprint
- ┌─────────────────────────▼──────────────────────────────┐
- │ 3. THE ENGINEER AGENT (Surgical Code Generation)       │
- └─────────────────────────┬──────────────────────────────┘
-                           │ Python `scenes.py` + `assets.py`
- ┌─────────────────────────▼──────────────────────────────┐
- │ 4. THE CRITIC LOOP (Visual Self-Correction - Premium)  │◄──┐
- └─────────────────────────┬──────────────────────────────┘   │ Iterative
-                           │ Rendered Video Frames          │ Refinement
-                           ▼                                │ Loop
-                     { Passes Visual QC? } ─────────────────┘
-                           │ Yes
- ┌─────────────────────────▼──────────────────────────────┐
- │ 5. THE POST-PRODUCTION AGENT (Sound & Render Mix)     │
- └────────────────────────────────────────────────────────┘
+Currently, the Matemium local agent operates on a **hardcoded pipeline** (Director → Engineer → Critic). While effective for basic operations, it lacks the flexibility to handle ambiguous errors, perform deep codebase exploration, or course-correct gracefully.
 
-```
-
-### Phase 1: The Director Agent (Creative & Pedagogy)
-
-* **Role:** Acts as an elite math educator, Disney-grade scriptwriter, and seasoned content creator.
-* **Behavior:** If a user provides a weak prompt (e.g., *"Explain quadratic formula"*), the Director **rejects mediocrity**. It proactively suggests narrative hooks, visual metaphors (e.g., morphing a physical square area into algebraic variables), and pacing options.
-* **User Collaboration:** It loops with the user to lock in the script, tone, chapter layout boundaries (`# ---DIV: ...`), and configuration switches (Audio Mode vs. Mute Mode).
-
-### Phase 2: Timing Blueprint Instantiation (Decoupled Generation)
-
-Before a single line of animation code is structured, the absolute timeline must be mapped to ensure frame-perfect synchronization.
-
-* **Path A: Audio Mode (Audio-First Execution)**
-1. The script text is dispatched to high-fidelity TTS systems to compile the raw voiceover track.
-2. The resulting audio is processed via word-level timestamp extractors (e.g., Whisper JSON parsing) to isolate exact millisecond coordinates for every spoken keyphrase.
-3. Kinetic subtitle payloads are auto-baked into the design parameters.
-
-
-* **Path B: Mute Mode (Beat-Cadence Execution)**
-1. Audio generation is skipped completely to protect user token allocations or fulfill layout requirements.
-2. The engine switches to mathematical reading-cadence estimations (e.g., word-count-to-duration ratios scaled by mathematical reading complexities) to generate a static, predictable temporal layout map for the animation timeline.
-
-
-
-### Phase 3: The Engineer Agent (Surgical Implementation)
-
-* **Role:** A highly disciplined Manim/Matemium compiler specialist (inspired by Claude Code & Cursor).
-* **Behavior:** Translates the locked script and its precise Timing Blueprint into **strictly decoupled** Python infrastructure:
-* `scenes.py`: Clean, readable timeline narrative using `CanvasBuilder` and structural flex layout dicts (`style={}`). **Crucial:** It explicitly anchors animation reveal delays and camera moves to the calculated durations passed down by Phase 2 via explicit `builder.wait(duration)` markers.
-* `assets.py`: Heavy lifting, pure mathematics, LaTeX strings, coordinate generation matrices, and mesh definitions.
-
-
-* **Execution Strategy:** Uses targeted Search/Replace diff patches rather than rewriting entire files, protecting local compute resources.
-
-### Phase 4: The Critic & Self-Correction Loop (Premium Multi-Modal)
-
-* **Role:** Quality Assurance inspector using multi-modal capabilities.
-* **Behavior:**
-1. Triggers local execution via the sidecar pipeline (`compile_manim`).
-2. If standard compilation fails, it parses `stderr`, runs absolute self-correction patches, and retries (capped at 3 attempts).
-3. **Visual Verification:** On successful build, it inspects keyframe image screenshots or mini-clip renders via multi-modal vision inputs. It checks for clipping text, overlapping math objects, or poor contrast, adjusting `style={}` layouts automatically until visual balance is achieved.
-
-
-
-### Phase 5: The Post-Production Mixer (Final Assembly)
-
-* **Role:** Sound engineer.
-* **Behavior:**
-* *In Audio Mode:* Uses `ffmpeg` sidecar tasks to map background audio tracks (Suno/Udio hooks) tightly against the generated narrative voiceover track, combining them directly into `ReelCutter` splits.
-* *In Mute Mode:* Skips voice tracks entirely; optional option to attach smooth, low-fidelity ambient backing tracks or deliver pure silent canvas exports.
-
-
+The goal is to shift to an **Autonomous ReAct (Reasoning and Acting) loop**. In this model, the agent is given a top-level objective and a suite of tools. The agent autonomously decides:
+1.  **What information it needs** (Thought).
+2.  **How to get it or change it** (Action / Tool Call).
+3.  **How to adapt based on the result** (Observation).
 
 ---
 
-## 3. Business & Monetization Matrix
+## 2. Architectural Pillars
 
-To optimize API costs while giving users freedom, Matemium uses a hybrid **Dynamic Token Wallet + Add-On Features** model.
+To enable true autonomy while protecting context limits (the "Hero" of context management), the system must implement the following pillars:
 
-### Token Economy
+### A. The ReAct Loop Engine
+The core runner must support iterative, multi-turn executions triggered by a single user prompt.
+*   **System Prompt:** The agent is instructed on its available tools, its objective, and the strict requirement to reason before acting.
+*   **Tool Calling Schema:** We must implement standard OpenAI-compatible tool definitions (or generic JSON-schema definitions for local GGUF models) that the LLM can invoke.
+*   **Execution Wrapper:** A robust `while` loop that captures the LLM's tool call, executes the local Python function, appends the tool output as a "user" or "tool" message, and re-queries the LLM until it emits a "Task Complete" signal or final response.
 
-* **The Unit:** Users purchase a generic pool of "Matemium Tokens".
-* **Model Scaling:** Token deduction scales directly based on the engine model driving the session:
-* *Standard Tasks (GPT-4o mini / Claude Haiku):* 1x Token multiplier.
-* *Elite Reasoning Tasks (Claude 3.5 Sonnet / GPT-4o):* 5x Token multiplier.
-* *Deep Thinking/Heavy Engine (Claude 3 Opus / o1/o3):* 12x Token multiplier.
+### B. Radical Context Minimization (Tool Design)
+The agent must never be forced to process the entire codebase at once. Tools must be designed for surgical precision.
+*   **`read_file(path, start_line, end_line)`:** Force the agent to read narrow slices of code.
+*   **`search_codebase(regex_pattern, dir_path)`:** Allow the agent to grep for usages and symbols.
+*   **`list_directory(path)`:** Allow the agent to navigate the project structure autonomously.
+*   **`replace_in_file(path, search_string, replace_string)`:** The exact, surgical Aider-style block we already perfected, now wrapped as an explicit, targeted tool.
 
+### C. Self-Healing & Validation (The "Critic" as an Action)
+Currently, the Critic is a hardcoded fallback phase. In a ReAct agent, validation is just another tool output.
+*   **`run_compiler()`:** A tool the agent can call to attempt a build. The observation returned is the `stderr` or compilation success.
+*   If `run_compiler()` fails, the agent *autonomously* decides to read the problematic line, formulate a fix, apply it using `replace_in_file`, and call `run_compiler()` again.
 
-* **Onboarding:** New users receive a complimentary bucket of one-time non-refreshing tokens to demo standard operations.
-
-### Feature Access Levels
-
-| Feature | Basic Plan / Token Only | Premium Plan (Subscription + Tokens) |
-| --- | --- | --- |
-| **Code Generation** | Standard text diff patches | Multi-modal visual feedback loop |
-| **Audio Sync / Timing** | Beat-Cadence (Mute Mode Only) | Full Audio-First Timestamp Extraction Engine |
-| **Watermarking** | Permanent `"matemium"` logo overlay | Removable via subscription or flat per-project token fee |
-| **Reel Cutting** | Standard multi-file splitting | Batch export directly optimized for platform metadata |
+### D. Sub-Agent Compression (Hierarchical Delegation)
+For complex tasks (e.g., "Implement a new 3D tape scene"), the main "Orchestrator" agent should not bloat its context.
+*   The Orchestrator can call a tool: `delegate_task(agent_role="Researcher", instruction="Find where the SolutionTape class is defined and summarize its API.")`
+*   A fresh, isolated ReAct loop spawns, performs the task, and returns a dense summary. The Orchestrator's context remains clean and fast.
 
 ---
 
-## 4. Agent Operational Guardrails & Directives
+## 3. Implementation Roadmap
 
-When modifying or generating content within a workspace, the agent must stringently follow these internal laws:
+### Phase 1: Tool Infrastructure
+1.  Define a standard interface for Tools (Name, Description, Input Schema, Execution Callable).
+2.  Implement the core toolset:
+    *   `read_file_slice`
+    *   `grep_search`
+    *   `list_files`
+    *   `apply_diff_patch` (using our existing Aider logic)
+    *   `run_matemium_compiler`
 
-* **Guardrail 1: Radical Decoupling.** Under no circumstances should raw math coordinate computations, complex LaTeX string arrays, or raw procedural loops live inside `scenes.py`. Keep layouts clean; map logic to `assets.py`.
-* **Guardrail 2: Absolute Temporal Dependency.** Never guess wait/delay timings inside `scenes.py`. All structural durations MUST trace directly back to the calculated metrics delivered from the Phase 2 Timing Blueprint.
-* **Guardrail 3: Do Not Settle for Basic Logic.** If an animation is static or uninspiring, inject dynamic transforms, smooth camera zooms (`camera.py`), or subtle orthographic tilts to emphasize 3D transitions.
-* **Guardrail 4: Strict Error Capping.** The self-correction compile loop must drop a detailed trace log file (`.matemium_debug.json`) and halt for human confirmation if an issue cannot be resolved within 3 compile iterations. This prevents infinite token bleeding.
-* **Guardrail 5: Fail-Safe Defaults.** If an explicit styling variable is omitted by the user, fallback to the strict 9:16 vertical design aesthetic (dark mode, high-contrast mathematical colors like neon cyan, gold, and clean white).
+### Phase 2: The ReAct Engine Loop
+1.  Build the `AgentRunner` class that handles the `while` loop.
+2.  Integrate JSON-schema/Grammar parsing to reliably extract the LLM's thought and chosen tool.
+3.  Implement safety boundaries (e.g., `max_iterations = 15` to prevent infinite loops).
+
+### Phase 3: The Orchestrator System Prompt
+Design the master system prompt:
+> "You are an autonomous AI engineering agent for the Matemium platform. You operate in a continuous loop of Thought, Action, and Observation.
+> You must never guess code structure; always use your search and read tools to verify assumptions before modifying files.
+> Once you have modified a file, you must run the compiler tool to verify your changes. Do not report success until the compiler passes."
+
+### Phase 4: UI/UX Transparency (The Desktop Client)
+Integrate the ReAct loop logs into the desktop application's UI (building upon the `AI-CHAT-PROGRESS-SPEC.md`).
+*   Show the user real-time stream of:
+    *   🧠 *Thinking...*
+    *   🛠️ *Agent called `grep_search("CanvasBuilder")`*
+    *   👀 *Observation received (14 matches)*
+    *   🧠 *Thinking...*
+    *   ✏️ *Agent applied code patch to `scenes.py`*
+    *   ✅ *Agent ran compiler (Success)*
+
+---
+
+## 4. Conclusion
+By migrating from a rigid pipeline to a ReAct tool-calling architecture, Matemium's AI will evolve from a simple script-generator into a robust, context-aware co-programmer capable of independent debugging, surgical refactoring, and complex, multi-file orchestration.

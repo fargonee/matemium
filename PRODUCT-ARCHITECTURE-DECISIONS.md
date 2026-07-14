@@ -196,7 +196,40 @@ The gate is enforced in the Tauri layer and reflected in all UI surfaces.
 - Memory/CPU budgeting when running embeddings + Manim in the same process.
 - Offline behavior and caching strategy for public gallery metadata.
 - How hosted MCP will consume or surface local capabilities.
-- Future model fine-tunes (e.g., “Math-focused Jina”) and their manifest entries.
+
+## 15. Local LLM Architecture (Offline Agent Engine)
+
+**Decision:** Support offline-capable, local-first agentic orchestration using quantized GGUF format models, downloadable on-demand as a lazy configuration package.
+
+### A. Supported Models & Quantization Profiles
+To accommodate varying client hardware configurations (from standard laptops with CPU-only to powerful developer rigs), Matemium supports three distinct model options. All models utilize standard `Q4_K_M` (4-bit Medium) quantizations as the recommended default to maximize token generation speed, with an optional upgrade to `Q8_0` (8-bit) for high-precision scenarios:
+
+1. **Lite Tier: Qwen-2.5-Coder-3B-Instruct**
+   - **Download Size:** **~1.9 GB** (Q4_K_M) / **~3.2 GB** (Q8_0)
+   - **VRAM/RAM Required:** ~4 GB / ~6 GB
+   - **Target Audience:** Standard/budget machines, CPU-only execution, ultrabooks. Optimized for maximum speed-of-generation with low latency.
+2. **Balanced Tier (Recommended): Qwen-2.5-Coder-7B-Instruct**
+   - **Download Size:** **~4.7 GB** (Q4_K_M) / **~7.7 GB** (Q8_0)
+   - **VRAM/RAM Required:** ~8 GB / ~12 GB
+   - **Target Audience:** Modern developer machines with dedicated GPUs, Apple Silicon MacBooks (M1/M2/M3 Unified Memory). Offers highly robust math layout reasoning and domain-specific code correctness.
+3. **Elite Tier: Llama-3-8B-Instruct**
+   - **Download Size:** **~4.9 GB** (Q4_K_M) / **~8.5 GB** (Q8_0)
+   - **VRAM/RAM Required:** ~8.5 GB / ~12.5 GB
+   - **Target Audience:** Top-spec workstations. High pedagogical dialogue capability.
+
+### B. Download Lifecycle & Lazy Configuration UX
+- **Installer footprint:** The installer remains a sleek **~50 MB**. GGUF models are strictly downloaded in the background post-installation.
+- **Gated Toggle:** In the Settings screen, users can activate `[ ] Enable Local LLM Engine (Offline Mode)`.
+- **Background Downloader:** Once toggled, the Tauri Rust asset manager (`downloads.rs`) initiates a resumable background download from the Matemium asset manifest, saving the model file to standard user-writable paths:
+  - Linux: `~/.local/share/Matemium/models/...`
+  - macOS: `~/Library/Application Support/Matemium/models/...`
+  - Windows: `%LOCALAPPDATA%\Matemium\models\...`
+- **Progress Reporting:** Tauri emits real-time progress percentages over the workspace events channel, allowing the UI to show a status bar progress card without freezing the application.
+
+### C. Sidecar Handshake & Execution Integration
+- Upon successful download and SHA256 checksum verification, the Tauri layer writes the path of the model and sets `"use_local_llm": true` in the application state.
+- The Python sidecar reads this configuration and instantiates local LLM orchestrators (via `llama.cpp` bindings or pointing to an OpenAI-compatible local adapter on port 11434).
+- The `CoordinatorConfig` in `matemium/agent/coordinator.py` overrides the `director_fn`, `engineer_fn`, and `critic_fn` stubs with active local LLM handlers, enabling completely offline animation generation.
 
 ## Summary Table of Major Shifts
 
@@ -204,7 +237,7 @@ The gate is enforced in the Tauri layer and reflected in all UI surfaces.
 |-------------------------|---------------------------------|----------------------------------------------|
 | Vector DB               | None                            | Fully local in sidecar (LanceDB + Jina)     |
 | Embeddings              | N/A                             | jina-embeddings-v2-base-code ONNX int8      |
-| Model delivery          | Bundled or none                 | First-run download (Rust)                   |
+| Model delivery          | Bundled or none                 | First-run download of Embeddings + GGUF LLMs (Tauri lazy-downloaded) |
 | Sidecar                 | Eager full engine               | Minimal control plane + lazy registry       |
 | Public content          | None                            | YouTube + thin metadata                     |
 | Publishing              | N/A                             | Official channel, metadata only             |
@@ -218,4 +251,4 @@ This document should be treated as the single source of truth for these product 
 
 ---
 
-*Last updated during the design conversation of 2026-07-02.*
+*Last updated during the design conversation of 2026-07-12.*

@@ -292,7 +292,6 @@ class Space3DDemo(CanvasScene):
 
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="3D Space Demo")
-        tape = builder.add_tape("main")
 
         # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
         # mode will automatically look straight down the local normal (from above).

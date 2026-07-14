@@ -29,9 +29,43 @@ try:
         Resource,
         ResourceContents,
     )
+    HAS_MCP = True
 except ImportError:
-    print("MCP SDK not installed. Install with: pip install 'matemium[intelligence]' or 'mcp'", file=sys.stderr)
-    sys.exit(1)
+    HAS_MCP = False
+    # Mock fallback stubs to prevent import-time compilation or crash failures
+    class Server:
+        def __init__(self, name: str):
+            self.name = name
+        def list_tools(self):
+            return lambda fn: fn
+        def call_tool(self):
+            return lambda fn: fn
+        def list_resources(self):
+            return lambda fn: fn
+        def read_resource(self):
+            return lambda fn: fn
+        async def run(self, *args, **kwargs):
+            raise ImportError("MCP SDK is not installed in the current environment.")
+    class Tool:
+        def __init__(self, name: str, description: str, inputSchema: dict[str, Any]):
+            self.name = name
+            self.description = description
+            self.inputSchema = inputSchema
+    class Resource:
+        def __init__(self, uri: str, name: str, description: str, mimeType: str | None = None):
+            self.uri = uri
+            self.name = name
+            self.description = description
+            self.mimeType = mimeType
+    class ResourceContents:
+        def __init__(self, uri: str, mimeType: str, text: str):
+            self.uri = uri
+            self.mimeType = mimeType
+            self.text = text
+    class TextContent:
+        def __init__(self, type: str, text: str):
+            self.type = type
+            self.text = text
 
 from .ipc.events import EventEmitter
 from .ipc.protocol import Request
@@ -108,6 +142,20 @@ async def list_tools() -> list[Tool]:
                     "workspace": {"type": "string", "description": "Optional workspace path"},
                 },
                 "required": ["query"],
+            },
+        ),
+        Tool(
+            name="run_lifecycle",
+            description="Execute the complete 5-phase multi-agent lifecycle to generate, synchronize, and compile mathematical animations.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_prompt": {"type": "string", "description": "The creative prompt explaining the mathematical animation concept"},
+                    "mode": {"type": "string", "enum": ["audio", "mute"], "description": "Audio-First (renders audio + timestamps) vs Mute-Mode (beat-cadence estimations)", "default": "mute"},
+                    "model_tier": {"type": "string", "enum": ["standard", "elite", "deep"], "default": "standard"},
+                    "account_tier": {"type": "string", "enum": ["basic", "premium"], "default": "basic"},
+                },
+                "required": ["user_prompt"],
             },
         ),
     ]
@@ -198,6 +246,43 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 return [TextContent(type="text", text=json.dumps(resp.result, indent=2))]
             return [TextContent(type="text", text=f"RETRIEVE_FAILED: {resp.error}")]
 
+        elif name == "run_lifecycle":
+            user_prompt = arguments.get("user_prompt")
+            mode_str = arguments.get("mode", "mute")
+            model_tier_str = arguments.get("model_tier", "standard")
+            account_tier_str = arguments.get("account_tier", "basic")
+            
+            from .agent.models import ProcessingMode, ModelTier, AccountTier
+            from .agent.coordinator import run_lifecycle
+            
+            mode = ProcessingMode(mode_str)
+            model_tier = ModelTier(model_tier_str)
+            account_tier = AccountTier(account_tier_str)
+            
+            ws = os.environ.get("MATEMIUM_ROOT") or "."
+            
+            # Execute the 5-phase lifecycle
+            result = run_lifecycle(
+                project_dir=ws,
+                user_prompt=user_prompt,
+                mode=mode,
+                model_tier=model_tier,
+                account_tier=account_tier,
+            )
+            
+            # Prepare serializable result dict
+            output = {
+                "ok": True,
+                "duration": result.post_production.total_duration,
+                "segments_count": len(result.blueprint.segments),
+                "tokens_spent": result.token_ledger.total_credits_spent(),
+                "artifacts": {
+                    "scenes_created": (Path(ws) / "scenes.py").exists(),
+                    "assets_created": (Path(ws) / "assets.py").exists(),
+                }
+            }
+            return [TextContent(type="text", text=json.dumps(output, indent=2))]
+
         return [TextContent(type="text", text=f"ERROR: unknown tool {name}")]
 
     except Exception as e:
@@ -243,6 +328,9 @@ async def read_resource(uri: str) -> list[ResourceContents]:
 
 async def main():
     """Run the MCP server over stdio (standard for local MCP clients)."""
+    if not HAS_MCP:
+        raise ImportError("MCP SDK not installed. Install with: pip install 'matemium[intelligence]' or 'mcp'")
+
     # Ensure workspace context if needed
     if "MATEMIUM_ROOT" not in os.environ:
         print("Warning: MATEMIUM_ROOT not set. MCP will use CWD for workspace files.", file=sys.stderr)

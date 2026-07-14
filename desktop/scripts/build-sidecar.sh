@@ -16,7 +16,7 @@ elif [[ -x "$VENV/Scripts/python.exe" ]]; then
   PIP="$VENV/Scripts/pip.exe"
 else
   echo "Missing engine venv at $VENV (looked for bin/python and Scripts/python.exe)"
-  echo "Create with: python -m venv .venv && .venv/bin/pip install -e '.[dev]' pyinstaller"
+  echo "Create with: python -m venv .venv && .venv/bin/pip install -e '.[dev,intelligence]' pyinstaller"
   exit 1
 fi
 

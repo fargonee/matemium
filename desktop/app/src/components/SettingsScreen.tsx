@@ -34,6 +34,164 @@ export function SettingsScreen({
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  const [assetStatuses, setAssetStatuses] = useState<Record<string, { downloaded: boolean; verified: boolean; progress?: number; error?: string; paused?: boolean }>>({});
+
+  const refreshStatuses = async () => {
+    try {
+      const qwen3b = await api.getAssetStatus("llm-qwen-coder-3b-q4");
+      const qwen7b = await api.getAssetStatus("llm-qwen-coder-7b-q4");
+      const llama8b = await api.getAssetStatus("llm-llama-8b-q4");
+
+      const next: typeof assetStatuses = {};
+      if (qwen3b?.[0]) next["llm-qwen-coder-3b-q4"] = qwen3b[0];
+      if (qwen7b?.[0]) next["llm-qwen-coder-7b-q4"] = qwen7b[0];
+      if (llama8b?.[0]) next["llm-llama-8b-q4"] = llama8b[0];
+
+      setAssetStatuses(prev => ({ ...prev, ...next }));
+    } catch (e) {
+      console.error("Failed to fetch asset statuses", e);
+    }
+  };
+
+  useEffect(() => {
+    refreshStatuses();
+
+    let unlisten: (() => void) | undefined;
+    void import("@tauri-apps/api/event").then(({ listen }) => {
+      listen("asset-progress", (event: any) => {
+        const payload = event.payload as { id: string; pct: number; message: string };
+        if (["llm-qwen-coder-3b-q4", "llm-qwen-coder-7b-q4", "llm-llama-8b-q4"].includes(payload.id)) {
+          setAssetStatuses(prev => ({
+            ...prev,
+            [payload.id]: {
+              downloaded: payload.pct === 100 && payload.message === "complete",
+              verified: payload.pct === 100 && payload.message === "complete",
+              progress: payload.pct,
+              error: payload.message.startsWith("failed") ? payload.message : undefined,
+              paused: payload.message === "paused",
+            }
+          }));
+        }
+      }).then(fn => { unlisten = fn; });
+    });
+
+    return () => { unlisten?.(); };
+  }, []);
+
+  const handleStartDownload = async (modelId: string) => {
+    try {
+      setAssetStatuses(prev => ({
+        ...prev,
+        [modelId]: { ...prev[modelId], progress: prev[modelId]?.progress || 0, error: undefined, downloaded: false, verified: false, paused: false }
+      }));
+      await api.startAssetDownload(modelId);
+      await refreshStatuses();
+    } catch (err) {
+      console.error("Failed to start download", err);
+    }
+  };
+
+  const handlePauseDownload = async (modelId: string) => {
+    try {
+      await api.pauseAssetDownload(modelId);
+      await refreshStatuses();
+    } catch (err) {
+      console.error("Failed to pause download", err);
+    }
+  };
+
+  const handleCancelDownload = async (modelId: string) => {
+    try {
+      await api.cancelAssetDownload(modelId);
+      await refreshStatuses();
+    } catch (err) {
+      console.error("Failed to cancel download", err);
+    }
+  };
+
+  const renderModelStatus = (modelId: string) => {
+    const status = assetStatuses[modelId];
+    if (!status) {
+      return (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+          <button type="button" className="btn btn-sm" onClick={() => void handleStartDownload(modelId)}>
+            Check Status
+          </button>
+        </div>
+      );
+    }
+
+    if (status.verified || status.downloaded) {
+      return (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--success-color, #10b981)", fontWeight: 600, marginTop: 4 }}>
+          <span style={{ fontSize: 14 }}>✓</span> Model is local &amp; fully ready
+        </div>
+      );
+    }
+
+    if (status.error && !status.paused) {
+      return (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+          <div style={{ fontSize: 11, color: "var(--fg-dim)", maxWidth: "70%" }}>
+            <span className="text-danger" style={{ color: "var(--error-color, #ef4444)" }}>Error: {status.error}</span>
+          </div>
+          <button type="button" className="btn btn-sm btn-primary" onClick={() => void handleStartDownload(modelId)}>
+            Retry Download
+          </button>
+        </div>
+      );
+    }
+
+    if (typeof status.progress === "number" && status.progress >= 0 && status.progress < 100) {
+      const isPaused = !!status.paused;
+      return (
+        <div style={{ marginTop: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+            <span style={{ color: "var(--fg-dim)", fontStyle: isPaused ? "italic" : "normal" }}>
+              {isPaused ? "Download paused" : "Downloading model assets..."}
+            </span>
+            <span style={{ fontWeight: 600, color: isPaused ? "var(--fg-dim)" : "var(--accent-color, #06b6d4)" }}>
+              {status.progress.toFixed(1)}%
+            </span>
+          </div>
+          <div style={{ height: 4, background: "var(--border-color)", borderRadius: 2, overflow: "hidden", position: "relative" }}>
+            <div style={{
+              width: `${status.progress}%`,
+              height: "100%",
+              background: isPaused ? "var(--border-color-dark, #4b5563)" : "var(--accent-color, #06b6d4)",
+              transition: "width 0.1s linear"
+            }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
+            {isPaused ? (
+              <button type="button" className="btn btn-sm btn-primary" onClick={() => void handleStartDownload(modelId)}>
+                Resume
+              </button>
+            ) : (
+              <button type="button" className="btn btn-sm" onClick={() => void handlePauseDownload(modelId)}>
+                Pause
+              </button>
+            )}
+            <button type="button" className="btn btn-sm btn-danger" onClick={() => void handleCancelDownload(modelId)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+        <div style={{ fontSize: 11, color: "var(--fg-dim)" }}>
+          Not downloaded yet.
+        </div>
+        <button type="button" className="btn btn-sm btn-primary" onClick={() => void handleStartDownload(modelId)}>
+          Download (Local Use)
+        </button>
+      </div>
+    );
+  };
+
   // Close on Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -223,7 +381,7 @@ export function SettingsScreen({
 
       case "ai":
         return (
-          <div className="settings-section">
+          <div className="settings-section" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div className="settings-section-header">
               <h3>AI &amp; LLM</h3>
               <p className="settings-section-desc">
@@ -231,11 +389,141 @@ export function SettingsScreen({
               </p>
             </div>
 
-            <div className="settings-card">
+            {/* Local LLM Offline Engine (Offline-First) */}
+            <div className="settings-card" style={{ border: settings.useLocalLlm ? "1px solid var(--accent-color, #06b6d4)" : "1px solid var(--border-color)" }}>
+              <label className="settings-checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={!!settings.useLocalLlm}
+                  onChange={(e) => {
+                    update({
+                      useLocalLlm: e.target.checked,
+                      usePersonalLlm: e.target.checked ? false : settings.usePersonalLlm,
+                    });
+                  }}
+                />
+                <div>
+                  <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                    Enable Local LLM Engine <span style={{
+                      borderRadius: 4,
+                      padding: "2px 6px",
+                      fontSize: 10,
+                      background: "var(--accent-dim, rgba(6, 182, 212, 0.15))",
+                      color: "var(--accent-color, #06b6d4)",
+                      fontWeight: 700,
+                      textTransform: "uppercase"
+                    }}>Offline Mode</span>
+                  </div>
+                  <div className="settings-hint" style={{ marginTop: 2 }}>
+                    Run state-of-the-art open mathematical assistant models entirely on your machine.
+                  </div>
+                </div>
+              </label>
+
+              {settings.useLocalLlm && (
+                <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-dim)" }}>
+                    Select local model:
+                  </div>
+
+                  {/* Model 1: Qwen 3B */}
+                  <div className="settings-model-row" style={{
+                    border: "1px solid var(--border-color)",
+                    borderRadius: 6,
+                    padding: 12,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    background: settings.localLlmModel === "llm-qwen-coder-3b-q4" ? "rgba(6, 182, 212, 0.05)" : "transparent"
+                  }}>
+                    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="local-llm-model"
+                        checked={settings.localLlmModel === "llm-qwen-coder-3b-q4"}
+                        onChange={() => update({ localLlmModel: "llm-qwen-coder-3b-q4" })}
+                        style={{ marginTop: 3 }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>Lite Tier: Qwen-2.5-Coder-3B-Instruct (1.9 GB)</div>
+                        <div className="settings-hint" style={{ fontSize: 11 }}>
+                          Optimized for low RAM (4GB+) and CPU-only devices. Ultra-fast generation.
+                        </div>
+                      </div>
+                    </label>
+                    {renderModelStatus("llm-qwen-coder-3b-q4")}
+                  </div>
+
+                  {/* Model 2: Qwen 7B */}
+                  <div className="settings-model-row" style={{
+                    border: "1px solid var(--border-color)",
+                    borderRadius: 6,
+                    padding: 12,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    background: settings.localLlmModel === "llm-qwen-coder-7b-q4" ? "rgba(6, 182, 212, 0.05)" : "transparent"
+                  }}>
+                    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="local-llm-model"
+                        checked={settings.localLlmModel === "llm-qwen-coder-7b-q4"}
+                        onChange={() => update({ localLlmModel: "llm-qwen-coder-7b-q4" })}
+                        style={{ marginTop: 3 }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>Balanced Tier: Qwen-2.5-Coder-7B-Instruct (4.7 GB)</div>
+                        <div className="settings-hint" style={{ fontSize: 11 }}>
+                          Perfect math layouts and coding correctness. Recommended for dedicated GPUs and M1/M2/M3 Macs.
+                        </div>
+                      </div>
+                    </label>
+                    {renderModelStatus("llm-qwen-coder-7b-q4")}
+                  </div>
+
+                  {/* Model 3: Llama 8B */}
+                  <div className="settings-model-row" style={{
+                    border: "1px solid var(--border-color)",
+                    borderRadius: 6,
+                    padding: 12,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    background: settings.localLlmModel === "llm-llama-8b-q4" ? "rgba(6, 182, 212, 0.05)" : "transparent"
+                  }}>
+                    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="local-llm-model"
+                        checked={settings.localLlmModel === "llm-llama-8b-q4"}
+                        onChange={() => update({ localLlmModel: "llm-llama-8b-q4" })}
+                        style={{ marginTop: 3 }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>Elite Tier: Llama-3-8B-Instruct (4.9 GB)</div>
+                        <div className="settings-hint" style={{ fontSize: 11 }}>
+                          Exceptional pedagogy and scripting style. Best for top-tier workstations.
+                        </div>
+                      </div>
+                    </label>
+                    {renderModelStatus("llm-llama-8b-q4")}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Cloud Hosted LLM options */}
+            <div className="settings-card" style={{
+              opacity: settings.useLocalLlm ? 0.5 : 1,
+              pointerEvents: settings.useLocalLlm ? "none" : "auto",
+              transition: "opacity 0.2s ease"
+            }}>
               <label className="settings-checkbox-row">
                 <input
                   type="checkbox"
                   checked={!!settings.usePersonalLlm}
+                  disabled={!!settings.useLocalLlm}
                   onChange={(e) => update({ usePersonalLlm: e.target.checked })}
                 />
                 <div>
@@ -251,6 +539,7 @@ export function SettingsScreen({
                 <select
                   className="settings-select"
                   value={settings.llmProvider || "openai"}
+                  disabled={!!settings.useLocalLlm}
                   onChange={(e) => update({ llmProvider: e.target.value })}
                 >
                   <option value="openai">OpenAI / Compatible</option>
@@ -264,6 +553,7 @@ export function SettingsScreen({
                 <button
                   type="button"
                   className="btn settings-btn-block"
+                  disabled={!!settings.useLocalLlm}
                   onClick={() =>
                     window.open(
                       `${config.serverUrl}/dashboard`,
@@ -276,8 +566,41 @@ export function SettingsScreen({
               </div>
             </div>
 
+            {/* Autonomous ReAct Agent Mode Option */}
+            <div className="settings-card" style={{ border: settings.useAutonomousAgent ? "1px solid #eab308" : "1px solid var(--border-color)" }}>
+              <label className="settings-checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={!!settings.useAutonomousAgent}
+                  onChange={(e) => {
+                    update({
+                      useAutonomousAgent: e.target.checked,
+                    });
+                  }}
+                />
+                <div>
+                  <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                    Enable Autonomous ReAct Agent Mode <span style={{
+                      borderRadius: 4,
+                      padding: "2px 6px",
+                      fontSize: 10,
+                      background: "rgba(234, 179, 8, 0.15)",
+                      color: "#eab308",
+                      fontWeight: 700,
+                      textTransform: "uppercase"
+                    }}>Experimental</span>
+                  </div>
+                  <div className="settings-hint" style={{ marginTop: 2 }}>
+                    Allow the AI to autonomously reason, search files, read slices, apply patches, and compile/self-heal in a multi-turn ReAct loop.
+                  </div>
+                </div>
+              </label>
+            </div>
+
             <div className="settings-hint">
-              The desktop app just selects the mode. Actual keys and billing live on the web.
+              {settings.useLocalLlm
+                ? "Running with local model. Internet access is not required."
+                : "The desktop app just selects the mode. Actual keys and billing live on the web."}
             </div>
           </div>
         );

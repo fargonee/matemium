@@ -21,6 +21,7 @@ struct SidecarInner {
     stdout_buffer: String,
 }
 
+#[derive(Clone)]
 pub struct SidecarManager {
     app: AppHandle,
     paths: AppPaths,

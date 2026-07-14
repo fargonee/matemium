@@ -37,7 +37,15 @@ class KeywordRetriever:
             p = self.workspace / name
             if p.exists():
                 try:
-                    self._cache[name] = p.read_text(encoding="utf-8", errors="ignore")
+                    if p.suffix.lower() == ".pdf":
+                        import subprocess
+                        try:
+                            content = subprocess.check_output(["pdftotext", str(p), "-"], text=True, errors="ignore")
+                            self._cache[name] = content
+                        except Exception:
+                            pass
+                    else:
+                        self._cache[name] = p.read_text(encoding="utf-8", errors="ignore")
                 except Exception:
                     pass
 
@@ -151,7 +159,7 @@ class VectorRetriever:
         embeddings = model.encode(texts, convert_to_numpy=True, normalize_embeddings=True)
         return embeddings.tolist()
 
-    def index_files(self, files: list[str], force: bool = False) -> int:
+    def index_files(self, files: list[str], force: bool = False, events: Any = None) -> int:
         """Index the given files (scenes.py, assets.py, etc.). Returns number of chunks."""
         if not self.workspace or not self._use_vector:
             return 0
@@ -166,22 +174,25 @@ class VectorRetriever:
             if not p.exists():
                 continue
             try:
-                text = p.read_text(encoding="utf-8", errors="ignore")
+                if p.suffix.lower() == ".pdf":
+                    import subprocess
+                    try:
+                        text = subprocess.check_output(["pdftotext", str(p), "-"], text=True, errors="ignore")
+                    except Exception:
+                        continue
+                else:
+                    text = p.read_text(encoding="utf-8", errors="ignore")
             except Exception:
                 continue
 
-            # Simple chunking: by sections or paragraphs
-            sections = re.split(r"(?m)^(# ---DIV:.*---|^def |^class )", text)
-            current = ""
-            for part in sections:
-                if re.match(r"^(# ---DIV:|^def |^class )", part):
-                    if current.strip():
-                        chunks.append({"file": fname, "text": current.strip()})
-                    current = part
-                else:
-                    current += part
-            if current.strip():
-                chunks.append({"file": fname, "text": current.strip()})
+            from .chunking import autodetect_and_chunk
+            file_chunks = autodetect_and_chunk(text, file_path=p, embedding_model=self._model)
+            if file_chunks and events is not None:
+                method = file_chunks[0]["metadata"].get("method", "unknown")
+                msg = f"Autodetected optimal chunker for {fname}: '{method}' ({len(file_chunks)} chunks)"
+                events.emit("loading_phase", phase="CHUNKING_STATUS", message=msg)
+            for fc in file_chunks:
+                chunks.append({"file": fname, "text": fc["text"]})
 
         if not chunks:
             return 0

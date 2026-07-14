@@ -36,6 +36,37 @@ pub fn run() {
 
             let sidecar = sidecar::SidecarManager::new(app.handle().clone(), paths.clone());
             let assets = crate::assets::AssetManager::new(paths.clone());
+
+            // Automatically synchronize LLM config to sidecar on startup!
+            let sidecar_clone = sidecar.clone();
+            let assets_clone = assets.clone();
+            let paths_clone = paths.clone();
+            tauri::async_runtime::spawn(async move {
+                let settings = paths_clone.load_settings().unwrap_or_default();
+                let use_local_llm = settings.use_local_llm.unwrap_or(false);
+                let mut model_path = "".to_string();
+
+                if use_local_llm {
+                    if let Some(ref model_id) = settings.local_llm_model {
+                        let statuses = assets_clone.get_status(Some(model_id));
+                        if let Some(status) = statuses.first() {
+                            if status.verified {
+                                if let Some(ref path) = status.path {
+                                    model_path = path.clone();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let params = serde_json::json!({
+                    "use_local_llm": use_local_llm,
+                    "model_path": model_path,
+                });
+
+                let _ = sidecar_clone.request("update_llm_config", params).await;
+            });
+
             app.manage(state::AppState { paths, sidecar, assets });
             Ok(())
         })
@@ -50,8 +81,14 @@ pub fn run() {
             commands::sidecar_configure_assets,
             commands::get_asset_status,
             commands::start_asset_download,
+            commands::pause_asset_download,
+            commands::cancel_asset_download,
             commands::get_readiness,
             commands::sidecar_retrieve,
+            commands::sidecar_upload_reference,
+            commands::sidecar_list_references,
+            commands::sidecar_delete_reference,
+            commands::sidecar_get_reference_content,
             commands::publish_animation,
             commands::list_gallery,
             commands::sidecar_lint,
@@ -65,6 +102,9 @@ pub fn run() {
             commands::cloud_chat,
             commands::cloud_get_profile,
             commands::cloud_generate_audio,
+            commands::conversation_list,
+            commands::conversation_save,
+            commands::conversation_delete,
             commands::settings_get,
             commands::settings_set,
             commands::canonicalize_media_preview_path,

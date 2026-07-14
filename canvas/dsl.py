@@ -793,6 +793,8 @@ class SheetDSL:
             "timeline": [item.to_dict() if hasattr(item, "to_dict") else asdict(item) for item in self.timeline],
             "tapes": [t.to_dict() for t in self.tapes],
         }
+        if getattr(self, "root_tape", None):
+            d["root_tape"] = self.root_tape.to_dict()
         if self.root_objects:
             d["root_objects"] = [o.to_dict() for o in self.root_objects]
         return d

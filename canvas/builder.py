@@ -95,11 +95,22 @@ class CanvasBuilder:
         else:
             self.settings = CanvasSettings.for_reels(title=title, **settings_kwargs)
         self.dsl = SheetDSL(canvas_settings=self.settings)
-        self._tapes: Dict[str, TapeObject] = {}
-        self._current_tape: Optional[TapeObject] = None
+        self.root_tape = TapeObject(
+            id="root_tape",
+            local_elements=[],
+            local_canvas_settings=self.settings,
+        )
+        self.dsl.root_tape = self.root_tape
+        self._tapes: Dict[str, TapeObject] = {"root_tape": self.root_tape}
+        self._current_tape: Optional[TapeObject] = self.root_tape
         self._layouts: Dict[str, LayoutEngine] = {}
-        self._layout = None
-        self._current_layout = None
+        self._layout = LayoutEngine(
+            frame_width=self.settings.frame_width,
+            frame_height=self.settings.frame_height,
+            scope=self.root_tape,
+        )
+        self._layouts["root_tape"] = self._layout
+        self._current_layout = self._layout
         self._counter = 0
         self._boards: Dict[str, CanvasElement] = {}
         self._last_flex_ids: List[str] = []

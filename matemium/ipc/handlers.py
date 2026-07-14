@@ -136,18 +136,194 @@ def handle_retrieve(params: dict[str, Any], events: EventEmitter) -> dict[str, A
 
     query = str(params.get("query", ""))
     top_k = int(params.get("top_k", 8))
-    files = params.get("files") or ["scenes.py", "assets.py"]
+    
+    # Base files to index
+    files = list(params.get("files") or ["scenes.py", "assets.py"])
+    
+    # Auto-scan references/ directory if it exists and append those files for indexing
+    if workspace:
+        ref_dir = workspace / "references"
+        if ref_dir.is_dir():
+            for f_path in ref_dir.rglob("*"):
+                if f_path.is_file() and f_path.suffix.lower() in (".pdf", ".md", ".txt", ".tex", ".py", ".json", ".csv"):
+                    try:
+                        rel_path = f_path.relative_to(workspace)
+                        files.append(str(rel_path))
+                    except Exception:
+                        pass
 
     retriever = get_retriever(workspace)
-    # Try to index relevant files if it's the vector retriever and not yet indexed
+    
+    results = []
+    
+    # 1. Separate reference files and codebase files
+    reference_files = []
+    codebase_files = []
+    for f in files:
+        if f.startswith("references/") or f.startswith("references\\"):
+            reference_files.append(f)
+        else:
+            codebase_files.append(f)
+            
+    # 2. Extract and parse reference files using autodetected chunkers (guaranteed context)
+    for f in reference_files:
+        p = workspace / f if workspace else Path(f)
+        if p.is_file():
+            try:
+                if p.suffix.lower() == ".pdf":
+                    import subprocess
+                    text = subprocess.check_output(["pdftotext", str(p), "-"], text=True, errors="ignore")
+                else:
+                    text = p.read_text(encoding="utf-8", errors="ignore")
+                    
+                from ..intelligence.chunking import autodetect_and_chunk
+                file_chunks = autodetect_and_chunk(text, file_path=p)
+                # Cap maximum chunks to prevent context overflow (e.g. max 25 chunks per reference)
+                for fc in file_chunks[:25]:
+                    results.append({
+                        "file": f,
+                        "chunk": fc["text"],
+                        "score": 1.0,  # guaranteed score
+                    })
+            except Exception:
+                pass
+                
+    # 3. Perform semantic retrieve on the rest of the codebase (scenes.py, assets.py)
+    if codebase_files:
+        if hasattr(retriever, "index_files"):
+            try:
+                retriever.index_files(codebase_files, events=events)
+            except Exception:
+                pass
+        elif hasattr(retriever, "load_files"):
+            try:
+                retriever.load_files(codebase_files)
+            except Exception:
+                pass
+                
+        semantic_results = retriever.retrieve(query, top_k=top_k)
+        for r in semantic_results:
+            results.append({
+                "file": r.get("file"),
+                "chunk": r.get("chunk"),
+                "score": r.get("score", 0.85)
+            })
+
+    return {"query": query, "results": results, "top_k": top_k}
+
+
+def handle_upload_reference(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
+    """Uploads a reference document into the workspace references folder and indexes it.
+
+    Params:
+      workspace: The root path of the workspace (resolved dynamically).
+      file_name: The name of the file to save.
+      file_content_base64: Optional base64 encoded string (for binary or any files).
+      file_content_text: Optional plain text string (for markdown/txt notes).
+    """
+    workspace = _require_workspace(params)
+    file_name = str(params.get("file_name", "")).strip()
+    if not file_name:
+        raise ValueError("file_name is required")
+
+    # Sanitize file name to prevent path traversal
+    file_name = Path(file_name).name
+
+    ref_dir = workspace / "references"
+    ref_dir.mkdir(parents=True, exist_ok=True)
+    target_path = ref_dir / file_name
+
+    import base64
+    if b64_content := params.get("file_content_base64"):
+        content_bytes = base64.b64decode(str(b64_content))
+        target_path.write_bytes(content_bytes)
+    elif text_content := params.get("file_content_text"):
+        target_path.write_text(str(text_content), encoding="utf-8")
+    else:
+        raise ValueError("Either file_content_base64 or file_content_text must be provided")
+
+    # Trigger immediate indexing of the new reference file
+    retriever = get_retriever(workspace)
+    relative_file_name = f"references/{file_name}"
+    
+    indexed = False
     if hasattr(retriever, "index_files"):
         try:
-            retriever.index_files(files)
-        except Exception:
-            pass
+            retriever.index_files([relative_file_name], force=True, events=events)
+            indexed = True
+        except Exception as e:
+            print(f"[RAG] Failed to index new reference: {e}")
+    elif hasattr(retriever, "load_files"):
+        try:
+            retriever.load_files([relative_file_name])
+            indexed = True
+        except Exception as e:
+            print(f"[RAG] Failed to load new reference: {e}")
 
-    results = retriever.retrieve(query, top_k=top_k)
-    return {"query": query, "results": results, "top_k": top_k}
+    return {
+        "status": "success",
+        "file_name": file_name,
+        "path": str(target_path.resolve()),
+        "indexed": indexed
+    }
+
+
+def handle_list_references(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+    """Lists all uploaded reference documents in the workspace references folder."""
+    workspace = _require_workspace(params)
+    ref_dir = workspace / "references"
+    
+    files = []
+    if ref_dir.is_dir():
+        for p in ref_dir.iterdir():
+            if p.is_file():
+                files.append(p.name)
+                
+    return {"status": "success", "references": sorted(files)}
+
+
+def handle_delete_reference(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+    """Deletes a reference document from the references folder."""
+    workspace = _require_workspace(params)
+    file_name = str(params.get("file_name", "")).strip()
+    if not file_name:
+        raise ValueError("file_name is required")
+        
+    file_name = Path(file_name).name
+    target_path = workspace / "references" / file_name
+    
+    deleted = False
+    if target_path.is_file():
+        target_path.unlink()
+        deleted = True
+        
+    return {"status": "success", "file_name": file_name, "deleted": deleted}
+
+
+def handle_get_reference_content(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+    """Retrieves the full extracted text content of an uploaded reference document."""
+    workspace = _require_workspace(params)
+    file_name = str(params.get("file_name", "")).strip()
+    if not file_name:
+        raise ValueError("file_name is required")
+        
+    file_name = Path(file_name).name
+    p = workspace / "references" / file_name
+    
+    if not p.is_file():
+        raise FileNotFoundError(f"Reference file not found: {p}")
+        
+    content = ""
+    try:
+        if p.suffix.lower() == ".pdf":
+            import subprocess
+            content = subprocess.check_output(["pdftotext", str(p), "-"], text=True, errors="ignore")
+        else:
+            content = p.read_text(encoding="utf-8", errors="ignore")
+    except Exception as e:
+        content = f"Error reading reference content: {e}"
+        
+    return {"status": "success", "file_name": file_name, "content": content}
 
 
 def handle_configure_assets(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
@@ -660,11 +836,174 @@ def handle_get_preview_data(params: dict[str, Any], events: EventEmitter) -> dic
     }
 
 
+def handle_update_llm_config(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+    """Lightweight: tell sidecar whether to use a local GGUF LLM and its path.
+
+    Example: {"use_local_llm": true, "model_path": "/path/to/models/qwen.gguf"}
+    """
+    import os
+    use_local = params.get("use_local_llm", False)
+    model_path = params.get("model_path", "")
+
+    os.environ["MATEMIUM_USE_LOCAL_LLM"] = "true" if use_local else "false"
+    if model_path:
+        os.environ["MATEMIUM_LOCAL_LLM_MODEL_PATH"] = str(model_path)
+
+    return {"ok": True, "configured": list(params.keys())}
+
+
+def handle_local_chat(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
+    """Offline local LLM chat completion using LocalInferenceRunner."""
+    import uuid
+    import re
+    from ..agent.local_runner import LocalInferenceRunner
+    
+    messages = params.get("messages", [])
+    scenes_excerpt = params.get("scenes_excerpt", "")
+
+    full_messages = []
+    
+    # 1. Read scene authoring system prompt
+    from ..paths import ROOT
+    prompt_path = ROOT / "shared" / "prompts" / "scene-authoring-system.txt"
+    system_prompt = ""
+    if prompt_path.is_file():
+        try:
+            system_prompt = prompt_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            pass
+    if not system_prompt:
+        system_prompt = (
+            "You are Ferganus, a Matemium assistant. Users author animations in scenes.py "
+            "using CanvasBuilder and CanvasScene — not raw Manim. Respond with concise "
+            "guidance and propose concrete Python edits when asked."
+        )
+
+    full_messages.append({"role": "system", "content": system_prompt})
+
+    # 2. Append scenes excerpt as system context if provided
+    if scenes_excerpt:
+        if "--- REFERENCE FILE:" in scenes_excerpt:
+            parts = scenes_excerpt.split("// --- workspace context below ---")
+            if len(parts) == 2:
+                references_part = parts[0].strip()
+                scenes_part = parts[1].strip()
+                full_messages.append({
+                    "role": "system",
+                    "content": f"Reference documents provided by the user:\n{references_part}"
+                })
+                if scenes_part:
+                    full_messages.append({
+                        "role": "system",
+                        "content": f"Current scenes.py:\n```python\n{scenes_part}\n```"
+                    })
+            else:
+                full_messages.append({
+                    "role": "system",
+                    "content": f"Workspace context and reference files:\n{scenes_excerpt}"
+                })
+        else:
+            full_messages.append({
+                "role": "system",
+                "content": f"Current scenes.py:\n```python\n{scenes_excerpt}\n```"
+            })
+
+    # 3. Append conversation history
+    for msg in messages:
+        if msg.get("role") != "system":
+            full_messages.append({
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", "")
+            })
+
+    # 4. Initialize LocalInferenceRunner
+    runner = LocalInferenceRunner()
+    
+    # 5. Execute generation
+    response_text = ""
+    if runner.is_ollama_running():
+        # Generate via Ollama
+        response_text = runner._generate_via_ollama_messages(full_messages)
+    else:
+        # Generate via llama-cpp-python using ChatML formatting
+        prompt = ""
+        for msg in full_messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+        prompt += "<|im_start|>assistant\n"
+        
+        # Load GGUF model in-process
+        try:
+            from llama_cpp import Llama
+        except ImportError:
+            raise ImportError(
+                "The 'llama-cpp-python' library is not installed in the sidecar environment. "
+                "To use in-process GGUF models, please install it in your environment by running:\n"
+                "pip install llama-cpp-python"
+            )
+        
+        if not runner.model_path or not runner.model_path.is_file():
+            raise FileNotFoundError(
+                f"Local GGUF model path not found or invalid: {runner.model_path}. "
+                "Ensure the model is fully downloaded via Settings."
+            )
+            
+        import matemium.agent.local_runner as lr
+        if lr._LLAMA_CPP_MODEL is None:
+            lr._LLAMA_CPP_MODEL = Llama(
+                model_path=str(runner.model_path),
+                n_ctx=8192,
+                n_gpu_layers=-1,
+                verbose=False
+            )
+            
+        output = lr._LLAMA_CPP_MODEL(
+            prompt,
+            max_tokens=2048,
+            temperature=0.1,
+            stop=["<|im_end|>", "<|im_start|>", "system", "user", "assistant", "###"],
+            echo=False
+        )
+        response_text = str(output["choices"][0]["text"])
+
+    # 6. Parse Search/Replace blocks or code edits from response_text
+    code_edit = None
+    search_match = re.search(r"<<<<<<<\s*SEARCH\n(.*?)\n=======\n(.*?)\n>>>>>>>\s*REPLACE", response_text, re.DOTALL)
+    if search_match:
+        search_block = search_match.group(1)
+        replace_block = search_match.group(2)
+        code_edit = {
+            "description": "Local GGUF Model refinement",
+            "search": search_block,
+            "replace": replace_block,
+            "full_file": None
+        }
+
+    model_name = runner.model_path.name if runner.model_path else "local-gguf"
+    return {
+        "id": str(uuid.uuid4()),
+        "message": {
+            "role": "assistant",
+            "content": response_text
+        },
+        "code_edit": code_edit,
+        "model": model_name,
+        "stub": False
+    }
+
+
 COMMANDS: dict[str, HandlerFn] = {
     "ping": handle_ping,
     "get_status": handle_get_status,
     "configure_assets": handle_configure_assets,
+    "update_llm_config": handle_update_llm_config,
+    "local_chat": handle_local_chat,
     "retrieve": handle_retrieve,
+    "upload_reference": handle_upload_reference,
+    "list_references": handle_list_references,
+    "delete_reference": handle_delete_reference,
+    "get_reference_content": handle_get_reference_content,
     "list_scenes": handle_list_scenes,
     "lint_project": handle_lint_project,
     "check_project": handle_check_project,

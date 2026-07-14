@@ -25,6 +25,10 @@ class ChatCompletionRequest(BaseModel):
         description="Explicitly request to use the user's stored personal LLM keys for the selected provider.",
     )
     model: str | None = Field(None, description="Optional model override for this call")
+    use_autonomous_agent: bool = Field(
+        False,
+        description="Explicitly request to execute the autonomous multi-turn ReAct agent loop for this call.",
+    )
 
 
 class CodeEdit(BaseModel):

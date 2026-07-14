@@ -66,6 +66,7 @@ export interface RenderResult {
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
+  references?: string[];
 }
 
 export interface CodeEdit {
@@ -118,6 +119,11 @@ export interface Settings {
   // LLM preferences - user chooses personal keys (BYO via web dashboard) or platform credits
   usePersonalLlm?: boolean;
   llmProvider?: string;
+  useLocalLlm?: boolean;
+  localLlmModel?: string;
+  externalLlmModel?: string;
+  reasoningLevel?: string;
+  useAutonomousAgent?: boolean;
 }
 
 export interface TokenResponse {
@@ -249,4 +255,29 @@ export interface PreviewData {
   root_objects?: any[];
   root_tape?: any;
   observations?: any[];  // list of camera keyframes/observations for replay
+}
+
+export interface AssetManifestEntry {
+  id: string;
+  name: string;
+  url: string;
+  sha256: string;
+  size: number;
+  extract: boolean;
+  extract_format: "tar.gz" | "zip" | "none" | string;
+  install_path: string;
+  platforms: string[];
+}
+
+export interface AssetManifest {
+  version: string;
+  assets: AssetManifestEntry[];
+  notes?: string;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  createdAt: string;
+  messages: ChatMessage[];
 }

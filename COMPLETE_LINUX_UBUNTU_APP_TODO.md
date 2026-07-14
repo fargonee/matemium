@@ -1,6 +1,6 @@
 # Complete Linux / Ubuntu App — Master TODO
 
-**Goal:** Ship a **working Matemium Canvas desktop application on Ubuntu** that a non-developer can install, create a project, edit `scenes.py`, chat with AI (stub or real server), lint/check, render a video locally, and play back the MP4 — **without installing Python or Manim manually**.
+**Goal:** Ship a **working Matemium desktop application on Ubuntu** that a non-developer can install, create a project, edit `scenes.py`, chat with AI (stub or real server), lint/check, render a video locally, and play back the MP4 — **without installing Python or Manim manually**.
 
 **Definition of done (Ubuntu):**
 
@@ -263,7 +263,7 @@ cd src-tauri
 cargo init --name matemium-desktop
 cargo tauri init \
   --app-name Matemium \
-  --window-title "Matemium Canvas" \
+  --window-title "Matemium" \
   --frontend-dist ../app/dist \
   --dev-url http://localhost:5173
 ```

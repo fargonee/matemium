@@ -115,3 +115,131 @@ def test_render_project_produces_video(demo_workspace: Path, tmp_path: Path):
     assert preview.parent == demo_workspace / "renders"
     assert export.is_file()
     assert export.parent == out
+
+
+def test_upload_reference_text(demo_workspace: Path):
+    stdout = StringIO()
+    events = EventEmitter(stream=stdout)
+    
+    result = dispatch(
+        "upload_reference",
+        {
+            "workspace": str(demo_workspace),
+            "file_name": "syllabus.txt",
+            "file_content_text": "Trigonometric identities: sin^2 + cos^2 = 1."
+        },
+        events
+    )
+    assert result["status"] == "success"
+    assert result["file_name"] == "syllabus.txt"
+    assert (demo_workspace / "references" / "syllabus.txt").is_file()
+    assert (demo_workspace / "references" / "syllabus.txt").read_text(encoding="utf-8") == "Trigonometric identities: sin^2 + cos^2 = 1."
+
+
+def test_upload_reference_base64(demo_workspace: Path):
+    import base64
+    stdout = StringIO()
+    events = EventEmitter(stream=stdout)
+    
+    encoded = base64.b64encode(b"Euler formula: e^(ix) = cos(x) + i*sin(x)").decode("utf-8")
+    result = dispatch(
+        "upload_reference",
+        {
+            "workspace": str(demo_workspace),
+            "file_name": "euler.txt",
+            "file_content_base64": encoded
+        },
+        events
+    )
+    assert result["status"] == "success"
+    assert (demo_workspace / "references" / "euler.txt").is_file()
+    assert (demo_workspace / "references" / "euler.txt").read_text(encoding="utf-8") == "Euler formula: e^(ix) = cos(x) + i*sin(x)"
+
+
+def test_retrieve_autoscans_references(demo_workspace: Path):
+    # Upload first
+    dispatch(
+        "upload_reference",
+        {
+            "workspace": str(demo_workspace),
+            "file_name": "notes.md",
+            "file_content_text": "# Trigonometry\nLet us prove the sine rule of triangles."
+        },
+        EventEmitter(stream=StringIO())
+    )
+    
+    # Query RAG retrieve
+    resp = dispatch(
+        "retrieve",
+        {
+            "workspace": str(demo_workspace),
+            "query": "sine rule",
+            "top_k": 3
+        },
+        EventEmitter(stream=StringIO())
+    )
+    
+    # Verify we successfully auto-scanned references/ folder and found matches!
+    assert "results" in resp
+    results = resp["results"]
+    assert len(results) > 0
+    assert any("sine rule" in r["chunk"].lower() for r in results)
+
+
+def test_list_and_delete_references(demo_workspace: Path):
+    # Upload some references first
+    dispatch(
+        "upload_reference",
+        {
+            "workspace": str(demo_workspace),
+            "file_name": "ref1.txt",
+            "file_content_text": "First reference content."
+        },
+        EventEmitter(stream=StringIO())
+    )
+    dispatch(
+        "upload_reference",
+        {
+            "workspace": str(demo_workspace),
+            "file_name": "ref2.txt",
+            "file_content_text": "Second reference content."
+        },
+        EventEmitter(stream=StringIO())
+    )
+    
+    # List references
+    list_res = dispatch(
+        "list_references",
+        {"workspace": str(demo_workspace)},
+        EventEmitter(stream=StringIO())
+    )
+    assert list_res["status"] == "success"
+    assert "ref1.txt" in list_res["references"]
+    assert "ref2.txt" in list_res["references"]
+    
+    # Delete one
+    delete_res = dispatch(
+        "delete_reference",
+        {"workspace": str(demo_workspace), "file_name": "ref1.txt"},
+        EventEmitter(stream=StringIO())
+    )
+    assert delete_res["status"] == "success"
+    assert delete_res["deleted"] is True
+    
+    # List again and verify it is gone
+    list_res2 = dispatch(
+        "list_references",
+        {"workspace": str(demo_workspace)},
+        EventEmitter(stream=StringIO())
+    )
+    assert "ref1.txt" not in list_res2["references"]
+    assert "ref2.txt" in list_res2["references"]
+    
+    # Get content of the remaining reference
+    content_res = dispatch(
+        "get_reference_content",
+        {"workspace": str(demo_workspace), "file_name": "ref2.txt"},
+        EventEmitter(stream=StringIO())
+    )
+    assert content_res["status"] == "success"
+    assert content_res["content"] == "Second reference content."

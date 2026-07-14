@@ -136,10 +136,10 @@ jobs:
           python -m venv .venv
           if [ -f .venv/bin/pip ]; then
             .venv/bin/pip install --upgrade pip
-            .venv/bin/pip install -e ".[dev]" pyinstaller
+            .venv/bin/pip install -e ".[dev,intelligence]" pyinstaller
           else
             .venv/Scripts/pip.exe install --upgrade pip
-            .venv/Scripts/pip.exe install -e ".[dev]" pyinstaller
+            .venv/Scripts/pip.exe install -e ".[dev,intelligence]" pyinstaller
           fi
 
       - name: Set up Node.js

@@ -29,6 +29,14 @@ pub struct Settings {
     pub use_personal_llm: Option<bool>,
     #[serde(default)]
     pub llm_provider: Option<String>,
+    #[serde(default)]
+    pub use_local_llm: Option<bool>,
+    #[serde(default)]
+    pub local_llm_model: Option<String>,
+    #[serde(default)]
+    pub external_llm_model: Option<String>,
+    #[serde(default)]
+    pub reasoning_level: Option<String>,
 }
 
 fn default_server_url() -> String {
@@ -49,6 +57,10 @@ impl Default for Settings {
             bottom_dock_default: default_bottom_dock_default(),
             use_personal_llm: Some(false),
             llm_provider: Some("openai".to_string()),
+            use_local_llm: Some(false),
+            local_llm_model: Some("llm-qwen-coder-3b-q4".to_string()),
+            external_llm_model: Some("gpt-4o-mini".to_string()),
+            reasoning_level: Some("low".to_string()),
         }
     }
 }
@@ -98,6 +110,10 @@ impl AppPaths {
 
     pub fn project_json_path(&self, project_id: &str) -> PathBuf {
         self.workspace_dir(project_id).join("project.json")
+    }
+
+    pub fn conversations_path(&self, project_id: &str) -> PathBuf {
+        self.workspace_dir(project_id).join("conversations.json")
     }
 
     pub fn renders_dir(&self, project_id: &str) -> PathBuf {

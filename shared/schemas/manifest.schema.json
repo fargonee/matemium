@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matemium.app/schemas/manifest.schema.json",
+  "title": "AssetManifest",
+  "type": "object",
+  "required": ["version", "assets"],
+  "properties": {
+    "version": { "type": "string" },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "url", "sha256", "size", "extract", "extract_format", "install_path", "platforms"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "url": { "type": "string", "format": "uri" },
+          "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$|^PLACEHOLDER_REPLACE_WITH_REAL$" },
+          "size": { "type": "integer", "minimum": 0 },
+          "extract": { "type": "boolean" },
+          "extract_format": { "type": "string", "enum": ["tar.gz", "zip", "none"] },
+          "install_path": { "type": "string" },
+          "platforms": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["linux", "darwin", "windows"] }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "notes": { "type": "string" }
+  },
+  "additionalProperties": false
+}

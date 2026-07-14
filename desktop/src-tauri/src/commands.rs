@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use base64;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, State, Manager};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::cloud::{ChatCompletionRequest, ChatMessage, PublishRequest, PublishResponse};
@@ -94,6 +94,8 @@ pub struct CloudChatParams {
     // LLM selection flags (passed through to server for BYO vs platform)
     pub llm_provider: Option<String>,
     pub use_personal_llm: Option<bool>,
+    pub model: Option<String>,
+    pub use_autonomous_agent: Option<bool>,
 }
 
 #[tauri::command]
@@ -186,18 +188,50 @@ pub async fn start_asset_download(
     app: AppHandle,
     asset_id: String,
 ) -> Result<(), String> {
-    // In real use, after download we can call configure + notify sidecar
-    state.assets.start_download(app.clone(), &asset_id, None).await?;
+    let assets = state.assets.clone();
 
-    // After successful TinyTeX download, auto-configure sidecar if possible
-    if asset_id == "tinytex-linux" {
-        if let Some(bin_dir) = state.assets.tinytex_bin_dir() {
-            let _ = state.sidecar.request(
-                "configure_assets",
-                json!({ "tinytex_dir": bin_dir.to_string_lossy().to_string() }),
-            ).await;
+    // Spawn non-blocking background task to handle connection stream and range resuming
+    tokio::spawn(async move {
+        let res = assets.start_download(app.clone(), &asset_id, None).await;
+
+        match res {
+            Ok(_) => {
+                if asset_id == "tinytex-linux" {
+                    if let Some(state) = app.try_state::<AppState>() {
+                        if let Some(bin_dir) = assets.tinytex_bin_dir() {
+                            let _ = state.sidecar.request(
+                                "configure_assets",
+                                json!({ "tinytex_dir": bin_dir.to_string_lossy().to_string() }),
+                            ).await;
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                // Safely update the persisted state with the error and notify the frontend
+                assets.set_error(&asset_id, &e, &app);
+            }
         }
-    }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn pause_asset_download(
+    state: State<'_, AppState>,
+    asset_id: String,
+) -> Result<(), String> {
+    state.assets.pause_download(&asset_id);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn cancel_asset_download(
+    state: State<'_, AppState>,
+    asset_id: String,
+) -> Result<(), String> {
+    state.assets.cancel_download(&asset_id);
     Ok(())
 }
 
@@ -254,13 +288,69 @@ pub async fn sidecar_retrieve(
     project_id: String,
     query: String,
     top_k: Option<u32>,
+    files: Option<Vec<String>>,
 ) -> Result<Value, String> {
     let workspace = workspace_path(&state.paths, &project_id)?;
+    let index_files = files.unwrap_or_else(|| vec!["scenes.py".to_string(), "assets.py".to_string()]);
     state.sidecar.request("retrieve", json!({
         "workspace": workspace,
         "query": query,
         "top_k": top_k.unwrap_or(8),
-        "files": ["scenes.py", "assets.py"],
+        "files": index_files,
+    })).await
+}
+
+#[tauri::command]
+pub async fn sidecar_upload_reference(
+    state: State<'_, AppState>,
+    project_id: String,
+    file_name: String,
+    file_content_base64: Option<String>,
+    file_content_text: Option<String>,
+) -> Result<Value, String> {
+    let workspace = workspace_path(&state.paths, &project_id)?;
+    state.sidecar.request("upload_reference", json!({
+        "workspace": workspace,
+        "file_name": file_name,
+        "file_content_base64": file_content_base64,
+        "file_content_text": file_content_text,
+    })).await
+}
+
+#[tauri::command]
+pub async fn sidecar_list_references(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> Result<Value, String> {
+    let workspace = workspace_path(&state.paths, &project_id)?;
+    state.sidecar.request("list_references", json!({
+        "workspace": workspace,
+    })).await
+}
+
+#[tauri::command]
+pub async fn sidecar_delete_reference(
+    state: State<'_, AppState>,
+    project_id: String,
+    file_name: String,
+) -> Result<Value, String> {
+    let workspace = workspace_path(&state.paths, &project_id)?;
+    state.sidecar.request("delete_reference", json!({
+        "workspace": workspace,
+        "file_name": file_name,
+    })).await
+}
+
+#[tauri::command]
+pub async fn sidecar_get_reference_content(
+    state: State<'_, AppState>,
+    project_id: String,
+    file_name: String,
+) -> Result<Value, String> {
+    let workspace = workspace_path(&state.paths, &project_id)?;
+    state.sidecar.request("get_reference_content", json!({
+        "workspace": workspace,
+        "file_name": file_name,
     })).await
 }
 
@@ -414,12 +504,25 @@ pub async fn cloud_chat(
         return Err(format!("APP_NOT_READY: {}", readiness.message));
     }
     let settings = state.paths.load_settings()?;
+
+    // Route chat requests locally through the sidecar when local LLM is enabled!
+    if settings.use_local_llm.unwrap_or(false) {
+        let sidecar_params = serde_json::json!({
+            "messages": params.messages,
+            "scenes_excerpt": params.scenes_excerpt.unwrap_or_default(),
+            "model": params.model,
+        });
+        return state.sidecar.request("local_chat", sidecar_params).await;
+    }
+
     let request = ChatCompletionRequest {
         messages: params.messages,
         project_id: params.project_id,
         scenes_excerpt: params.scenes_excerpt,
         llm_provider: params.llm_provider,
         use_personal_llm: params.use_personal_llm,
+        model: params.model,
+        use_autonomous_agent: params.use_autonomous_agent,
     };
     crate::cloud::chat_raw(&settings, request).await
 }
@@ -464,12 +567,41 @@ pub async fn list_gallery(state: State<'_, AppState>, search: Option<String>) ->
     crate::cloud::list_gallery(&settings, search.as_deref()).await
 }
 
+async fn sync_sidecar_llm_config(state: &State<'_, AppState>) -> Result<(), String> {
+    let settings = state.paths.load_settings()?;
+    let use_local_llm = settings.use_local_llm.unwrap_or(false);
+    let mut model_path = "".to_string();
+
+    if use_local_llm {
+        if let Some(ref model_id) = settings.local_llm_model {
+            let statuses = state.assets.get_status(Some(model_id));
+            if let Some(status) = statuses.first() {
+                if status.verified {
+                    if let Some(ref path) = status.path {
+                        model_path = path.clone();
+                    }
+                }
+            }
+        }
+    }
+
+    let params = serde_json::json!({
+        "use_local_llm": use_local_llm,
+        "model_path": model_path,
+    });
+
+    let _ = state.sidecar.request("update_llm_config", params).await;
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn settings_set(
     state: State<'_, AppState>,
     settings: Settings,
 ) -> Result<(), String> {
-    state.paths.save_settings(&settings)
+    state.paths.save_settings(&settings)?;
+    let _ = sync_sidecar_llm_config(&state).await;
+    Ok(())
 }
 
 #[derive(Debug, Deserialize)]
@@ -761,6 +893,107 @@ pub async fn project_open_output(
     app.opener()
         .open_path(path.display().to_string(), None::<&str>)
         .map_err(|e| format!("open file: {e}"))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Conversation {
+    pub id: String,
+    pub title: String,
+    pub created_at: String,
+    pub messages: Vec<ChatMessage>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationListParams {
+    pub project_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationSaveParams {
+    pub project_id: String,
+    pub conversation: Conversation,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationDeleteParams {
+    pub project_id: String,
+    pub conversation_id: String,
+}
+
+#[tauri::command]
+pub async fn conversation_list(
+    state: State<'_, AppState>,
+    params: ConversationListParams,
+) -> Result<Value, String> {
+    let path = state.paths.conversations_path(&params.project_id);
+    if !path.exists() {
+        return Ok(serde_json::Value::Array(vec![]));
+    }
+    let data = std::fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read conversations file: {}", e))?;
+    let list: Vec<Conversation> = serde_json::from_str(&data)
+        .unwrap_or_else(|_| vec![]);
+    serde_json::to_value(list).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn conversation_save(
+    state: State<'_, AppState>,
+    params: ConversationSaveParams,
+) -> Result<(), String> {
+    let path = state.paths.conversations_path(&params.project_id);
+    let mut list: Vec<Conversation> = if path.exists() {
+        let data = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read conversations file: {}", e))?;
+        serde_json::from_str(&data).unwrap_or_else(|_| vec![])
+    } else {
+        vec![]
+    };
+
+    // Find and update or append
+    let mut found = false;
+    for c in list.iter_mut() {
+        if c.id == params.conversation.id {
+            *c = params.conversation.clone();
+            found = true;
+            break;
+        }
+    }
+    if !found {
+        list.push(params.conversation);
+    }
+
+    let data = serde_json::to_string_pretty(&list)
+        .map_err(|e| format!("Failed to serialize conversations: {}", e))?;
+    std::fs::write(&path, data)
+        .map_err(|e| format!("Failed to write conversations file: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn conversation_delete(
+    state: State<'_, AppState>,
+    params: ConversationDeleteParams,
+) -> Result<(), String> {
+    let path = state.paths.conversations_path(&params.project_id);
+    if !path.exists() {
+        return Ok(());
+    }
+    let data = std::fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read conversations: {}", e))?;
+    let mut list: Vec<Conversation> = serde_json::from_str(&data)
+        .unwrap_or_else(|_| vec![]);
+
+    list.retain(|c| c.id != params.conversation_id);
+
+    let data = serde_json::to_string_pretty(&list)
+        .map_err(|e| format!("Failed to serialize conversations: {}", e))?;
+    std::fs::write(&path, data)
+        .map_err(|e| format!("Failed to write conversations: {}", e))?;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -37,6 +37,8 @@ intelligence = [
     "sentence-transformers>=3.0.0",
     # For MCP server
     "mcp>=0.1.0",
+    # For GGUF local offline LLM inference:
+    "llama-cpp-python>=0.2.75",
 ]
 dev = [
     "pytest>=8.0",

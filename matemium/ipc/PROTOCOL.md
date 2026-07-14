@@ -46,6 +46,7 @@ Events may arrive **between** the request write and the matching response line. 
 |---------|-----------------|--------|
 | `get_status` | — | Lightweight status: `{ phase, engine_loaded, core_ready, version, ... }`. Does **not** load heavy engines. |
 | `configure_assets` | e.g. `{"tinytex_dir": "..."}` | `{ok, configured: [...]}`. Light (no engine). Allows Rust to tell sidecar asset locations early. |
+| `update_llm_config` | `use_local_llm`, `model_path` | `{ok, configured: [...]}`. Light (no engine). Tells the sidecar whether to use a local GGUF LLM and maps its local path. |
 | `retrieve` | `{"query": "...", "workspace"?, "top_k"?: 8, "files"?: [...]}` | `{query, results: [{file, chunk, score, type}], top_k}`. Uses vector RAG if INTELLIGENCE_READY, else keyword fallback. |
 | `lint_project` | `workspace` | `{ ok, diagnostics[], workspace }` |
 | `check_project` | `workspace`, (`scene`?) | `{ ok, errors[], warnings[], scene, timeline_length?, title? }` |

@@ -32,6 +32,8 @@ pub fn extract_access_token(response: &TokenResponse) -> String {
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub references: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,6 +48,10 @@ pub struct ChatCompletionRequest {
     pub llm_provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub use_personal_llm: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub use_autonomous_agent: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

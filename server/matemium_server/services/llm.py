@@ -50,7 +50,7 @@ def scene_authoring_system_prompt() -> str:
         return _SCENE_AUTHORING_PROMPT_PATH.read_text(encoding="utf-8").strip()
     except OSError:
         return (
-            "You are a Matemium Canvas assistant. Users author animations in scenes.py "
+            "You are Ferganus, a Matemium assistant. Users author animations in scenes.py "
             "using CanvasBuilder and CanvasScene — not raw Manim. Respond with concise "
             "guidance and propose concrete Python edits when asked."
         )
@@ -189,6 +189,57 @@ async def generate_speech(
 
 # ---------------- internal helpers ----------------
 
+def extract_code_edit(content: str) -> CodeEdit | None:
+    """
+    Extract a CodeEdit from the assistant's content.
+    Supports:
+    - Aider-style search/replace block.
+    - Full-file python code block if it contains class / CanvasScene definitions.
+    """
+    # 1. Search for Aider Search/Replace format
+    search_marker = "<<<<<<< SEARCH"
+    divider_marker = "======="
+    replace_marker = ">>>>>>> REPLACE"
+
+    search_idx = content.find(search_marker)
+    if search_idx >= 0:
+        divider_idx = content.find(divider_marker, search_idx)
+        replace_idx = content.find(replace_marker, divider_idx)
+        if divider_idx > search_idx and replace_idx > divider_idx:
+            search_text = content[search_idx + len(search_marker) : divider_idx]
+            replace_text = content[divider_idx + len(divider_marker) : replace_idx]
+            
+            # Clean up leading/trailing newlines
+            if search_text.startswith("\n"):
+                search_text = search_text[1:]
+            if search_text.endswith("\n"):
+                search_text = search_text[:-1]
+            if replace_text.startswith("\n"):
+                replace_text = replace_text[1:]
+            if replace_text.endswith("\n"):
+                replace_text = replace_text[:-1]
+
+            return CodeEdit(
+                description="Apply proposed search/replace edit",
+                search=search_text,
+                replace=replace_text,
+            )
+
+    # 2. Look for Python Markdown code blocks that look like full scenes.py files
+    import re
+    code_block_re = re.compile(r"```(?:python)?\s*\n(.*?)\n\s*```", re.DOTALL)
+    matches = code_block_re.findall(content)
+    for match in matches:
+        # Safety check: ensure it looks like a full scenes.py file (has CanvasScene / class definitions)
+        if ("CanvasScene" in match or "CanvasBuilder" in match) and "class " in match:
+            return CodeEdit(
+                description="Apply proposed full file replacement",
+                full_file=match.strip(),
+            )
+            
+    return None
+
+
 def _stub_response(request: ChatCompletionRequest) -> ChatCompletionResponse:
     last_user = next(
         (m.content for m in reversed(request.messages) if m.role == "user"),
@@ -220,12 +271,38 @@ async def _openai_compatible_chat(
 ) -> ChatCompletionResponse:
     messages = [{"role": "system", "content": scene_authoring_system_prompt()}]
     if request.scenes_excerpt:
-        messages.append(
-            {
-                "role": "system",
-                "content": f"Current scenes.py:\n```python\n{request.scenes_excerpt}\n```",
-            }
-        )
+        if "--- REFERENCE FILE:" in request.scenes_excerpt:
+            parts = request.scenes_excerpt.split("// --- workspace context below ---")
+            if len(parts) == 2:
+                references_part = parts[0].strip()
+                scenes_part = parts[1].strip()
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": f"Reference documents provided by the user:\n{references_part}",
+                    }
+                )
+                if scenes_part:
+                    messages.append(
+                        {
+                            "role": "system",
+                            "content": f"Current scenes.py:\n```python\n{scenes_part}\n```",
+                        }
+                    )
+            else:
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": f"Workspace context and reference files:\n{request.scenes_excerpt}",
+                    }
+                )
+        else:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": f"Current scenes.py:\n```python\n{request.scenes_excerpt}\n```",
+                }
+            )
     messages.extend({"role": m.role, "content": m.content} for m in request.messages)
 
     async with httpx.AsyncClient(base_url=base_url, timeout=90.0) as client:
@@ -243,10 +320,11 @@ async def _openai_compatible_chat(
 
     choice = data["choices"][0]["message"]
     usage = data.get("usage", {})
+    code_edit = extract_code_edit(choice["content"])
     resp = ChatCompletionResponse(
         id=data.get("id", f"chatcmpl-{uuid.uuid4().hex[:12]}"),
         message=ChatMessage(role="assistant", content=choice["content"]),
-        code_edit=None,
+        code_edit=code_edit,
         model=data.get("model", model),
         stub=False,
     )

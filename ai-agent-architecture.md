@@ -462,10 +462,10 @@ User project workspaces are separate from the sidecar binary path — passed per
 | Tier | Mode | Project shape | User experience |
 |------|------|---------------|-----------------|
 | **v1 — Chat API** | Completions + optional diff blocks | Single `scenes.py` | User reviews/applies patches |
-| **v2 — Agent** | Tool loop + self-correction | **`scenes.py` + `assets.py` only** | Agent edits, compiles, fixes autonomously |
-| **v3 — Local agent** (future) | Same tools, local model | Two-file | Offline-capable orchestration |
+| **v2 — Agent (Cloud)** | Tool loop + self-correction | **`scenes.py` + `assets.py` only** | Agent edits, compiles, fixes autonomously via cloud router |
+| **v3 — Local Agent** | Same tools, local model | Two-file | Offline-capable local orchestration using GGUF models (3B / 7B) |
 
-v1 remains supported for simple chat. **v2 is the target architecture** described in this document.
+v1 remains supported for simple chat. **v2 (Cloud)** and **v3 (Local)** are the primary target architectures. See `PRODUCT-ARCHITECTURE-DECISIONS.md` Section 15 for complete details on the local GGUF model specifications, lazy download sizes, and runtime sidecar handshake.
 
 ---
 

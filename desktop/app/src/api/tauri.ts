@@ -6,6 +6,7 @@ import type {
   ChatMessage,
   CheckResult,
   ClearCacheResult,
+  Conversation,
   LintResult,
   ListScenesResult,
   MediaPreviewResult,
@@ -104,6 +105,14 @@ export async function startAssetDownload(assetId: string): Promise<void> {
   return invoke("start_asset_download", { assetId });
 }
 
+export async function pauseAssetDownload(assetId: string): Promise<void> {
+  return invoke("pause_asset_download", { assetId });
+}
+
+export async function cancelAssetDownload(assetId: string): Promise<void> {
+  return invoke("cancel_asset_download", { assetId });
+}
+
 export interface Readiness {
   phase: string;
   assetsReady: boolean;
@@ -121,12 +130,59 @@ export async function getReadiness(): Promise<Readiness> {
 export async function sidecarRetrieve(
   projectId: string,
   query: string,
-  topK: number = 8
+  topK: number = 8,
+  files?: string[] | null,
 ): Promise<{ query: string; results: any[] }> {
   return invoke<{ query: string; results: any[] }>("sidecar_retrieve", {
-    project_id: projectId,
+    projectId,
     query,
-    top_k: topK,
+    topK,
+    files: files ?? null,
+  });
+}
+
+export async function sidecarUploadReference(
+  projectId: string,
+  fileName: string,
+  fileContentBase64?: string | null,
+  fileContentText?: string | null,
+): Promise<{ status: string; file_name: string; path: string; indexed: boolean }> {
+  return invoke<{ status: string; file_name: string; path: string; indexed: boolean }>(
+    "sidecar_upload_reference",
+    {
+      projectId,
+      fileName,
+      fileContentBase64: fileContentBase64 ?? null,
+      fileContentText: fileContentText ?? null,
+    }
+  );
+}
+
+export async function sidecarListReferences(
+  projectId: string,
+): Promise<{ status: string; references: string[] }> {
+  return invoke<{ status: string; references: string[] }>("sidecar_list_references", {
+    projectId,
+  });
+}
+
+export async function sidecarDeleteReference(
+  projectId: string,
+  fileName: string,
+): Promise<{ status: string; file_name: string; deleted: boolean }> {
+  return invoke<{ status: string; file_name: string; deleted: boolean }>("sidecar_delete_reference", {
+    projectId,
+    fileName,
+  });
+}
+
+export async function sidecarGetReferenceContent(
+  projectId: string,
+  fileName: string,
+): Promise<{ status: string; file_name: string; content: string }> {
+  return invoke<{ status: string; file_name: string; content: string }>("sidecar_get_reference_content", {
+    projectId,
+    fileName,
   });
 }
 
@@ -162,15 +218,17 @@ export async function cloudChat(
   messages: ChatMessage[],
   projectId?: string,
   scenesExcerpt?: string,
-  llmConfig?: { llm_provider?: string; use_personal_llm?: boolean },
+  llmConfig?: { llm_provider?: string; use_personal_llm?: boolean; model?: string; use_autonomous_agent?: boolean },
 ): Promise<ChatCompletionResponse> {
   return invoke<ChatCompletionResponse>("cloud_chat", {
     params: {
       messages,
       projectId: projectId ?? null,
       scenesExcerpt: scenesExcerpt ?? null,
-      llm_provider: llmConfig?.llm_provider ?? null,
-      use_personal_llm: llmConfig?.use_personal_llm ?? null,
+      llmProvider: llmConfig?.llm_provider ?? null,
+      usePersonalLlm: llmConfig?.use_personal_llm ?? null,
+      model: llmConfig?.model ?? null,
+      useAutonomousAgent: llmConfig?.use_autonomous_agent ?? null,
     },
   });
 }
@@ -268,4 +326,16 @@ export async function projectOpenOutput(projectId: string, path: string): Promis
 
 export async function sidecarGetPreviewData(projectId: string): Promise<PreviewData> {
   return invoke<PreviewData>("sidecar_get_preview_data", { params: { projectId } });
+}
+
+export async function listConversations(projectId: string): Promise<Conversation[]> {
+  return invoke<Conversation[]>("conversation_list", { params: { projectId } });
+}
+
+export async function saveConversation(projectId: string, conversation: Conversation): Promise<void> {
+  return invoke("conversation_save", { params: { projectId, conversation } });
+}
+
+export async function deleteConversation(projectId: string, conversationId: string): Promise<void> {
+  return invoke("conversation_delete", { params: { projectId, conversationId } });
 }

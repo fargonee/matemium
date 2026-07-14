@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Matemium Canvas",
+        "title": "Matemium",
         "width": 1280,
         "height": 800,
         "resizable": true,

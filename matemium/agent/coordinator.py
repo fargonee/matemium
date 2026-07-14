@@ -91,7 +91,23 @@ class LifecycleCoordinator:
         self.account_tier = account_tier
         self.watermark_removal_paid = watermark_removal_paid
         self.extra_project_tokens_spent = extra_project_tokens_spent
-        self.config = config or CoordinatorConfig()
+        
+        cfg = config or CoordinatorConfig()
+
+        # Dynamically inject local LLM overrides if Enable Local LLM setting is active
+        import os
+        if os.environ.get("MATEMIUM_USE_LOCAL_LLM") == "true":
+            from .local_agent import (
+                local_director_agent,
+                local_engineer_agent,
+                make_local_critic_patch_fn,
+            )
+            retriever = cfg.retriever_fn
+            cfg.director_fn = local_director_agent
+            cfg.engineer_fn = lambda session: local_engineer_agent(session, retriever_fn=retriever)
+            cfg.patch_fn = make_local_critic_patch_fn(self.project_dir)
+
+        self.config = cfg
 
     def _charge_phase(self, session: ProjectSession, phase: Phase, label: str) -> None:
         base = PHASE_TOKEN_BASE[phase]

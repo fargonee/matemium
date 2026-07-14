@@ -5,6 +5,7 @@ import config from "./config.json";
 import type {
   ChatMessage,
   CodeEdit,
+  Conversation,
   LintDiagnostic,
   LLMConfig,
   ProjectOpen,
@@ -87,8 +88,16 @@ export default function App() {
   const [linting, setLinting] = useState(false);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState("");
   const [pendingEdit, setPendingEdit] = useState<CodeEdit | null>(null);
+  const [chatProgressStep, setChatProgressStep] = useState<
+    "idle" | "preparing" | "retrieving" | "thinking" | "processing" | "refreshing"
+  >("idle");
+  const [chatContextMatches, setChatContextMatches] = useState<Array<{ file: string; score?: number }>>([]);
+  const [appliedEditErrors, setAppliedEditErrors] = useState<LintDiagnostic[]>([]);
+  const [uploadedReferences, setUploadedReferences] = useState<string[]>([]);
 
   const [settings, setSettings] = useState<Settings>({
     serverUrl: config.serverUrl,
@@ -106,10 +115,18 @@ export default function App() {
   const [outputsRefreshToken, setOutputsRefreshToken] = useState(0);
   const [mediaPreview, setMediaPreview] = useState<MediaPreviewItem | null>(null);
   const [readiness, setReadiness] = useState<api.Readiness | null>(null);
+  const [localModelReady, setLocalModelReady] = useState(true);
+  const [localModelStatusMsg, setLocalModelStatusMsg] = useState("");
+  const [downloadedModels, setDownloadedModels] = useState<Record<string, boolean>>({
+    "llm-qwen-coder-3b-q4": false,
+    "llm-qwen-coder-7b-q4": false,
+    "llm-llama-8b-q4": false,
+  });
   const [showGallery, setShowGallery] = useState(false);
   const {
     layout,
     setBottomPanelOpen,
+    setSidebarOpen,
     setContainerWidth,
     setEditorRegionHeight,
     setChatWidthFromPointer,
@@ -319,10 +336,46 @@ export default function App() {
     try {
       const r = await api.getReadiness();
       setReadiness(r);
+
+      // Query statuses of all 3 local models to know which ones are ready/downloaded
+      const qwen3b = await api.getAssetStatus("llm-qwen-coder-3b-q4");
+      const qwen7b = await api.getAssetStatus("llm-qwen-coder-7b-q4");
+      const llama8b = await api.getAssetStatus("llm-llama-8b-q4");
+
+      const nextDownloaded = {
+        "llm-qwen-coder-3b-q4": !!(qwen3b?.[0]?.downloaded && qwen3b?.[0]?.verified),
+        "llm-qwen-coder-7b-q4": !!(qwen7b?.[0]?.downloaded && qwen7b?.[0]?.verified),
+        "llm-llama-8b-q4": !!(llama8b?.[0]?.downloaded && llama8b?.[0]?.verified),
+      };
+      setDownloadedModels(nextDownloaded);
+
+      const currentModelId = settings.localLlmModel || "llm-qwen-coder-3b-q4";
+      const currentStatus = currentModelId === "llm-qwen-coder-3b-q4" ? qwen3b?.[0] :
+                            currentModelId === "llm-qwen-coder-7b-q4" ? qwen7b?.[0] :
+                            llama8b?.[0];
+
+      if (settings.useLocalLlm) {
+        if (currentStatus) {
+          const isModelReady = !!(currentStatus.downloaded && currentStatus.verified);
+          setLocalModelReady(isModelReady);
+          if (!isModelReady) {
+            const pct = typeof currentStatus.progress === "number" ? ` (${currentStatus.progress.toFixed(1)}%)` : "";
+            setLocalModelStatusMsg(`Downloading offline model${pct}...`);
+          } else {
+            setLocalModelStatusMsg("");
+          }
+        } else {
+          setLocalModelReady(false);
+          setLocalModelStatusMsg("Offline model not downloaded yet.");
+        }
+      } else {
+        setLocalModelReady(true);
+        setLocalModelStatusMsg("");
+      }
     } catch (e) {
       // ignore, default not ready
     }
-  }, []);
+  }, [settings.useLocalLlm, settings.localLlmModel]);
 
   const refreshLlmProfile = useCallback(async () => {
     if (!inTauri) return;
@@ -356,8 +409,10 @@ export default function App() {
     return () => { unlistenAsset?.(); };
   }, [refreshReadiness]);
 
-  const isReady = readiness?.fullyReady || readiness?.phase === "ready" || (readiness?.assetsReady && readiness?.engineReady);
-  const readinessMessage = readiness?.message || "Checking readiness...";
+  const isReady = (readiness?.fullyReady || readiness?.phase === "ready" || (readiness?.assetsReady && readiness?.engineReady)) && localModelReady;
+  const readinessMessage = !localModelReady 
+    ? (localModelStatusMsg || "Waiting for offline model...") 
+    : (readiness?.message || "Checking readiness...");
 
   // Auto trigger asset download on start if not ready (demo for phase 4)
   useEffect(() => {
@@ -455,6 +510,17 @@ export default function App() {
     [appendLog, project],
   );
 
+  const loadProjectReferences = useCallback(async (projectId: string) => {
+    try {
+      const res = await api.sidecarListReferences(projectId);
+      if (res.status === "success" && res.references) {
+        setUploadedReferences(res.references);
+      }
+    } catch (e) {
+      console.error("Failed to load project references:", e);
+    }
+  }, []);
+
   const openProjectById = useCallback(
     async (projectId: string) => {
       if (!isReady) {
@@ -473,15 +539,40 @@ export default function App() {
       });
       setDirtyFiles(EMPTY_DIRTY);
       setDiagnostics([]);
-      setChatMessages([]);
       setPendingEdit(null);
+
+      // Load conversations for the opened project
+      try {
+        const convList = await api.listConversations(opened.id);
+        setConversations(convList);
+        if (convList.length > 0) {
+          const activeId = convList[0].id;
+          setActiveConversationId(activeId);
+          setChatMessages(convList[0].messages);
+        } else {
+          const newConv: Conversation = {
+            id: Date.now().toString(),
+            title: "New Conversation",
+            createdAt: new Date().toISOString(),
+            messages: [],
+          };
+          await api.saveConversation(opened.id, newConv);
+          setConversations([newConv]);
+          setActiveConversationId(newConv.id);
+          setChatMessages([]);
+        }
+      } catch (e) {
+        console.error("Failed to load conversations:", e);
+        setChatMessages([]);
+      }
       setPipeline(INITIAL_PIPELINE_STATE);
       const sceneFallback = applyProjectRenderPrefs(opened.id, opened.scene_class);
       const scene = await loadScenes(opened.id, sceneFallback);
       saveProjectRenderPrefs(opened.id, { scene });
       setStatusMessage(`Opened ${opened.name}`, "ok");
+      void loadProjectReferences(opened.id);
     },
-    [applyProjectRenderPrefs, flushDirtyFiles, loadScenes, project, isReady, readinessMessage],
+    [applyProjectRenderPrefs, flushDirtyFiles, loadScenes, project, isReady, readinessMessage, loadProjectReferences],
   );
 
   const closeProject = useCallback(async () => {
@@ -497,6 +588,37 @@ export default function App() {
     setDiagnostics([]);
     setStatusMessage("Ready", "idle");
   }, [flushDirtyFiles, project, refreshProjects]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't run shortcuts if no project is active
+      if (!project) return;
+
+      const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
+      const isMod = isMac ? e.metaKey : e.ctrlKey;
+
+      if (isMod) {
+        const key = e.key.toLowerCase();
+
+        // 1. Toggle Sidebar: Ctrl+B / Cmd+B
+        if (key === "b" && !e.shiftKey && !e.altKey) {
+          e.preventDefault();
+          setSidebarOpen(layout.sidebarOpen !== false ? false : true);
+        }
+
+        // 2. Toggle Bottom Panel: Ctrl+J / Cmd+J or Ctrl+` / Cmd+`
+        if (key === "j" || e.key === "`") {
+          e.preventDefault();
+          setBottomPanelOpen(!layout.bottomPanelOpen);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [project, layout, setSidebarOpen, setBottomPanelOpen]);
 
   useEffect(() => {
     if (!inTauri) return;
@@ -698,53 +820,251 @@ export default function App() {
     }
   };
 
+  const handleUpdateSettingsField = useCallback(async (updates: Partial<Settings>) => {
+    const nextSettings = { ...settings, ...updates };
+    try {
+      await api.settingsSet(nextSettings);
+      setSettings(nextSettings);
+      // Automatically refresh readiness to reflect changes like local model paths
+      void refreshReadiness();
+    } catch (e) {
+      console.error("Failed to update settings field", e);
+    }
+  }, [settings, refreshReadiness]);
+
+  const handleSelectConversation = useCallback(async (convId: string) => {
+    if (!project) return;
+    try {
+      const convList = await api.listConversations(project.id);
+      setConversations(convList);
+      const conv = convList.find((c) => c.id === convId);
+      if (conv) {
+        setActiveConversationId(convId);
+        setChatMessages(conv.messages);
+      }
+    } catch (e) {
+      console.error("Failed to switch conversation:", e);
+    }
+  }, [project]);
+
+  const handleNewConversation = useCallback(async () => {
+    if (!project) return;
+    try {
+      const newConv: Conversation = {
+        id: Date.now().toString(),
+        title: `Conversation ${conversations.length + 1}`,
+        createdAt: new Date().toISOString(),
+        messages: [],
+      };
+      await api.saveConversation(project.id, newConv);
+      setConversations((prev) => [newConv, ...prev]);
+      setActiveConversationId(newConv.id);
+      setChatMessages([]);
+    } catch (e) {
+      console.error("Failed to start new conversation:", e);
+    }
+  }, [project, conversations.length]);
+
+  const handleDeleteConversation = useCallback(async (convId: string) => {
+    if (!project) return;
+    try {
+      await api.deleteConversation(project.id, convId);
+      const nextConversations = conversations.filter((c) => c.id !== convId);
+      setConversations(nextConversations);
+      
+      // If the active conversation was deleted, select another one or create a new one
+      if (activeConversationId === convId) {
+        if (nextConversations.length > 0) {
+          setActiveConversationId(nextConversations[0].id);
+          setChatMessages(nextConversations[0].messages);
+        } else {
+          const newConv: Conversation = {
+            id: Date.now().toString(),
+            title: "New Conversation",
+            createdAt: new Date().toISOString(),
+            messages: [],
+          };
+          await api.saveConversation(project.id, newConv);
+          setConversations([newConv]);
+          setActiveConversationId(newConv.id);
+          setChatMessages([]);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to delete conversation:", e);
+    }
+  }, [project, conversations, activeConversationId]);
+
+  useEffect(() => {
+    if (!project || !activeConversationId) return;
+    
+    // Find active conversation in state list
+    const activeConv = conversations.find((c) => c.id === activeConversationId);
+    if (!activeConv) return;
+    
+    // Check if messages have actually changed to prevent infinite write loops
+    const hasChanged = JSON.stringify(activeConv.messages) !== JSON.stringify(chatMessages);
+    if (!hasChanged) return;
+    
+    // If user's first prompt has been sent, auto-rename the conversation based on the prompt!
+    let updatedTitle = activeConv.title;
+    if (activeConv.messages.length === 0 && chatMessages.length > 0) {
+      const firstUserMsg = chatMessages.find(m => m.role === "user");
+      if (firstUserMsg && firstUserMsg.content) {
+        const cleanContent = firstUserMsg.content.replace(/^### Active Reference Attachments:[\s\S]*### User Question:/i, "").trim();
+        updatedTitle = cleanContent.slice(0, 24).trim() || "New Conversation";
+        if (cleanContent.length > 24) updatedTitle += "...";
+      }
+    }
+
+    const updatedConv: Conversation = {
+      ...activeConv,
+      title: updatedTitle,
+      messages: chatMessages,
+    };
+    
+    // Update local state list
+    setConversations((prev) => prev.map((c) => (c.id === activeConversationId ? updatedConv : c)));
+    
+    // Persist to disk
+    void api.saveConversation(project.id, updatedConv);
+  }, [chatMessages, activeConversationId, project?.id]);
+
   const getLlmConfigForCall = () => {
+    const activeModel = settings.useLocalLlm ? settings.localLlmModel : settings.externalLlmModel;
     if (settings.usePersonalLlm && settings.llmProvider) {
       return {
         llm_provider: settings.llmProvider,
         use_personal_llm: true,
+        model: activeModel,
+        use_autonomous_agent: !!settings.useAutonomousAgent,
       };
     }
-    return undefined;
+    return {
+      model: activeModel,
+      use_autonomous_agent: !!settings.useAutonomousAgent,
+    };
   };
 
-  const handleChatSend = async () => {
-    if (!chatInput.trim()) return;
+  const handleChatSend = async (promptOverride?: string) => {
+    const inputContent = promptOverride !== undefined ? promptOverride : chatInput;
+    if (!inputContent.trim()) return;
     if (!isReady) {
       setStatusMessage("App not ready — " + readinessMessage, "idle");
       return;
     }
-    const userMessage: ChatMessage = { role: "user", content: chatInput.trim() };
+
+    const activeReferences = [...uploadedReferences];
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: inputContent.trim(),
+      references: activeReferences.length > 0 ? activeReferences : undefined,
+    };
     const nextMessages = [...chatMessages, userMessage];
     setChatMessages(nextMessages);
-    setChatInput("");
+    if (promptOverride === undefined) {
+      setChatInput("");
+    }
+    setUploadedReferences([]); // Clear the visual selection chips immediately!
+    setChatContextMatches([]);
+    setAppliedEditErrors([]);
+
     try {
       setBusy(true);
+      setChatProgressStep("preparing");
       const llmConfig = getLlmConfigForCall();
       let scenesExcerpt = fileContents.scenes;
-      // Phase 6: use RAG chunks if intelligence ready (reduces token use)
+      let finalMessages = [...nextMessages];
+
+      // Inject reasoning level system prompts if medium or high to guide model behavior
+      if (settings.reasoningLevel === "medium") {
+        finalMessages.push({
+          role: "system",
+          content: "System instruction override: Use step-by-step reasoning and careful logical planning before outputting any code modifications. Analyze coordinates and element positioning systematically."
+        });
+      } else if (settings.reasoningLevel === "high") {
+        finalMessages.push({
+          role: "system",
+          content: "System instruction override: Perform highly rigorous mathematical verification, visual overlap analysis, and deep multi-step planning. Elaborate your reasoning exhaustively within <thought> tags before proposing any code edits."
+        });
+      }
+
+      // Phase 6: use advanced RAG chunks if intelligence ready (reduces token use)
       if (isReady && project) {
+        setChatProgressStep("retrieving");
         try {
-          const rag = await api.sidecarRetrieve(project.id, chatInput.trim() || userMessage.content, 6);
-          const ragText = rag.results?.map((r: any) => `// ${r.file}\n${r.chunk}`).join("\n\n---\n\n") || "";
-          if (ragText) {
-            scenesExcerpt = ragText + "\n\n// --- full scenes below if needed ---\n" + fileContents.scenes.slice(0, 3000);
+          const searchFiles = [
+            "scenes.py",
+            "assets.py",
+            ...activeReferences.map((name) => `references/${name}`),
+          ];
+          const rag = await api.sidecarRetrieve(project.id, inputContent.trim(), 6, searchFiles);
+          if (rag.results && rag.results.length > 0) {
+            const seen = new Set<string>();
+            const matches: Array<{ file: string; score?: number }> = [];
+            for (const r of rag.results) {
+              if (!seen.has(r.file)) {
+                seen.add(r.file);
+                matches.push({
+                  file: r.file,
+                  score: r.score !== undefined ? r.score : 1.0,
+                });
+              }
+            }
+            setChatContextMatches(matches);
+
+            // Separate codebase RAG chunks from reference chunks
+            const codebaseChunks = rag.results.filter((r: any) => !r.file.startsWith("references/"));
+            const referenceChunks = rag.results.filter((r: any) => r.file.startsWith("references/"));
+
+            // Codebase context goes to scenesExcerpt as Python comments
+            const codebaseText = codebaseChunks.map((r: any) => `# File: ${r.file}\n${r.chunk}`).join("\n\n---\n\n") || "";
+            if (codebaseText) {
+              scenesExcerpt = codebaseText + "\n\n# --- full scenes below if needed ---\n" + fileContents.scenes.slice(0, 3000);
+            }
+
+            // Reference context goes directly into finalMessages to guarantee the AI sees them clearly as prompt attachments
+            if (referenceChunks.length > 0) {
+              const referenceText = referenceChunks.map((r: any) => `[ATTACHMENT FILE: ${r.file}]\n${r.chunk}`).join("\n\n---\n\n");
+              const enrichedUserContent = `### Active Reference Attachments:\n${referenceText}\n\n### User Question:\n${inputContent.trim()}`;
+              
+              finalMessages[finalMessages.length - 1] = {
+                role: "user",
+                content: enrichedUserContent,
+              };
+            }
           }
         } catch {}
       }
+
+      setChatProgressStep("thinking");
       const response = await api.cloudChat(
-        nextMessages,
+        finalMessages,
         project?.id,
         scenesExcerpt,
         llmConfig,
       );
+      setChatProgressStep("processing");
       setChatMessages((prev) => [...prev, response.message]);
       if (response.code_edit) {
         setPendingEdit(response.code_edit);
       }
       appendLog(`[chat] model=${response.model} stub=${response.stub ?? false} personal=${!!llmConfig}`);
+
+      // Consume and clear temporary reference files after successful message send
+      if (project && activeReferences.length > 0) {
+        for (const name of activeReferences) {
+          try {
+            await api.sidecarDeleteReference(project.id, name);
+          } catch (e) {
+            console.error(`Failed to delete reference file ${name} after sending chat:`, e);
+          }
+        }
+      }
+
       // Refresh credits/profile after platform use
       if (!llmConfig && settings.apiToken) {
+        setChatProgressStep("refreshing");
         void refreshLlmProfile();
       }
     } catch (error) {
@@ -757,22 +1077,122 @@ export default function App() {
       }
     } finally {
       setBusy(false);
+      setChatProgressStep("idle");
     }
   };
 
-  const handleApplyEdit = () => {
-    if (!pendingEdit) return;
+  const handleApplyEdit = async () => {
+    if (!pendingEdit || !project) return;
     try {
       const next = applyCodeEdit(fileContents.scenes, pendingEdit);
       setFileContents((prev) => ({ ...prev, scenes: next }));
-      setDirtyFiles((prev) => ({ ...prev, scenes: true }));
+      setDirtyFiles((prev) => ({ ...prev, scenes: false }));
       updateActiveFile("scenes");
       setPendingEdit(null);
-      setStatusMessage("Applied AI edit", "ok");
+
+      // Auto-save the applied edit
+      setSaving(true);
+      await api.projectSave(project.id, next);
+      setSaving(false);
+
+      // Auto-lint to verify correctness
+      setLinting(true);
+      const lintRes = await api.sidecarLint(project.id);
+      setDiagnostics(lintRes.diagnostics ?? []);
+      const errors = (lintRes.diagnostics ?? []).filter((d: any) => d.severity === "error");
+      if (errors.length > 0) {
+        setAppliedEditErrors(errors);
+        setStatusMessage(`Edit applied with ${errors.length} lint error(s)`, "error");
+      } else {
+        setAppliedEditErrors([]);
+        setStatusMessage("Applied AI edit successfully", "ok");
+      }
+      setLinting(false);
     } catch (error) {
       setStatusMessage(formatError(error), "error");
+      setSaving(false);
+      setLinting(false);
     }
   };
+
+  const handleFixAppliedEditErrors = () => {
+    if (appliedEditErrors.length === 0) return;
+    const errorDesc = appliedEditErrors.map((e) => `Line ${e.line}: ${e.message}`).join("\n");
+    const fixPrompt = `I applied the previous edit, but it introduced the following lint error(s):\n${errorDesc}\n\nPlease fix these errors.`;
+    setAppliedEditErrors([]);
+    void handleChatSend(fixPrompt);
+  };
+
+  const handleUploadReferenceFile = useCallback(
+    async (file: File) => {
+      if (!project?.id) return;
+      setBusy(true);
+      setStatusMessage(`Uploading reference document: ${file.name}...`, "busy");
+      appendLog(`[Upload] Starting upload for reference file: ${file.name}`);
+
+      try {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const dataUrl = reader.result as string;
+            // Get the base64 content from the data URL
+            const base64Content = dataUrl.split(",")[1];
+            
+            const res = await api.sidecarUploadReference(project.id, file.name, base64Content, null);
+            if (res.status === "success") {
+              setStatusMessage(`Reference '${file.name}' successfully uploaded and indexed!`, "ok");
+              appendLog(`[Upload] Uploaded reference successfully: ${res.path} (Indexed: ${res.indexed})`);
+              void loadProjectReferences(project.id);
+            } else {
+              throw new Error("Upload response status not success");
+            }
+          } catch (e: any) {
+            setStatusMessage(`Upload failed: ${String(e.message || e)}`, "error");
+            appendLog(`[Upload Error] ${String(e.message || e)}`);
+          } finally {
+            setBusy(false);
+          }
+        };
+        reader.onerror = () => {
+          setStatusMessage("FileReader error during upload", "error");
+          appendLog("[Upload Error] FileReader failed to read file binary data.");
+          setBusy(false);
+        };
+        reader.readAsDataURL(file);
+      } catch (err: any) {
+        setStatusMessage(`Upload failed: ${String(err.message || err)}`, "error");
+        appendLog(`[Upload Error] ${String(err.message || err)}`);
+        setBusy(false);
+      }
+    },
+    [project?.id, appendLog, setStatusMessage, loadProjectReferences]
+  );
+
+  const handleDeleteReferenceFile = useCallback(
+    async (fileName: string) => {
+      if (!project?.id) return;
+      setBusy(true);
+      setStatusMessage(`Removing reference file: ${fileName}...`, "busy");
+      appendLog(`[Delete] Deleting reference file: ${fileName}`);
+
+      try {
+        const res = await api.sidecarDeleteReference(project.id, fileName);
+        if (res.status === "success") {
+          setStatusMessage(`Reference file '${fileName}' successfully removed.`, "ok");
+          appendLog(`[Delete] Successfully deleted reference file from workspace.`);
+          setUploadedReferences((prev) => prev.filter((r) => r !== fileName));
+        } else {
+          throw new Error("Delete failed");
+        }
+      } catch (err: any) {
+        setStatusMessage(`Delete failed: ${String(err.message || err)}`, "error");
+        appendLog(`[Delete Error] ${String(err.message || err)}`);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [project?.id, appendLog, setStatusMessage]
+  );
 
   const handlePublish = async () => {
     if (!project || !publishTitle.trim()) return;
@@ -829,7 +1249,7 @@ export default function App() {
     return (
       <div className="empty-state">
         <div>
-          <p>Matemium Canvas runs inside the Tauri desktop shell.</p>
+          <p>Matemium runs inside the Tauri desktop shell.</p>
           <p>Start with: <code>cd desktop &amp;&amp; cargo tauri dev</code></p>
         </div>
       </div>
@@ -899,31 +1319,38 @@ export default function App() {
           style={
             project
               ? ({
-                  "--sidebar-width": `${layout.sidebarWidth}px`,
+                  "--sidebar-width": layout.sidebarOpen !== false ? `${layout.sidebarWidth}px` : "0px",
                   "--chat-width": `${layout.chatWidth}px`,
+                  gridTemplateColumns: layout.sidebarOpen !== false
+                    ? `var(--sidebar-width, 260px) 8px minmax(280px, 1fr) 8px var(--chat-width, 320px)`
+                    : `minmax(280px, 1fr) 8px var(--chat-width, 320px)`,
                 } as React.CSSProperties)
               : undefined
           }
         >
         {project ? (
           <>
-            <aside className="sidebar">
-              <ProjectSidebar
-                view={sidebarView}
-                onViewChange={updateSidebarView}
-                sections={sections}
-                projectId={project.id}
-                busy={busy}
-                outputsRefreshToken={outputsRefreshToken}
-                onJump={(line) => editorRef.current?.jumpToLine(line)}
-                onStatus={(message, kind = "ok") => setStatusMessage(message, kind)}
-                onPreviewMedia={setMediaPreview}
-              />
-            </aside>
-            <ResizeHandle
-              orientation="vertical"
-              onDragPosition={resizeSidebarFromPointer}
-            />
+            {layout.sidebarOpen !== false ? (
+              <>
+                <aside className="sidebar">
+                  <ProjectSidebar
+                    view={sidebarView}
+                    onViewChange={updateSidebarView}
+                    sections={sections}
+                    projectId={project.id}
+                    busy={busy}
+                    outputsRefreshToken={outputsRefreshToken}
+                    onJump={(line) => editorRef.current?.jumpToLine(line)}
+                    onStatus={(message, kind = "ok") => setStatusMessage(message, kind)}
+                    onPreviewMedia={setMediaPreview}
+                  />
+                </aside>
+                <ResizeHandle
+                  orientation="vertical"
+                  onDragPosition={resizeSidebarFromPointer}
+                />
+              </>
+            ) : null}
           </>
         ) : null}
 
@@ -1128,6 +1555,10 @@ export default function App() {
                 pendingEdit={pendingEdit}
                 input={chatInput}
                 busy={busy}
+                progressStep={chatProgressStep}
+                contextMatches={chatContextMatches}
+                validationErrors={appliedEditErrors}
+                onFixErrors={handleFixAppliedEditErrors}
                 onInputChange={setChatInput}
                 onSend={() => void handleChatSend()}
                 onApplyEdit={handleApplyEdit}
@@ -1140,6 +1571,23 @@ export default function App() {
                 }
                 onGenerateAudio={() => void handleGenerateAudio()}
                 disabled={!isReady}
+                onUploadFile={handleUploadReferenceFile}
+                uploadedReferences={uploadedReferences}
+                onDeleteReference={handleDeleteReferenceFile}
+                useLocalLlm={!!settings.useLocalLlm}
+                onToggleLocalLlm={(val) => void handleUpdateSettingsField({ useLocalLlm: val })}
+                localLlmModel={settings.localLlmModel || "llm-qwen-coder-3b-q4"}
+                onLocalLlmModelChange={(val) => void handleUpdateSettingsField({ localLlmModel: val })}
+                externalLlmModel={settings.externalLlmModel || "gpt-4o-mini"}
+                onExternalLlmModelChange={(val) => void handleUpdateSettingsField({ externalLlmModel: val })}
+                reasoningLevel={settings.reasoningLevel || "low"}
+                onReasoningLevelChange={(val) => void handleUpdateSettingsField({ reasoningLevel: val })}
+                downloadedModels={downloadedModels}
+                conversations={conversations}
+                activeConversationId={activeConversationId}
+                onSelectConversation={handleSelectConversation}
+                onNewConversation={handleNewConversation}
+                onDeleteConversation={handleDeleteConversation}
               />
             </aside>
           </>
