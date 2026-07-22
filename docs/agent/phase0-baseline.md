@@ -17,7 +17,7 @@ This baseline inventories all known autonomous entry points and records the limi
 | Local generation pipeline | `LifecycleCoordinator.run` / `run_lifecycle` | `matemium/agent/coordinator.py` | Fixed Director → Engineer → Critic lifecycle | Reuse domain operations; do not treat as the autonomy state machine |
 | Local LLM handlers | `local_director_agent`, `local_engineer_agent` | `matemium/agent/local_agent.py` | Replaces coordinator handlers with local inference | Adapt behind the structured model gateway |
 | Pydantic bridge | `PydanticAIAgent.run_sync` | `matemium/agent/pydantic_ai_bridge.py` | Parses a structured final model payload for fixed phases | Reuse validation patterns where compatible |
-| MCP | `run_lifecycle` | `matemium/mcp_server.py` | Exposes the fixed five-phase lifecycle as one MCP tool | Keep separately versioned; optionally create a state-machine run later |
+| MCP lifecycle helpers | `lifecycle_status`, `create_tape_content` | `matemium/mcp_server.py` | Inspects the gated Roadmap and creates bounded tape-content artifacts | Never expose the legacy `run_lifecycle` bypass; production advances through the normative phase state |
 | MCP authoring tools | `view_file`, `edit_file`, `compile_manim`, `retrieve` | `matemium/mcp_server.py` | Mixed direct execution and proposed-patch behavior | Normalize behind typed tool results and capability policy |
 | Tests/scratch | Direct runner/coordinator calls | `tests/test_react_runner.py`, `tests/test_agent_coordinator.py`, `verification_scratch.py` | Mock loop and lifecycle verification | Retain as legacy regression coverage; add benchmark harness |
 

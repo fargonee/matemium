@@ -8,9 +8,15 @@ export type ProjectFile =
   | "helpers"
   | "passport"
   | "description"
-  | "tape"
+  | "tape_content"
+  | "orchestration"
   | "roadmap"
-  | "narration";
+  | "tts_narration"
+  | "tts_style"
+  | "audio_description"
+  | "custom_narration"
+  | "transcript"
+  | "timestamps";
 
 export interface GlobalWorkspacePrefs {
   sidebarView: SidebarView;
@@ -32,7 +38,7 @@ interface WorkspacePrefsStore {
 
 const DEFAULT_GLOBAL: GlobalWorkspacePrefs = {
   sidebarView: "project",
-  activeFile: "scenes",
+  activeFile: "roadmap",
 };
 
 const DEFAULT_RENDER: ProjectRenderPrefs = {
@@ -47,7 +53,7 @@ function isSidebarView(value: string): value is SidebarView {
 }
 
 function isProjectFile(value: string): value is ProjectFile {
-  return ["scenes", "helpers", "passport", "description", "tape", "roadmap", "narration"].includes(value);
+  return ["scenes", "helpers", "passport", "description", "tape_content", "orchestration", "roadmap", "tts_narration", "tts_style", "audio_description", "custom_narration", "transcript", "timestamps"].includes(value);
 }
 
 function isVideoOrientation(value: string): value is VideoOrientation {

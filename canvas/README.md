@@ -17,33 +17,40 @@ Layout-to-animation compiler for infinite scrollable math sheets on Manim.
 | [`../project-spec.md`](../project-spec.md) | Feature status and abstraction audit |
 | [`3D-model.md`](3D-model.md) | Emerging 3D world model, current sheet assumptions audit |
 
-### Quick 3D + Tape Example
+### Quick Multi-Tape Example
 
 ```python
 from canvas.builder import CanvasBuilder
-from canvas.dsl import ObjectAnchor, TapeScroll
 
-b = CanvasBuilder(title="Mixed 3D + Tape")
+b = CanvasBuilder(title="Compare Two Ideas")
 
-# Classic tape content (targets root tape by default)
-b.add_heading("A Tape in 3D Space")
-b.add_body("This content lives inside the tape's local 2D space.")
+method = b.add_tape("method")
+method.add_heading("Method")
+method.add_body("Factor the expression first.")
+method.add_math(r"x^2 - 5x + 6 = (x-2)(x-3)")
 
-# Position/rotate the tape as a 3D object
-b.set_tape_pose(rotation=(30, 15, 0))
+check = b.add_tape("check")
+check.add_heading("Check")
+check.add_body("Verify each root in the original equation.")
+check.add_math(r"x=2:\;4-10+6=0")
 
-# Free 3D object
+# Returning to method content automatically switches the visible tape context.
+method.add_observation("Both roots check out, so the factorization is complete.")
+```
+
+No manual drag/drop, stacking, lift, or tape switch animation is needed. When the timeline reveals content from a different tape, `CanvasScene` automatically focuses that tape and hides/dims inactive tape content.
+
+### Quick 3D Object Example
+
+```python
+from canvas.builder import CanvasBuilder
+
+b = CanvasBuilder(title="3D Object")
+
+b.add_heading("A cube above the reasoning tape")
 b.add_object("Solid3D", id="cube", position=(4, 1, 2), content={"shape": "cube"})
-
-# Normal 3D observation (tape treated as any 3D plane)
-b.observe_object("root_tape")
-
-# Enter tape-scroll-mode (classic internal tape scroll/reveal)
+b.observe_object("cube")
 b.scroll_tape(local_y=3.0)
-
-# Or use raw keyframes
-# b.add_camera_keyframe(target=ObjectAnchor("cube"))
-# b.add_camera_keyframe(target=TapeScroll("root_tape", local_y=3.0))
 ```
 
 Render: `../matemium.sh demo` from the repo root.

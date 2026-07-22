@@ -27,12 +27,14 @@ You write **Matemium scene code**, not raw Manim and not Sheet DSL JSON.
 
 ## Mental model (clarified 3D + tape)
 
-- The world is **one infinite 3D space**. `TapeObject` is one special object (can be placed/rotated via `world_transform` like any other).
+- The world is **one infinite 3D space**. `TapeObject` is the special content-bearing 2D canvas inside that world; current high-level authoring creates tapes with `add_tape("id")` and writes into them through `TapeBuilder`.
 - By default, observe any object (incl. tapes) with normal 3D: use `observe_object("id")` or `add_camera_keyframe(target=ObjectAnchor("id"))` -- cinematic look-at/orbit.
 - Use `scroll_tape(local_y=..., tape_id=...)` or `add_camera_keyframe(target=TapeScroll(...))` to **enter tape-scroll-mode** on a tape: this activates its internal 2D sheet logic (local scroll, lazy reveal, flex, focus).
-- Use `add_tape("my_tape", position=..., rotation=...)` + `with in_object_space("my_tape"):` for secondary tapes.
+- Use `add_tape("my_tape")` to create a secondary 2D tape. It returns a `TapeBuilder`; author content with `my_tape.add_heading(...)`, `my_tape.add_body(...)`, `my_tape.add_math(...)`, etc.
+- When the timeline reaches content from another tape, the engine automatically switches the visible tape context: it hides/dims inactive tape content and moves the camera into tape-scroll view for the active tape. Do not hand-author drag/drop, stacking, lifting, or manual tape switches unless the user explicitly asks for a physical 3D effect.
 - Existing `add_text`/`add_flex_row` etc. target current tape context (root by default).
-- Use `set_tape_pose(...)` for root or specific tape. `add_object` / `add_world_object` for free 3D.
+- `add_solid_lift(...)` raises 3D solids above a tape for inspection; it is not for moving one tape above another.
+- Use `add_object` / `add_world_object` for free 3D objects.
 - Mixed scenes: 3D objects + tapes; camera switches modes explicitly via keyframe target.
 
 ## Required file structure
@@ -88,6 +90,7 @@ class MyScene(CanvasScene):
 
 | Method | Purpose |
 |--------|---------|
+| `add_tape("name")` | Create a secondary tape and return a `TapeBuilder` for content |
 | `add_flex_row([specs...], gap=..., justify_content=..., align_items=...)` | Horizontal row; each item is its own timeline element |
 | `add_flex_column([specs...], gap=..., align_items=...)` | Vertical stack inside one scroll step |
 | `text_spec(...)`, `math_spec(...)`, `observation_spec(...)` | Flex item dicts |

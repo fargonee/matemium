@@ -1,11 +1,35 @@
 {
+  "schema_version": 2,
   "title": "Untitled project",
-  "status": "draft",
+  "status": "discovery",
+  "objective": "",
+  "central_message": "",
   "audience": "",
-  "learning_goal": "",
+  "assumed_knowledge": "",
+  "viewer_takeaway": "",
+  "platform": "",
   "duration_seconds": 60,
   "orientation": "portrait",
   "language": "English",
+  "mathematical_depth": "",
+  "visual_direction": "",
   "tone": "clear and engaging",
-  "constraints": []
+  "pacing": "",
+  "production_path": null,
+  "narration": {
+    "enabled": true,
+    "voice_direction": "",
+    "delivery_style": ""
+  },
+  "audio_direction": "",
+  "required_elements": [],
+  "avoid": [],
+  "references": [],
+  "factual_constraints": [],
+  "success_criteria": [],
+  "assumptions": [],
+  "readiness": {
+    "status": "needs_input",
+    "missing_fields": ["objective", "central_message", "audience", "viewer_takeaway", "visual_direction", "production_path"]
+  }
 }

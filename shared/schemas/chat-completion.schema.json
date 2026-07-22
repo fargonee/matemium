@@ -19,7 +19,7 @@
       "description": "v1 chat: optional single-file patch",
       "properties": {
         "description": { "type": "string" },
-        "filename": { "type": "string", "enum": ["scenes.py", "helpers.py", "brief/passport.json", "brief/description.md", "brief/tape.md", "brief/roadmap.json", "brief/narration.md"] },
+        "filename": { "type": "string", "anyOf": [{ "enum": ["scenes.py", "helpers.py", "brief/passport.json", "brief/description.md", "brief/orchestration.md", "brief/roadmap.json", "brief/tts-narration.md", "brief/tts-narration-style.md", "brief/audio-description.md", "brief/custom-narration.md", "brief/transcript.md", "brief/timestamps.json"] }, { "pattern": "^brief/tapes/[a-z0-9][a-z0-9_-]{0,63}\\.md$" }] },
         "search": { "type": ["string", "null"] },
         "replace": { "type": ["string", "null"] },
         "full_file": { "type": ["string", "null"] },

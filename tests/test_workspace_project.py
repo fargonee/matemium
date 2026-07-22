@@ -11,6 +11,7 @@ from matemium.workspace_project import (
     check_project,
     lint_scenes_file,
     list_scenes_in_workspace,
+    load_scenes_module,
     load_scene_class,
     resolve_scene_name,
     scenes_file,
@@ -48,6 +49,36 @@ def test_load_scene_class(demo_workspace: Path):
     from canvas import CanvasScene
 
     assert issubclass(cls, CanvasScene)
+
+
+@pytest.mark.parametrize(
+    "legacy_import",
+    [
+        "from .assets import add_compare_row",
+        "from . import assets as project_assets",
+        "import assets as project_assets",
+    ],
+)
+def test_helpers_support_legacy_assets_imports(tmp_path: Path, legacy_import: str):
+    ws = tmp_path / "legacy-imports"
+    ws.mkdir()
+    (ws / "helpers.py").write_text(
+        "def add_compare_row():\n    return 'loaded from helpers'\n",
+        encoding="utf-8",
+    )
+    reference = (
+        "add_compare_row"
+        if "from .assets import" in legacy_import
+        else "project_assets.add_compare_row"
+    )
+    (ws / "scenes.py").write_text(
+        f"{legacy_import}\nRESULT = {reference}()\n",
+        encoding="utf-8",
+    )
+
+    module = load_scenes_module(ws)
+
+    assert module.RESULT == "loaded from helpers"
 
 
 def test_lint_valid_workspace(demo_workspace: Path):

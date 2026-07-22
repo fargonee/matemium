@@ -405,7 +405,19 @@ class ReActAgentRunner:
             )
         tools_str = "\n\n".join(tool_desc)
 
-        return f"""You are an autonomous AI engineering agent for the Matemium platform.
+        manager_policy = ""
+        try:
+            from ..paths import ROOT
+
+            manager_policy = (ROOT / "shared" / "prompts" / "project-manager-system.txt").read_text(
+                encoding="utf-8"
+            ).strip()
+        except Exception:
+            pass
+
+        return f"""{manager_policy}
+
+You are an autonomous AI engineering agent for the Matemium platform.
 You operate in a deliberate loop of Plan, Action, Observation, and Reassessment.
 
 ### Rules of Engagement:

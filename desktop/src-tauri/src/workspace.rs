@@ -53,6 +53,22 @@ pub struct Settings {
     #[serde(default)]
     pub xai_connected_at: Option<String>,
     #[serde(default)]
+    pub cerebras_api_key: Option<String>,
+    #[serde(default)]
+    pub cerebras_connected_at: Option<String>,
+    #[serde(default)]
+    pub github_api_key: Option<String>,
+    #[serde(default)]
+    pub github_connected_at: Option<String>,
+    #[serde(default)]
+    pub mistral_api_key: Option<String>,
+    #[serde(default)]
+    pub mistral_connected_at: Option<String>,
+    #[serde(default)]
+    pub gemini_api_key: Option<String>,
+    #[serde(default)]
+    pub gemini_connected_at: Option<String>,
+    #[serde(default)]
     pub use_local_llm: Option<bool>,
     #[serde(default)]
     pub local_llm_model: Option<String>,
@@ -128,6 +144,14 @@ impl Default for Settings {
             groq_connected_at: None,
             xai_api_key: None,
             xai_connected_at: None,
+            cerebras_api_key: None,
+            cerebras_connected_at: None,
+            github_api_key: None,
+            github_connected_at: None,
+            mistral_api_key: None,
+            mistral_connected_at: None,
+            gemini_api_key: None,
+            gemini_connected_at: None,
             use_local_llm: Some(false),
             local_llm_model: Some("llm-qwen-coder-3b-q4".to_string()),
             external_llm_model: Some("openai/gpt-4o-mini".to_string()),

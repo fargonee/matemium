@@ -5,6 +5,10 @@ export const PROVIDER_NAMES: Record<string, string> = {
   openai: "OpenAI",
   groq: "Groq",
   xai: "xAI",
+  cerebras: "Cerebras Cloud",
+  github: "GitHub Models",
+  mistral: "Mistral",
+  gemini: "Google AI Studio",
 };
 
 export const DEFAULT_PINNED_MODELS: Record<string, ProviderModel[]> = {
@@ -58,6 +62,24 @@ export const DEFAULT_PINNED_MODELS: Record<string, ProviderModel[]> = {
     { id: "grok-2-latest", name: "Grok 2", provider: "xai", badges: ["Popular"] },
     { id: "grok-3-mini", name: "Grok 3 mini", provider: "xai", badges: ["Reasoning"] },
   ],
+  cerebras: [
+    { id: "gpt-oss-120b", name: "GPT OSS 120B", provider: "cerebras", badges: ["Fast"] },
+    { id: "zai-glm-4.7", name: "GLM 4.7", provider: "cerebras", badges: ["Fast"] },
+  ],
+  github: [
+    { id: "openai/gpt-4.1", name: "GPT-4.1", provider: "github", badges: ["Popular"] },
+    { id: "openai/gpt-4o", name: "GPT-4o", provider: "github", badges: ["Popular"] },
+    { id: "meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout", provider: "github", badges: ["Popular"] },
+  ],
+  mistral: [
+    { id: "mistral-small-latest", name: "Mistral Small", provider: "mistral", badges: ["Fast"] },
+    { id: "mistral-medium-latest", name: "Mistral Medium", provider: "mistral", badges: ["Popular"] },
+    { id: "mistral-large-latest", name: "Mistral Large", provider: "mistral", badges: ["Popular"] },
+  ],
+  gemini: [
+    { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", provider: "gemini", badges: ["Popular"] },
+    { id: "gemini-3.5-pro", name: "Gemini 3.5 Pro", provider: "gemini", badges: ["Popular"] },
+  ],
 };
 
 export function providerModelState(settings: Settings, provider: string) {
@@ -91,6 +113,21 @@ export function pinnedModelOptions(settings: Settings, provider: string): Provid
       }
     );
   });
+}
+
+export function pinnedModelOptionsForProviders(settings: Settings, providers: string[]): ProviderModel[] {
+  const seen = new Set<string>();
+  const models: ProviderModel[] = [];
+  for (const provider of providers) {
+    for (const model of pinnedModelOptions(settings, provider)) {
+      const key = `${model.provider}:${model.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        models.push(model);
+      }
+    }
+  }
+  return models;
 }
 
 export function modelDisplayName(id: string): string {

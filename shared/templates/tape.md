@@ -1,12 +1,16 @@
-# Tape
+# Tape content — Main tape
 
-Use one section for each part of the final video. Keep timing, visuals, narration,
-and transitions together so a reader can reconstruct what happens on screen.
+This file contains only what must appear on the mathematical reasoning tape.
+Keep camera movement, 3D staging, transitions, narration delivery, and scene code
+in their dedicated artifacts.
 
-## 00:00 - Opening
+Use stable beat identifiers so orchestration, narration, timestamps, and scene
+authoring can refer to the same content without duplicating it.
 
-- **Visual:**
-- **Narration:**
-- **Action:**
-- **Transition:**
-- **Notes:**
+## beat-opening — Opening
+
+- **Visible statement:**
+- **Mathematical content:**
+- **Diagram or labels:**
+- **Reveal/hold intent:**
+- **Accuracy notes:**

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matemium.app/schemas/timestamps.schema.json",
+  "title": "MatemiumAudioTimestamps",
+  "type": "object",
+  "required": ["schema_version", "source_audio", "generated_at", "status", "segments"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "source_audio": { "type": ["string", "null"] },
+    "generated_at": { "type": ["string", "null"], "format": "date-time" },
+    "status": { "type": "string", "enum": ["pending", "candidate", "verified", "rejected"] },
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["start", "end", "text"],
+        "properties": {
+          "start": { "type": "number", "minimum": 0 },
+          "end": { "type": "number", "exclusiveMinimum": 0 },
+          "text": { "type": "string" },
+          "beat_id": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

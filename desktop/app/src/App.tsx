@@ -34,10 +34,11 @@ import { ResizeHandle } from "./components/ResizeHandle";
 import { resolveBottomDockDefault, useBottomDockTab } from "./hooks/useBottomDockTab";
 import { usePanelLayout } from "./hooks/usePanelLayout";
 import { useSidecarEvents } from "./hooks/useSidecarEvents";
-import { pinnedModelOptions } from "./modelCatalog";
+import { DEFAULT_PINNED_MODELS, modelDisplayName, pinnedModelOptionsForProviders } from "./modelCatalog";
 import { applyCodeEdit } from "./utils/codeEdit";
 import { formatError, tailLines } from "./utils/errors";
 import { parseSections } from "./utils/sections";
+import { encodeProjectPreferenceResponse } from "./utils/projectQuestions";
 import {
   applySidecarEvent,
   beginRenderJob,
@@ -60,16 +61,22 @@ import {
 } from "./utils/workspacePrefs";
 type StatusKind = "idle" | "ok" | "error" | "busy";
 
-const PROJECT_FILES: ProjectFile[] = ["scenes", "helpers", "passport", "description", "tape", "roadmap", "narration"];
+type LocalModelOption = {
+  id: string;
+  label: string;
+  ready: boolean;
+};
+
+const PROJECT_FILES: ProjectFile[] = ["scenes", "helpers", "passport", "description", "tape_content", "orchestration", "roadmap", "tts_narration", "tts_style", "audio_description", "custom_narration", "transcript", "timestamps"];
 const EMPTY_CONTENTS: Record<ProjectFile, string> = {
-  scenes: "", helpers: "", passport: "", description: "", tape: "", roadmap: "", narration: "",
+  scenes: "", helpers: "", passport: "", description: "", tape_content: "", orchestration: "", roadmap: "", tts_narration: "", tts_style: "", audio_description: "", custom_narration: "", transcript: "", timestamps: "",
 };
 const EMPTY_DIRTY: Record<ProjectFile, boolean> = {
-  scenes: false, helpers: false, passport: false, description: false, tape: false, roadmap: false, narration: false,
+  scenes: false, helpers: false, passport: false, description: false, tape_content: false, orchestration: false, roadmap: false, tts_narration: false, tts_style: false, audio_description: false, custom_narration: false, transcript: false, timestamps: false,
 };
 const FILE_LABELS: Record<ProjectFile, string> = {
   scenes: "scenes.py", helpers: "helpers.py", passport: "Passport", description: "Description",
-  tape: "Tape", roadmap: "Roadmap", narration: "Narration",
+  tape_content: "Tape content", orchestration: "Orchestration", roadmap: "Roadmap", tts_narration: "TTS narration", tts_style: "TTS style", audio_description: "Audio description", custom_narration: "Custom narration", transcript: "Verified transcript", timestamps: "Timestamps",
 };
 
 function projectFiles(opened: ProjectOpen): Record<ProjectFile, string> {
@@ -78,7 +85,7 @@ function projectFiles(opened: ProjectOpen): Record<ProjectFile, string> {
 
 function briefValidationErrors(files: Record<ProjectFile, string>): Partial<Record<ProjectFile, string>> {
   const errors: Partial<Record<ProjectFile, string>> = {};
-  for (const file of ["passport", "roadmap"] as const) {
+  for (const file of ["passport", "roadmap", "timestamps"] as const) {
     try {
       JSON.parse(files[file]);
     } catch {
@@ -86,6 +93,192 @@ function briefValidationErrors(files: Record<ProjectFile, string>): Partial<Reco
     }
   }
   return errors;
+}
+
+function passportProductionPath(passport: string): "mute_video" | "tts" | "custom_audio" | null {
+  try {
+    const value = (JSON.parse(passport) as { production_path?: unknown }).production_path;
+    return value === "mute_video" || value === "tts" || value === "custom_audio" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function lifecycleRoadmapForPath(
+  path: "mute_video" | "tts" | "custom_audio" | null,
+  currentRoadmap: string,
+): string {
+  type Phase = { id: string; title: string; status: string; progress: number; notes: string };
+  const phase = (id: string, title: string, notes: string): Phase => ({ id, title, status: "todo", progress: 0, notes });
+  let current: { phases?: Phase[] } = {};
+  try { current = JSON.parse(currentRoadmap) as { phases?: Phase[] }; } catch { /* replace invalid roadmap */ }
+  const existing = new Map((current.phases ?? []).map((item) => [item.id, item]));
+  const shared = [
+    phase("project_creation", "Project creation", "The workspace and initial idea are preserved."),
+    phase("description", "Project description", "Settle the rare-changing description through collaboration."),
+    phase("passport", "Passport and production path", "Resolve the production identity and explicitly select a production path."),
+  ].map((item, index) => existing.get(item.id) ?? (index === 0 ? { ...item, status: "done", progress: 100 } : item));
+  shared[2] = {
+    ...shared[2],
+    status: "in_progress",
+    progress: Math.min(99, Math.max(shared[2].progress, 1)),
+    notes: "Confirm the selected production path and finish any remaining Passport decisions.",
+  };
+  const common = [
+    phase("tape_content", "Tape content", "Approve exactly what appears on the mathematical reasoning tape."),
+    phase("orchestration", "Orchestration", "Approve the world, tapes, camera, reveals, transitions, and pacing intent."),
+  ];
+  const branches: Record<Exclude<typeof path, null>, Phase[]> = {
+    mute_video: [
+      ...common,
+      phase("authoring", "Scene authoring", "Create scenes.py and helpers.py from approved creative artifacts."),
+      phase("render_repair", "Render and visual repair", "Render, inspect visual evidence, and fix unexpected behavior."),
+      phase("mute_delivery", "Mute video delivery", "Deliver the validated animation without a final audio track."),
+    ],
+    tts: [
+      ...common,
+      phase("tts_narration", "TTS narration and provisional timing", "Write narration, optional style direction, and deliberate provisional timing."),
+      phase("authoring", "Scene authoring", "Create scenes.py and helpers.py against approved narration timing."),
+      phase("render_repair", "Render and visual repair", "Render, inspect visual evidence, and repair the animation."),
+      phase("timing_regulation", "Final timing regulation", "Regulate authoring and narration timing against the validated render before TTS."),
+      phase("tts_generation", "TTS generation", "Generate and approve the final narration audio."),
+      phase("final_assembly", "Final assembly", "Attach approved audio without avoidable video quality loss."),
+    ],
+    custom_audio: [
+      ...common,
+      phase("audio_specification", "Custom audio specification", "Define narration, holds, pace, silence, emphasis, and acceptance criteria."),
+      phase("audio_generation", "Custom audio generation", "Generate distinguishable audio attempts through the configured external service."),
+      phase("transcription_validation", "Transcription and validation", "Extract fresh transcript/timestamps and regenerate until the audio is approved."),
+      phase("content_reconciliation", "Post-audio content reconciliation", "Adapt tape content and orchestration to the verified audio wording and timing."),
+      phase("authoring", "Scene authoring", "Create scenes.py and helpers.py only after audio reconciliation."),
+      phase("render_repair", "Render and synchronization repair", "Render against approved timing and repair visual or synchronization defects."),
+      phase("final_assembly", "Final assembly", "Attach approved audio without avoidable video quality loss."),
+    ],
+  };
+  const pathPhases = path ? branches[path] : [];
+  const invalidatedPhases = (current.phases ?? [])
+    .filter((item) => !["project_creation", "description", "passport"].includes(item.id) && (item.status !== "todo" || item.progress > 0))
+    .map((item) => item.id);
+  return `${JSON.stringify({
+    schema_version: 2,
+    production_path: path,
+    current_phase: path ? "passport" : "description",
+    phases: [...shared, ...pathPhases],
+    ...(path ? {} : { pending_branch: "Choose mute video, TTS, or custom audio in the Passport." }),
+    invalidated_phases: invalidatedPhases,
+    blockers: [],
+  }, null, 2)}\n`;
+}
+
+function narrationTextForAudio(markdown: string): string {
+  const spoken = [...markdown.matchAll(/^\s*-\s*\*\*(?:Spoken text|Text):\*\*\s*(.+)$/gim)]
+    .map((match) => match[1].trim())
+    .filter(Boolean);
+  if (spoken.length > 0) return spoken.join("\n\n");
+  return markdown
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line) && !/^\s*-\s*\*\*(?:Target|Requested timing|Delivery|Performance)/i.test(line))
+    .join("\n")
+    .trim();
+}
+
+function roadmapPulse(roadmap: string): { id: string; title: string; path: string | null; progress: number } | null {
+  try {
+    const data = JSON.parse(roadmap) as { current_phase?: string; production_path?: string | null; phases?: Array<{ id?: string; title?: string; progress?: number }> };
+    const phase = data.phases?.find((item) => item.id === data.current_phase);
+    return phase?.id && phase.title ? { id: phase.id, title: phase.title, path: data.production_path ?? null, progress: Number(phase.progress ?? 0) } : null;
+  } catch {
+    return null;
+  }
+}
+
+function roadmapAfterAudioApproval(roadmap: string, path: "tts" | "custom_audio"): string | null {
+  try {
+    const data = JSON.parse(roadmap) as { current_phase?: string; phases?: Array<Record<string, unknown>> };
+    if (!data.phases) return null;
+    const currentId = path === "tts" ? "tts_generation" : "transcription_validation";
+    const nextId = path === "tts" ? "final_assembly" : "content_reconciliation";
+    if (data.current_phase !== currentId) return null;
+    const current = data.phases.find((phase) => phase.id === currentId);
+    const next = data.phases.find((phase) => phase.id === nextId);
+    if (!current || !next || Number(current.progress ?? 0) < 60) return null;
+    current.status = "done";
+    current.progress = 100;
+    current.notes = path === "tts"
+      ? "The generated TTS performance was reviewed and approved."
+      : "The generated custom audio, fresh transcript, and segment timing were reviewed and approved.";
+    next.status = "in_progress";
+    next.progress = 0;
+    data.current_phase = nextId;
+    return `${JSON.stringify(data, null, 2)}\n`;
+  } catch {
+    return null;
+  }
+}
+
+function roadmapAfterSuccessfulRender(roadmap: string, videoPath: string): string | null {
+  try {
+    const data = JSON.parse(roadmap) as { current_phase?: string; phases?: Array<Record<string, unknown>> };
+    if (!data.phases || !["authoring", "render_repair"].includes(data.current_phase ?? "")) return null;
+    const authoring = data.phases.find((phase) => phase.id === "authoring");
+    const review = data.phases.find((phase) => phase.id === "render_repair");
+    if (!review) return null;
+    if (data.current_phase === "authoring" && authoring) {
+      authoring.status = "done";
+      authoring.progress = 100;
+      authoring.notes = "Authoring produced a successful render and moved into visual review.";
+    }
+    review.status = "in_progress";
+    review.progress = 80;
+    review.notes = "A render succeeded. Inspect the actual output and repair any visual, mathematical, timing, camera, or synchronization issue before approval.";
+    const evidence = Array.isArray(review.evidence) ? review.evidence.map(String) : [];
+    if (!evidence.includes(videoPath)) evidence.push(videoPath);
+    review.evidence = evidence;
+    data.current_phase = "render_repair";
+    return `${JSON.stringify(data, null, 2)}\n`;
+  } catch {
+    return null;
+  }
+}
+
+function roadmapAfterRenderApproval(roadmap: string, path: "mute_video" | "tts" | "custom_audio"): string | null {
+  try {
+    const data = JSON.parse(roadmap) as { current_phase?: string; phases?: Array<Record<string, unknown>> };
+    if (!data.phases || data.current_phase !== "render_repair") return null;
+    const review = data.phases.find((phase) => phase.id === "render_repair");
+    const nextId = path === "mute_video" ? "mute_delivery" : path === "tts" ? "timing_regulation" : "final_assembly";
+    const next = data.phases.find((phase) => phase.id === nextId);
+    if (!review || !next || Number(review.progress ?? 0) < 80) return null;
+    review.status = "done";
+    review.progress = 100;
+    review.notes = "The rendered animation was inspected and approved after repair.";
+    next.status = "in_progress";
+    next.progress = path === "mute_video" ? 90 : 0;
+    data.current_phase = nextId;
+    return `${JSON.stringify(data, null, 2)}\n`;
+  } catch {
+    return null;
+  }
+}
+
+function roadmapAfterDeliveryApproval(roadmap: string, path: "mute_video" | "tts" | "custom_audio"): string | null {
+  try {
+    const data = JSON.parse(roadmap) as { current_phase?: string; phases?: Array<Record<string, unknown>>; completed_at?: string };
+    if (!data.phases) return null;
+    const terminalId = path === "mute_video" ? "mute_delivery" : "final_assembly";
+    if (data.current_phase !== terminalId) return null;
+    const terminal = data.phases.find((phase) => phase.id === terminalId);
+    if (!terminal || Number(terminal.progress ?? 0) < 90) return null;
+    terminal.status = "done";
+    terminal.progress = 100;
+    terminal.notes = path === "mute_video"
+      ? "The validated mute animation was delivered for the user to add audio independently."
+      : "The final audio was attached to the validated animation and the assembled product was approved.";
+    data.completed_at = new Date().toISOString();
+    return `${JSON.stringify(data, null, 2)}\n`;
+  } catch {
+    return null;
+  }
 }
 
 export default function App() {
@@ -101,6 +294,8 @@ export default function App() {
   const [project, setProject] = useState<ProjectOpen | null>(null);
   const [fileContents, setFileContents] = useState<Record<ProjectFile, string>>(EMPTY_CONTENTS);
   const [dirtyFiles, setDirtyFiles] = useState(EMPTY_DIRTY);
+  const [tapeContents, setTapeContents] = useState<Record<string, string>>({});
+  const [dirtyTapes, setDirtyTapes] = useState<Record<string, boolean>>({});
   const [activeFile, setActiveFile] = useState<ProjectFile>(
     () => loadGlobalPrefs().activeFile,
   );
@@ -157,11 +352,7 @@ export default function App() {
   const [readiness, setReadiness] = useState<api.Readiness | null>(null);
   const [localModelReady, setLocalModelReady] = useState(true);
   const [localModelStatusMsg, setLocalModelStatusMsg] = useState("");
-  const [downloadedModels, setDownloadedModels] = useState<Record<string, boolean>>({
-    "llm-qwen-coder-3b-q4": false,
-    "llm-qwen-coder-7b-q4": false,
-    "llm-llama-8b-q4": false,
-  });
+  const [localModelOptions, setLocalModelOptions] = useState<LocalModelOption[]>([]);
   const [showGallery, setShowGallery] = useState(false);
   const {
     layout,
@@ -386,23 +577,18 @@ export default function App() {
     try {
       const r = await api.getReadiness();
       setReadiness(r);
-
-      // Query statuses of all 3 local models to know which ones are ready/downloaded
-      const qwen3b = await api.getAssetStatus("llm-qwen-coder-3b-q4");
-      const qwen7b = await api.getAssetStatus("llm-qwen-coder-7b-q4");
-      const llama8b = await api.getAssetStatus("llm-llama-8b-q4");
-
-      const nextDownloaded = {
-        "llm-qwen-coder-3b-q4": !!(qwen3b?.[0]?.downloaded && qwen3b?.[0]?.verified),
-        "llm-qwen-coder-7b-q4": !!(qwen7b?.[0]?.downloaded && qwen7b?.[0]?.verified),
-        "llm-llama-8b-q4": !!(llama8b?.[0]?.downloaded && llama8b?.[0]?.verified),
-      };
-      setDownloadedModels(nextDownloaded);
+      const statuses = await api.getAssetStatus();
+      const modelAssets = statuses.filter((status) => status.asset_type === "local_model");
+      setLocalModelOptions(
+        modelAssets.map((status) => ({
+          id: status.id,
+          label: status.display_name || modelDisplayName(status.id),
+          ready: !!(status.downloaded && status.verified),
+        })),
+      );
 
       const currentModelId = settings.localLlmModel || "llm-qwen-coder-3b-q4";
-      const currentStatus = currentModelId === "llm-qwen-coder-3b-q4" ? qwen3b?.[0] :
-                            currentModelId === "llm-qwen-coder-7b-q4" ? qwen7b?.[0] :
-                            llama8b?.[0];
+      const currentStatus = statuses.find((status) => status.id === currentModelId);
 
       if (settings.useLocalLlm) {
         if (currentStatus) {
@@ -528,8 +714,13 @@ export default function App() {
           setSaving(false);
         }
       }
+      for (const [slug, dirty] of Object.entries(dirtyTapes)) {
+        if (!dirty) continue;
+        await api.projectSaveTape(projectId, slug, tapeContents[slug] ?? "");
+        setDirtyTapes((prev) => ({ ...prev, [slug]: false }));
+      }
     },
-    [dirtyFiles, fileContents, project?.id],
+    [dirtyFiles, dirtyTapes, fileContents, project?.id, tapeContents],
   );
 
   const runLint = useCallback(
@@ -590,8 +781,11 @@ export default function App() {
       setProject(opened);
       setFileContents(projectFiles(opened));
       setDirtyFiles(EMPTY_DIRTY);
+      setTapeContents(opened.tapes ?? {});
+      setDirtyTapes({});
       setDiagnostics([]);
       setPendingEdit(null);
+      updateActiveFile("roadmap");
 
       // Load conversations for the opened project
       try {
@@ -624,7 +818,7 @@ export default function App() {
       setStatusMessage(`Opened ${opened.name}`, "ok");
       void loadProjectReferences(opened.id);
     },
-    [applyProjectRenderPrefs, flushDirtyFiles, loadScenes, project, isReady, readinessMessage, loadProjectReferences],
+    [applyProjectRenderPrefs, flushDirtyFiles, loadScenes, project, isReady, readinessMessage, loadProjectReferences, updateActiveFile],
   );
 
   const closeProject = useCallback(async () => {
@@ -635,6 +829,8 @@ export default function App() {
     setProject(null);
     setFileContents(EMPTY_CONTENTS);
     setDirtyFiles(EMPTY_DIRTY);
+    setTapeContents({});
+    setDirtyTapes({});
     setScenes([]);
     setSelectedScene("");
     setDiagnostics([]);
@@ -725,6 +921,20 @@ export default function App() {
   }, [dirtyFiles, fileContents, project, runLint, saveFile]);
 
   useEffect(() => {
+    if (!project || !Object.values(dirtyTapes).some(Boolean)) return;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        for (const [slug, dirty] of Object.entries(dirtyTapes)) {
+          if (!dirty) continue;
+          await api.projectSaveTape(project.id, slug, tapeContents[slug] ?? "");
+          setDirtyTapes((prev) => ({ ...prev, [slug]: false }));
+        }
+      })();
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [dirtyTapes, project, tapeContents]);
+
+  useEffect(() => {
     if (!project) return;
     void runLint({ silent: true });
   }, [project?.id, runLint]);
@@ -737,6 +947,7 @@ export default function App() {
     }
     try {
       setBusy(true);
+      await flushDirtyFiles();
       const created = await api.projectCreate(newName.trim());
       setNewName("");
       await refreshProjects();
@@ -758,6 +969,8 @@ export default function App() {
         setProject(null);
         setFileContents(EMPTY_CONTENTS);
         setDirtyFiles(EMPTY_DIRTY);
+        setTapeContents({});
+        setDirtyTapes({});
         setScenes([]);
         setSelectedScene("");
       }
@@ -810,6 +1023,11 @@ export default function App() {
         orientation,
         outputDir,
       );
+      const nextRoadmap = roadmapAfterSuccessfulRender(fileContents.roadmap, result.export_video ?? result.video);
+      if (nextRoadmap) {
+        await api.projectSaveFile(project.id, "roadmap", nextRoadmap);
+        setFileContents((current) => ({ ...current, roadmap: nextRoadmap }));
+      }
       setOutputsRefreshToken((n) => n + 1);
       setActiveWorkspaceItem("renders");
       await refreshProjects();
@@ -847,19 +1065,47 @@ export default function App() {
   };
 
   const handleGenerateAudio = async () => {
-    const text = chatInput.trim() || chatMessages[chatMessages.length - 1]?.content || "";
+    const productionPath = passportProductionPath(fileContents.passport);
+    const source = productionPath === "tts"
+      ? fileContents.tts_narration
+      : productionPath === "custom_audio"
+        ? fileContents.custom_narration
+        : chatInput.trim() || chatMessages[chatMessages.length - 1]?.content || "";
+    const text = productionPath ? narrationTextForAudio(source) : source;
     if (!text) {
-      setStatusMessage("Enter text or have a chat message for audio", "error");
+      setStatusMessage(productionPath ? "Complete the narration artifact before generating audio" : "Enter text or have a chat message for audio", "error");
       return;
     }
     try {
       setBusy(true);
-      const llmConfig = { tts_provider: settings.llmProvider || "openrouter", use_personal_llm: true };
-      const res = await api.cloudGenerateAudio(text, "alloy", llmConfig);
+      await flushDirtyFiles();
+      const llmConfig = { tts_provider: settings.openaiApiKey ? "openai" : settings.llmProvider || "openai", use_personal_llm: true };
+      const res = await api.cloudGenerateAudio(
+        text,
+        "alloy",
+        llmConfig,
+        project && productionPath && productionPath !== "mute_video"
+          ? { projectId: project.id, artifactKind: productionPath === "tts" ? "tts" : "custom_audio" }
+          : undefined,
+        productionPath === "tts"
+          ? { instructions: fileContents.tts_style }
+          : productionPath === "custom_audio"
+            ? { instructions: fileContents.audio_description }
+            : undefined,
+      );
       if (res.audioBase64) {
         appendLog(`[audio] generated ${text.length} chars`);
-        setStatusMessage("Audio generated (base64 in log for now - integrate with media preview)", "ok");
-        // For live preview parallel safety, just log; future can save via project
+        if (res.audioPath) appendLog(`[audio] saved=${res.audioPath}`);
+        setStatusMessage(res.audioPath ? "Audio generated and saved to project assets" : "Audio generated", "ok");
+        if (project && res.audioPath) {
+          const reopened = await api.projectOpen(project.id);
+          setProject(reopened);
+          setFileContents(projectFiles(reopened));
+          setTapeContents(reopened.tapes ?? {});
+          setDirtyFiles(EMPTY_DIRTY);
+          setDirtyTapes({});
+          setOutputsRefreshToken((value) => value + 1);
+        }
       } else {
         setStatusMessage("Audio generation failed", "error");
       }
@@ -867,6 +1113,142 @@ export default function App() {
       setStatusMessage(formatError(error), "error");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleAssembleAudio = async () => {
+    if (!project) return;
+    try {
+      setBusy(true);
+      await flushDirtyFiles();
+      const result = await api.projectMuxAudio(project.id, pipeline.videoPath);
+      const reopened = await api.projectOpen(project.id);
+      setProject(reopened);
+      setFileContents(projectFiles(reopened));
+      setTapeContents(reopened.tapes ?? {});
+      setDirtyFiles(EMPTY_DIRTY);
+      setDirtyTapes({});
+      appendLog(`[assembly] video-copy audio=${result.audio} output=${result.output}`);
+      setStatusMessage("Final video assembled without re-encoding the video stream", "ok");
+      setOutputsRefreshToken((value) => value + 1);
+      setActiveWorkspaceItem("renders");
+    } catch (error) {
+      setStatusMessage(formatError(error), "error");
+      appendLog(`[assembly-error] ${formatError(error)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleTranscribeAudio = async () => {
+    if (!project) return;
+    try {
+      setBusy(true);
+      await flushDirtyFiles();
+      const provider = settings.openaiApiKey ? "openai" : settings.llmProvider || "openai";
+      const result = await api.projectTranscribeAudio(project.id, null, provider);
+      const reopened = await api.projectOpen(project.id);
+      setProject(reopened);
+      setFileContents(projectFiles(reopened));
+      setDirtyFiles(EMPTY_DIRTY);
+      setTapeContents(reopened.tapes ?? {});
+      setDirtyTapes({});
+      updateActiveFile("transcript");
+      appendLog(`[transcription] audio=${result.audio} segments=${result.segments.length}`);
+      setStatusMessage("Fresh transcript and timestamps extracted for review", "ok");
+    } catch (error) {
+      setStatusMessage(formatError(error), "error");
+      appendLog(`[transcription-error] ${formatError(error)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleApproveAudio = async () => {
+    if (!project) return;
+    const path = passportProductionPath(fileContents.passport);
+    if (path !== "tts" && path !== "custom_audio") return;
+    const nextRoadmap = roadmapAfterAudioApproval(fileContents.roadmap, path);
+    if (!nextRoadmap) {
+      setStatusMessage("Generate and review a valid audio candidate before approval", "error");
+      return;
+    }
+    let nextTimestamps = fileContents.timestamps;
+    let nextTranscript = fileContents.transcript;
+    if (path === "custom_audio") {
+      try {
+        const timestamps = JSON.parse(fileContents.timestamps) as { segments?: unknown[]; status?: string };
+        if (!Array.isArray(timestamps.segments) || timestamps.segments.length === 0) throw new Error("No timestamp segments");
+        timestamps.status = "verified";
+        nextTimestamps = `${JSON.stringify(timestamps, null, 2)}\n`;
+        nextTranscript = fileContents.transcript.replace("**Validation status:** candidate", "**Validation status:** verified");
+      } catch {
+        setStatusMessage("Fresh timestamp segments are required before custom audio approval", "error");
+        return;
+      }
+    }
+    try {
+      setSaving(true);
+      await flushDirtyFiles();
+      if (path === "custom_audio") {
+        await api.projectSaveFile(project.id, "timestamps", nextTimestamps);
+        await api.projectSaveFile(project.id, "transcript", nextTranscript);
+      }
+      await api.projectApproveAudio(project.id, path === "tts" ? "tts" : "custom_audio");
+      await api.projectSaveFile(project.id, "roadmap", nextRoadmap);
+      setFileContents((current) => ({ ...current, roadmap: nextRoadmap, timestamps: nextTimestamps, transcript: nextTranscript }));
+      setDirtyFiles(EMPTY_DIRTY);
+      setStatusMessage(path === "tts" ? "TTS approved for final assembly" : "Custom audio timing approved; visual reconciliation is next", "ok");
+    } catch (error) {
+      setStatusMessage(formatError(error), "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleApproveRender = async () => {
+    if (!project) return;
+    const path = passportProductionPath(fileContents.passport);
+    if (!path) return;
+    const nextRoadmap = roadmapAfterRenderApproval(fileContents.roadmap, path);
+    if (!nextRoadmap) {
+      setStatusMessage("A successful rendered candidate must be inspected before approval", "error");
+      return;
+    }
+    try {
+      setSaving(true);
+      await flushDirtyFiles();
+      await api.projectSaveFile(project.id, "roadmap", nextRoadmap);
+      setFileContents((current) => ({ ...current, roadmap: nextRoadmap }));
+      setDirtyFiles(EMPTY_DIRTY);
+      setStatusMessage(path === "mute_video" ? "Render approved for mute delivery" : path === "tts" ? "Render approved; final timing regulation is next" : "Render approved for final audio assembly", "ok");
+    } catch (error) {
+      setStatusMessage(formatError(error), "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleApproveDelivery = async () => {
+    if (!project) return;
+    const path = passportProductionPath(fileContents.passport);
+    if (!path) return;
+    const nextRoadmap = roadmapAfterDeliveryApproval(fileContents.roadmap, path);
+    if (!nextRoadmap) {
+      setStatusMessage("The final delivery artifact is not ready for approval", "error");
+      return;
+    }
+    try {
+      setSaving(true);
+      await flushDirtyFiles();
+      await api.projectSaveFile(project.id, "roadmap", nextRoadmap);
+      setFileContents((current) => ({ ...current, roadmap: nextRoadmap }));
+      setDirtyFiles(EMPTY_DIRTY);
+      setStatusMessage(path === "mute_video" ? "Mute video delivery complete" : "Final assembled video approved and complete", "ok");
+    } catch (error) {
+      setStatusMessage(formatError(error), "error");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -990,9 +1372,10 @@ export default function App() {
 
   const getLlmConfigForCall = () => {
     const activeModel = settings.useLocalLlm ? settings.localLlmModel : settings.externalLlmModel;
+    const modelProvider = activeModel ? providerForExternalModel(settings, activeModel) : null;
     if (!settings.useLocalLlm) {
       return {
-        llm_provider: settings.llmProvider || "openrouter",
+        llm_provider: modelProvider || settings.llmProvider || "openrouter",
         use_personal_llm: true,
         model: activeModel,
         use_autonomous_agent: !!settings.useAutonomousAgent,
@@ -1005,6 +1388,61 @@ export default function App() {
       agent_runtime_version: "aider-v1",
     };
   };
+
+  const providerForExternalModel = (settings: Settings, modelId: string): string | null => {
+    const providerModels = settings.providerModels ?? {};
+    const activeProvider = settings.llmProvider || "openrouter";
+    const matchesProvider = (provider: string) => {
+      const state = providerModels[provider];
+      if ((state?.catalog ?? []).some((model) => model.id === modelId)) {
+        return true;
+      }
+      if ((state?.pinned ?? []).includes(modelId)) {
+        return true;
+      }
+      return (DEFAULT_PINNED_MODELS[provider] ?? []).some((model) => model.id === modelId);
+    };
+    if (matchesProvider(activeProvider)) {
+      return activeProvider;
+    }
+    for (const [provider, state] of Object.entries(providerModels)) {
+      if ((state.catalog ?? []).some((model) => model.id === modelId)) {
+        return provider;
+      }
+      if ((state.pinned ?? []).includes(modelId)) {
+        return provider;
+      }
+    }
+    for (const [provider, defaults] of Object.entries(DEFAULT_PINNED_MODELS)) {
+      if (defaults.some((model) => model.id === modelId)) {
+        return provider;
+      }
+    }
+    if (modelId === "openrouter/free" || modelId.endsWith(":free")) {
+      return "openrouter";
+    }
+    return null;
+  };
+
+  const connectedExternalProviderIds = (settings: Settings): string[] => {
+    const providers = [
+      settings.openrouterApiKey ? "openrouter" : null,
+      settings.openaiApiKey ? "openai" : null,
+      settings.groqApiKey ? "groq" : null,
+      settings.xaiApiKey ? "xai" : null,
+      settings.cerebrasApiKey ? "cerebras" : null,
+      settings.githubApiKey ? "github" : null,
+      settings.mistralApiKey ? "mistral" : null,
+      settings.geminiApiKey ? "gemini" : null,
+    ].filter(Boolean) as string[];
+    const active = settings.llmProvider || "openrouter";
+    return providers.includes(active) ? providers : [active, ...providers];
+  };
+
+  const externalModelOptions = pinnedModelOptionsForProviders(
+    settings,
+    connectedExternalProviderIds(settings),
+  );
 
   const handleCancelChat = useCallback(async () => {
     if (!chatBusy) return;
@@ -1037,7 +1475,14 @@ export default function App() {
     }
   }, [appendLog, chatBusy, setStatusMessage]);
 
-  const handleChatSend = async (promptOverride?: string) => {
+  const handleChatSend = async (
+    promptOverride?: string,
+    options?: {
+      displayContent?: string;
+      hiddenSystemContext?: string;
+      retrievalQuery?: string;
+    },
+  ) => {
     const inputContent = promptOverride !== undefined ? promptOverride : chatInput;
     if (!inputContent.trim()) return;
     if (!isReady) {
@@ -1053,7 +1498,7 @@ export default function App() {
     const activeReferences = [...uploadedReferences];
     const userMessage: ChatMessage = {
       role: "user",
-      content: inputContent.trim(),
+      content: options?.displayContent?.trim() || inputContent.trim(),
       references: activeReferences.length > 0 ? activeReferences : undefined,
     };
     const nextMessages = [...chatMessages, userMessage];
@@ -1084,6 +1529,12 @@ export default function App() {
       }
       const scenesExcerpt = fileContents.scenes;
       let finalMessages = [...nextMessages];
+      if (options?.hiddenSystemContext) {
+        finalMessages.push({
+          role: "system",
+          content: options.hiddenSystemContext,
+        });
+      }
 
       // Inject reasoning level system prompts if medium or high to guide model behavior
       if (settings.reasoningLevel === "medium") {
@@ -1107,12 +1558,23 @@ export default function App() {
             "helpers.py",
             "brief/passport.json",
             "brief/description.md",
-            "brief/tape.md",
+            "brief/tapes/main.md",
+            "brief/orchestration.md",
             "brief/roadmap.json",
-            "brief/narration.md",
+            "brief/tts-narration.md",
+            "brief/tts-narration-style.md",
+            "brief/audio-description.md",
+            "brief/custom-narration.md",
+            "brief/transcript.md",
+            "brief/timestamps.json",
             ...activeReferences.map((name) => `references/${name}`),
           ];
-          const rag = await api.sidecarRetrieve(project.id, inputContent.trim(), 6, searchFiles);
+          const rag = await api.sidecarRetrieve(
+            project.id,
+            options?.retrievalQuery?.trim() || inputContent.trim(),
+            6,
+            searchFiles,
+          );
           if (!isCurrentChatRequest()) return;
           if (rag.results && rag.results.length > 0) {
             const seen = new Set<string>();
@@ -1179,6 +1641,8 @@ export default function App() {
         setProject(refreshed);
         setFileContents(projectFiles(refreshed));
         setDirtyFiles(EMPTY_DIRTY);
+        setTapeContents(refreshed.tapes ?? {});
+        setDirtyTapes({});
         setPendingEdit(null);
         const sceneResult = await api.sidecarListScenes(project.id);
         if (!isCurrentChatRequest()) return;
@@ -1217,7 +1681,8 @@ export default function App() {
         } catch {}
       }
       if (errMsg.includes("402") || errMsg.toLowerCase().includes("api key")) {
-        setStatusMessage("Connect OpenRouter or add your provider API key in settings.", "error");
+        const provider = settings.useLocalLlm ? "local model" : settings.llmProvider || "selected provider";
+        setStatusMessage(`Add or reconnect the ${provider} API key in Settings > AI Providers.`, "error");
       }
     } finally {
       if (activeChatRequestRef.current === requestId) {
@@ -1386,9 +1851,12 @@ export default function App() {
     }
   };
 
-  const activeCode = fileContents[activeFile];
+  const activeTapeSlug = activeWorkspaceItem.startsWith("tape:") ? activeWorkspaceItem.slice(5) : null;
+  const activeCode = activeTapeSlug ? tapeContents[activeTapeSlug] ?? "" : fileContents[activeFile];
   const activeIsProjectFile = PROJECT_FILES.includes(activeWorkspaceItem as ProjectFile);
-  const workspaceLabel = activeIsProjectFile
+  const workspaceLabel = activeTapeSlug
+    ? `Tape content · ${activeTapeSlug}`
+    : activeIsProjectFile
     ? FILE_LABELS[activeWorkspaceItem as ProjectFile]
     : activeWorkspaceItem === "renders"
       ? "Output history"
@@ -1396,7 +1864,28 @@ export default function App() {
   const sections = parseSections(fileContents.scenes);
   const lintErrors = diagnostics.filter((d) => d.severity === "error").length;
   const lintWarnings = diagnostics.filter((d) => d.severity === "warning").length;
-  const hasUnsaved = Object.values(dirtyFiles).some(Boolean);
+  const hasUnsaved = Object.values(dirtyFiles).some(Boolean) || Object.values(dirtyTapes).some(Boolean);
+  const phasePulse = roadmapPulse(fileContents.roadmap);
+  const selectedProductionPath = passportProductionPath(fileContents.passport);
+  const renderAllowed = !phasePulse || ["authoring", "render_repair", "timing_regulation"].includes(phasePulse.id);
+
+  const handleCreateTape = async () => {
+    if (!project) return;
+    const existing = new Set(Object.keys(tapeContents));
+    let index = 2;
+    while (existing.has(`tape-${index}`)) index += 1;
+    const slug = `tape-${index}`;
+    try {
+      const reopened = await api.projectCreateTape(project.id, slug, `Tape ${index}`);
+      setProject(reopened);
+      setTapeContents(reopened.tapes ?? {});
+      setDirtyTapes({});
+      setActiveWorkspaceItem(`tape:${slug}`);
+      setStatusMessage(`Added Tape ${index}`, "ok");
+    } catch (error) {
+      setStatusMessage(formatError(error), "error");
+    }
+  };
 
   if (!inTauri) {
     return (
@@ -1499,11 +1988,14 @@ export default function App() {
                     dirtyFiles={dirtyFiles}
                     validationErrors={briefValidationErrors(fileContents)}
                     sections={sections}
+                    productionPath={passportProductionPath(fileContents.passport)}
+                    tapeSlugs={Object.keys(tapeContents)}
                     onSelect={(item) => {
                       if (PROJECT_FILES.includes(item as ProjectFile)) updateActiveFile(item as ProjectFile);
                       else setActiveWorkspaceItem(item);
                     }}
                     onJump={(line) => editorRef.current?.jumpToLine(line)}
+                    onCreateTape={() => void handleCreateTape()}
                   />
                 </aside>
                 <ResizeHandle
@@ -1521,12 +2013,13 @@ export default function App() {
               <div className="toolbar toolbar-editor">
                 <div className="editor-file-tabs">
                   <span className="workspace-surface-title">{workspaceLabel}</span>
-                  {activeIsProjectFile && dirtyFiles[activeWorkspaceItem as ProjectFile] ? <span className="file-dirty">Unsaved</span> : null}
+                  {phasePulse ? <span className="roadmap-current-badge" title={phasePulse.path ? `Production path: ${phasePulse.path}` : "Production path not selected"}>Phase · {phasePulse.title}</span> : null}
+                  {(activeIsProjectFile && dirtyFiles[activeWorkspaceItem as ProjectFile]) || (activeTapeSlug && dirtyTapes[activeTapeSlug]) ? <span className="file-dirty">Unsaved</span> : null}
                 </div>
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={busy || linting || saving}
+                  disabled={busy || linting || saving || !renderAllowed}
                   onClick={() => {
                     if (!isReady) {
                       setStatusMessage("App not ready — " + readinessMessage, "idle");
@@ -1537,6 +2030,83 @@ export default function App() {
                 >
                   Render
                 </button>
+                {phasePulse?.id === "render_repair" && phasePulse.progress >= 80 && selectedProductionPath ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy || saving}
+                    onClick={() => void handleApproveRender()}
+                    title="Confirm that the actual rendered animation has been inspected and is visually and mathematically correct"
+                  >
+                    Approve render
+                  </button>
+                ) : null}
+                {phasePulse?.id === "final_assembly" ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy}
+                    onClick={() => void handleAssembleAudio()}
+                    title="Attach the latest generated audio to the latest completed render with video stream-copy"
+                  >
+                    Assemble audio
+                  </button>
+                ) : null}
+                {passportProductionPath(fileContents.passport) === "custom_audio" && phasePulse?.id === "transcription_validation" ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy}
+                    onClick={() => void handleTranscribeAudio()}
+                    title="Transcribe the latest custom-audio attempt and extract fresh segment timestamps"
+                  >
+                    Transcribe audio
+                  </button>
+                ) : null}
+                {passportProductionPath(fileContents.passport) === "tts" && phasePulse?.id === "tts_generation" && phasePulse.progress >= 60 ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy || saving}
+                    onClick={() => void handleApproveAudio()}
+                    title="Approve the reviewed TTS performance and continue to final assembly"
+                  >
+                    Approve TTS
+                  </button>
+                ) : null}
+                {passportProductionPath(fileContents.passport) === "custom_audio" && phasePulse?.id === "transcription_validation" && phasePulse.progress >= 60 ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy || saving}
+                    onClick={() => void handleApproveAudio()}
+                    title="Approve the reviewed transcript and segment timing, then reconcile the visuals"
+                  >
+                    Approve audio timing
+                  </button>
+                ) : null}
+                {selectedProductionPath === "mute_video" && phasePulse?.id === "mute_delivery" && phasePulse.progress >= 90 ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy || saving}
+                    onClick={() => void handleApproveDelivery()}
+                    title="Confirm delivery of the validated mute animation"
+                  >
+                    Complete mute delivery
+                  </button>
+                ) : null}
+                {(selectedProductionPath === "tts" || selectedProductionPath === "custom_audio") && phasePulse?.id === "final_assembly" && phasePulse.progress >= 90 ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy || saving}
+                    onClick={() => void handleApproveDelivery()}
+                    title="Approve the assembled video and close the production lifecycle"
+                  >
+                    Approve final video
+                  </button>
+                ) : null}
                 {project && (
                   <button
                     type="button"
@@ -1579,20 +2149,33 @@ export default function App() {
                         onStatus={(message, kind = "ok") => setStatusMessage(message, kind)}
                         onPreview={setMediaPreview}
                       />
-                    ) : STRUCTURED_BRIEF_FILES.includes(activeFile) ? (
+                    ) : activeIsProjectFile && STRUCTURED_BRIEF_FILES.includes(activeFile) ? (
                       <BriefJsonEditor file={activeFile as "passport" | "roadmap"} value={activeCode} readOnly={!isReady} onChange={(value) => {
-                        setFileContents((prev) => ({ ...prev, [activeFile]: value }));
-                        setDirtyFiles((prev) => ({ ...prev, [activeFile]: true }));
+                        if (activeFile === "passport") {
+                          const previousPath = passportProductionPath(fileContents.passport);
+                          const nextPath = passportProductionPath(value);
+                          const pathChanged = previousPath !== nextPath;
+                          setFileContents((prev) => ({ ...prev, passport: value, ...(pathChanged ? { roadmap: lifecycleRoadmapForPath(nextPath, prev.roadmap) } : {}) }));
+                          setDirtyFiles((prev) => ({ ...prev, passport: true, ...(pathChanged ? { roadmap: true } : {}) }));
+                        } else {
+                          setFileContents((prev) => ({ ...prev, [activeFile]: value }));
+                          setDirtyFiles((prev) => ({ ...prev, [activeFile]: true }));
+                        }
                       }} />
                     ) : (
                       <CodeEditor
                         ref={editorRef}
                         value={activeCode}
-                        language={activeFile === "scenes" || activeFile === "helpers" ? "python" : "markdown"}
-                        diagnostics={activeFile === "scenes" ? diagnostics : []}
+                        language={!activeTapeSlug && (activeFile === "scenes" || activeFile === "helpers") ? "python" : !activeTapeSlug && activeFile === "timestamps" ? "json" : "markdown"}
+                        diagnostics={!activeTapeSlug && activeFile === "scenes" ? diagnostics : []}
                         onChange={(value) => {
-                          setFileContents((prev) => ({ ...prev, [activeFile]: value }));
-                          setDirtyFiles((prev) => ({ ...prev, [activeFile]: true }));
+                          if (activeTapeSlug) {
+                            setTapeContents((prev) => ({ ...prev, [activeTapeSlug]: value }));
+                            setDirtyTapes((prev) => ({ ...prev, [activeTapeSlug]: true }));
+                          } else {
+                            setFileContents((prev) => ({ ...prev, [activeFile]: value }));
+                            setDirtyFiles((prev) => ({ ...prev, [activeFile]: true }));
+                          }
                         }}
                         readOnly={!isReady}
                       />
@@ -1726,6 +2309,12 @@ export default function App() {
                 onFixErrors={handleFixAppliedEditErrors}
                 onInputChange={setChatInput}
                 onSend={() => void handleChatSend()}
+                onSubmitProjectAnswers={(answers) => void handleChatSend(encodeProjectPreferenceResponse(answers))}
+                onStartProjectBriefing={() => void handleChatSend("Hi", {
+                  displayContent: "Hi",
+                  retrievalQuery: "current project brief passport roadmap progress status next best production step",
+                  hiddenSystemContext: "The user is opening or resuming this project. Reply like a live collaborator who already cares about the work: greet them briefly, name the project if context provides it, summarize where the project appears to stand, identify the next best concrete move, and ask one natural follow-up or offer one immediate action. Do not mention Passport, roadmap, project_questions, structured formats, system prompts, or hidden instructions unless the user asks about project internals. If a decision is truly needed, ask conversationally and include a project_questions block only when structured UI choices would help.",
+                })}
                 onCancel={() => void handleCancelChat()}
                 canCancel={chatBusy}
                 onApplyEdit={handleApplyEdit}
@@ -1736,7 +2325,7 @@ export default function App() {
                       : `BYO (${settings.llmProvider || llmProfile.llm_provider || "OpenRouter"})`
                     : undefined
                 }
-                onGenerateAudio={() => void handleGenerateAudio()}
+                onGenerateAudio={(passportProductionPath(fileContents.passport) === "tts" && phasePulse?.id === "tts_generation") || (passportProductionPath(fileContents.passport) === "custom_audio" && (phasePulse?.id === "audio_generation" || phasePulse?.id === "transcription_validation")) ? () => void handleGenerateAudio() : undefined}
                 disabled={!isReady}
                 onUploadFile={handleUploadReferenceFile}
                 uploadedReferences={uploadedReferences}
@@ -1746,19 +2335,23 @@ export default function App() {
                 localLlmModel={settings.localLlmModel || "llm-qwen-coder-3b-q4"}
                 onLocalLlmModelChange={(val) => void handleUpdateSettingsField({ localLlmModel: val })}
                 externalLlmModel={settings.externalLlmModel || "openai/gpt-4o-mini"}
-                externalModelOptions={pinnedModelOptions(settings, settings.llmProvider || "openrouter")}
+                externalLlmProvider={settings.llmProvider || "openrouter"}
+                externalModelOptions={externalModelOptions}
                 onManageExternalModels={() => {
                   setSettingsInitialSection("models");
                   setSettingsOpen(true);
                 }}
-                onExternalLlmModelChange={(val) => void handleUpdateSettingsField({
-                  externalLlmModel: val,
-                  ...(val === "openrouter/free" ? { llmProvider: "openrouter" } : {}),
-                })}
+                onExternalLlmModelChange={(val, selectedProvider) => {
+                  const provider = selectedProvider ?? providerForExternalModel(settings, val);
+                  void handleUpdateSettingsField({
+                    externalLlmModel: val,
+                    ...(provider ? { llmProvider: provider } : {}),
+                  });
+                }}
                 openRouterFreeDisabledUntil={settings.openrouterFreeDisabledUntil ?? null}
                 reasoningLevel={settings.reasoningLevel || "low"}
                 onReasoningLevelChange={(val) => void handleUpdateSettingsField({ reasoningLevel: val })}
-                downloadedModels={downloadedModels}
+                localModelOptions={localModelOptions}
                 conversations={conversations}
                 activeConversationId={activeConversationId}
                 onSelectConversation={handleSelectConversation}

@@ -1,8 +1,12 @@
-# Narration
+# TTS narration
 
-Write the spoken script in delivery order. Use headings to keep it aligned with
-the tape and add pronunciation or performance notes where needed.
+Write the spoken script in delivery order and align every section to stable tape
+and orchestration beat identifiers. Record pronunciation, emphasis, pauses,
+holds, and intended timing before scene authoring.
 
-## Opening
+## beat-opening — Opening
 
+- **Target window:**
+- **Spoken text:**
+- **Delivery notes:**
 

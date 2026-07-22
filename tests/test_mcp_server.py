@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, patch
 import pytest
 
 from matemium.mcp_server import list_tools, call_tool
@@ -11,7 +10,7 @@ from matemium.mcp_server import list_tools, call_tool
 
 @pytest.mark.anyio
 async def test_mcp_list_tools() -> None:
-    """Verify that list_tools returns all core tools including the new run_lifecycle tool."""
+    """The MCP surface exposes gated lifecycle helpers, not the legacy bypass."""
     tools = await list_tools()
     
     # Assert all necessary tool names are exposed
@@ -20,49 +19,43 @@ async def test_mcp_list_tools() -> None:
     assert "edit_file" in tool_names
     assert "compile_manim" in tool_names
     assert "retrieve" in tool_names
-    assert "run_lifecycle" in tool_names
+    assert "create_tape_content" in tool_names
+    assert "lifecycle_status" in tool_names
+    assert "run_lifecycle" not in tool_names
 
-    # Check run_lifecycle schema expectations
-    lifecycle_tool = next(t for t in tools if t.name == "run_lifecycle")
-    assert "user_prompt" in lifecycle_tool.inputSchema["required"]
-    assert "mode" in lifecycle_tool.inputSchema["properties"]
+    tape_tool = next(t for t in tools if t.name == "create_tape_content")
+    assert tape_tool.inputSchema["required"] == ["slug", "title"]
 
 
 @pytest.mark.anyio
-@patch("matemium.agent.coordinator.run_lifecycle")
-async def test_mcp_call_tool_run_lifecycle(mock_run_lifecycle: MagicMock) -> None:
-    """Verify that call_tool successfully dispatches run_lifecycle requests to the coordinator."""
-    # 1. Setup mock LifecycleResult output
-    mock_result = MagicMock()
-    mock_result.post_production.total_duration = 12.5
-    mock_result.blueprint.segments = [1, 2, 3]
-    mock_result.token_ledger.total_credits_spent.return_value = 150
-    mock_run_lifecycle.return_value = mock_result
+async def test_mcp_lifecycle_status_and_tape_creation(tmp_path, monkeypatch) -> None:
+    """MCP can inspect the gate and create bounded additional tape files."""
+    brief = tmp_path / "brief"
+    (brief / "tapes").mkdir(parents=True)
+    (brief / "passport.json").write_text(
+        json.dumps({"production_path": "custom_audio", "readiness": {"status": "ready", "missing_fields": []}}),
+        encoding="utf-8",
+    )
+    (brief / "roadmap.json").write_text(
+        json.dumps({
+            "production_path": "custom_audio",
+            "current_phase": "tape_content",
+            "phases": [{"id": "tape_content", "title": "Tape content", "status": "in_progress"}],
+            "invalidated_phases": [],
+            "blockers": [],
+        }),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MATEMIUM_ROOT", str(tmp_path))
 
-    # 2. Invoke the tool
-    arguments = {
-        "user_prompt": "Animate a revolving helix.",
-        "mode": "mute",
-        "model_tier": "standard",
-        "account_tier": "basic",
-    }
-    
-    results = await call_tool("run_lifecycle", arguments)
-    
-    assert len(results) == 1
-    assert results[0].type == "text"
-    
-    # Parse output JSON payload
-    data = json.loads(results[0].text)
-    assert data["ok"] is True
-    assert data["duration"] == 12.5
-    assert data["segments_count"] == 3
-    assert data["tokens_spent"] == 150
+    status = await call_tool("lifecycle_status", {})
+    payload = json.loads(status[0].text)
+    assert payload["production_path"] == "custom_audio"
+    assert payload["current_phase"]["id"] == "tape_content"
 
-    # Ensure coordinator was called with parsed enums
-    mock_run_lifecycle.assert_called_once()
-    passed_args, passed_kwargs = mock_run_lifecycle.call_args
-    assert passed_kwargs["user_prompt"] == "Animate a revolving helix."
-    assert passed_kwargs["mode"].value == "mute"
-    assert passed_kwargs["model_tier"].value == "standard"
-    assert passed_kwargs["account_tier"].value == "basic"
+    created = await call_tool("create_tape_content", {"slug": "comparison", "title": "Comparison"})
+    assert json.loads(created[0].text)["ok"] is True
+    assert (brief / "tapes" / "comparison.md").is_file()
+
+    escaped = await call_tool("create_tape_content", {"slug": "../escape", "title": "Escape"})
+    assert escaped[0].text.startswith("ERROR:")

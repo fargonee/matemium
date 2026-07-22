@@ -1,9 +1,16 @@
-use reqwest::Client;
+use std::path::Path;
+
+use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::workspace::{ProviderModel, Settings};
+
+const PROJECT_MANAGER_SYSTEM_PROMPT: &str =
+    include_str!("../../../shared/prompts/project-manager-system.txt");
+const SCENE_AUTHORING_SYSTEM_PROMPT: &str =
+    include_str!("../../../shared/prompts/scene-authoring-system.txt");
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -135,6 +142,21 @@ fn content_to_text(value: &Value) -> String {
     }
 }
 
+fn parse_provider_chat_payload(provider: &str, body: &[u8]) -> Result<Value, String> {
+    serde_json::from_slice(body).map_err(|error| {
+        let preview = String::from_utf8_lossy(body)
+            .chars()
+            .take(240)
+            .collect::<String>()
+            .replace(['\r', '\n'], " ");
+        if preview.trim().is_empty() {
+            format!("parse {provider} chat response JSON: {error} (empty response body)")
+        } else {
+            format!("parse {provider} chat response JSON: {error}; response began: {preview}")
+        }
+    })
+}
+
 pub async fn exchange_openrouter_code(
     code: &str,
     code_verifier: &str,
@@ -172,6 +194,10 @@ fn provider_api_key<'a>(settings: &'a Settings, provider: &str) -> Option<&'a st
         "openai" => settings.openai_api_key.as_deref(),
         "groq" => settings.groq_api_key.as_deref(),
         "xai" => settings.xai_api_key.as_deref(),
+        "cerebras" => settings.cerebras_api_key.as_deref(),
+        "github" => settings.github_api_key.as_deref(),
+        "mistral" => settings.mistral_api_key.as_deref(),
+        "gemini" => settings.gemini_api_key.as_deref(),
         _ => None,
     }
     .map(str::trim)
@@ -184,7 +210,19 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
         "openai" => Some("https://api.openai.com/v1"),
         "groq" => Some("https://api.groq.com/openai/v1"),
         "xai" => Some("https://api.x.ai/v1"),
+        "cerebras" => Some("https://api.cerebras.ai/v1"),
+        "github" => Some("https://models.github.ai/inference"),
+        "mistral" => Some("https://api.mistral.ai/v1"),
+        "gemini" => Some("https://generativelanguage.googleapis.com/v1beta/openai"),
         _ => None,
+    }
+}
+
+fn provider_models_url(provider: &str, base_url: &str) -> String {
+    match provider {
+        "github" => "https://models.github.ai/catalog/models".to_string(),
+        "openrouter" => format!("{base_url}/models?output_modalities=text&sort=most-popular"),
+        _ => format!("{base_url}/models"),
     }
 }
 
@@ -194,8 +232,17 @@ fn default_model_for_provider(provider: &str) -> &'static str {
         "openai" => "gpt-4o-mini",
         "groq" => "llama-3.1-8b-instant",
         "xai" => "grok-2-latest",
+        "cerebras" => "gpt-oss-120b",
+        "github" => "openai/gpt-4.1",
+        "mistral" => "mistral-small-latest",
+        "gemini" => "gemini-3.5-flash",
         _ => "gpt-4o-mini",
     }
+}
+
+pub(crate) fn is_openrouter_free_model(id: &str) -> bool {
+    let lowered = id.trim().to_lowercase();
+    lowered == "openrouter/free" || lowered.ends_with(":free")
 }
 
 fn normalize_model_for_provider(provider: &str, model: Option<String>) -> String {
@@ -211,6 +258,18 @@ fn normalize_model_for_provider(provider: &str, model: Option<String>) -> String
     }
     if selected.starts_with("xai/") && provider == "xai" {
         return selected.trim_start_matches("xai/").to_string();
+    }
+    if selected.starts_with("cerebras/") && provider == "cerebras" {
+        return selected.trim_start_matches("cerebras/").to_string();
+    }
+    if selected.starts_with("mistral/") && provider == "mistral" {
+        return selected.trim_start_matches("mistral/").to_string();
+    }
+    if selected.starts_with("gemini/") && provider == "gemini" {
+        return selected.trim_start_matches("gemini/").to_string();
+    }
+    if provider == "github" {
+        return selected;
     }
     if selected.contains('/') {
         return default_model_for_provider(provider).to_string();
@@ -236,14 +295,12 @@ pub async fn list_provider_models(
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| format!("http client: {e}"))?;
-    let url = if provider == "openrouter" {
-        format!("{base_url}/models?output_modalities=text&sort=most-popular")
-    } else {
-        format!("{base_url}/models")
-    };
+    let url = provider_models_url(&provider, base_url);
     let response = client
         .get(url)
         .bearer_auth(api_key)
+        .header(header::ACCEPT, "application/vnd.github+json")
+        .header("X-GitHub-Api-Version", "2026-03-10")
         .header("HTTP-Referer", "https://matemium.app")
         .header("X-OpenRouter-Title", "Matemium")
         .send()
@@ -263,6 +320,7 @@ pub async fn list_provider_models(
     let data = payload
         .get("data")
         .and_then(Value::as_array)
+        .or_else(|| payload.as_array())
         .ok_or_else(|| format!("{provider} models response did not include data[]"))?;
 
     let mut models = data
@@ -319,6 +377,26 @@ fn normalize_provider_model(provider: &str, item: &Value) -> Option<ProviderMode
     {
         badges.push("Vision".to_string());
     }
+    if item
+        .get("capabilities")
+        .and_then(Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .any(|value| value.as_str() == Some("tool-calling"))
+        })
+        .unwrap_or(false)
+    {
+        badges.push("Tools".to_string());
+    }
+    if item
+        .get("supported_input_modalities")
+        .and_then(Value::as_array)
+        .map(|values| values.iter().any(|value| value.as_str() == Some("image")))
+        .unwrap_or(false)
+    {
+        badges.push("Vision".to_string());
+    }
 
     Some(ProviderModel {
         id: id.to_string(),
@@ -359,9 +437,17 @@ fn looks_like_chat_model(provider: &str, id: &str, item: &Value) -> bool {
             .map(|values| values.iter().any(|value| value.as_str() == Some("text")))
             .unwrap_or(true);
     }
+    if provider == "github" {
+        let output_modalities = item
+            .get("supported_output_modalities")
+            .and_then(Value::as_array);
+        return output_modalities
+            .map(|values| values.iter().any(|value| value.as_str() == Some("text")))
+            .unwrap_or(true);
+    }
     let included = [
-        "gpt", "chatgpt", "o1", "o3", "o4", "llama", "mixtral", "gemma", "qwen", "deepseek",
-        "compound", "grok", "kimi",
+        "gpt", "chatgpt", "o1", "o3", "o4", "llama", "mixtral", "mistral", "gemma", "qwen",
+        "deepseek", "compound", "grok", "kimi", "gemini", "glm",
     ];
     included.iter().any(|needle| lowered.contains(needle))
 }
@@ -429,9 +515,10 @@ pub async fn external_provider_chat(
     settings: &Settings,
     mut request: ChatCompletionRequest,
 ) -> Result<ChatCompletionResponse, String> {
-    let provider = settings
+    let provider = request
         .llm_provider
         .as_deref()
+        .or(settings.llm_provider.as_deref())
         .unwrap_or("openrouter")
         .trim()
         .to_lowercase();
@@ -451,7 +538,13 @@ pub async fn external_provider_chat(
             .or_else(|| settings.external_llm_model.clone()),
     );
 
-    let mut messages = Vec::new();
+    let mut messages = vec![json!({
+        "role": "system",
+        "content": format!(
+            "{}\n\n{}",
+            PROJECT_MANAGER_SYSTEM_PROMPT, SCENE_AUTHORING_SYSTEM_PROMPT
+        ),
+    })];
     if let Some(excerpt) = request
         .scenes_excerpt
         .as_deref()
@@ -472,16 +565,23 @@ pub async fn external_provider_chat(
 
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(60))
+        // Keep provider responses uncompressed and on one conservative transport;
+        // body decoding failures happen below JSON parsing and otherwise lose context.
+        .http1_only()
         .build()
         .map_err(|e| format!("http client: {e}"))?;
     let response = client
         .post(format!("{base_url}/chat/completions"))
         .bearer_auth(api_key)
+        .header(header::ACCEPT, "application/json")
+        .header(header::ACCEPT_ENCODING, "identity")
+        .header("X-GitHub-Api-Version", "2026-03-10")
         .header("HTTP-Referer", "https://matemium.app")
         .header("X-OpenRouter-Title", "Matemium")
         .json(&json!({
             "model": model,
             "messages": messages,
+            "stream": false,
         }))
         .send()
         .await
@@ -495,7 +595,7 @@ pub async fn external_provider_chat(
             .and_then(|value| value.to_str().ok())
             .and_then(|value| value.parse::<u64>().ok());
         let body = response.text().await.unwrap_or_default();
-        if provider == "openrouter" && model == "openrouter/free" && status.as_u16() == 429 {
+        if provider == "openrouter" && is_openrouter_free_model(&model) && status.as_u16() == 429 {
             return Err(format!(
                 "OPENROUTER_FREE_RATE_LIMITED:{}",
                 retry_after.unwrap_or(0)
@@ -504,10 +604,16 @@ pub async fn external_provider_chat(
         return Err(format!("{provider} chat HTTP {status}: {body}"));
     }
 
-    let payload = response
-        .json::<Value>()
-        .await
-        .map_err(|e| format!("parse {provider} chat response: {e}"))?;
+    let content_type = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("unknown")
+        .to_string();
+    let body = response.bytes().await.map_err(|e| {
+        format!("read {provider} chat response body ({content_type}): {e}. Retry the request.")
+    })?;
+    let payload = parse_provider_chat_payload(&provider, &body)?;
     let choice = payload
         .get("choices")
         .and_then(Value::as_array)
@@ -684,6 +790,8 @@ pub struct AudioSpeechRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tts_provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub use_personal_llm: Option<bool>,
@@ -693,23 +801,56 @@ pub async fn generate_audio(
     settings: &Settings,
     request: AudioSpeechRequest,
 ) -> Result<Vec<u8>, String> {
-    let base = settings.server_url.trim_end_matches('/');
-    let url = format!("{base}/v1/audio/speech");
+    let provider = request
+        .tts_provider
+        .as_deref()
+        .or(settings.llm_provider.as_deref())
+        .unwrap_or("openai")
+        .trim()
+        .to_lowercase();
+    let api_key = provider_api_key(settings, &provider).ok_or_else(|| {
+        format!(
+            "No {provider} API key is stored on this computer. Connect a TTS-capable provider in Settings."
+        )
+    })?;
+    let base = provider_base_url(&provider)
+        .ok_or_else(|| format!("Unsupported TTS provider: {provider}"))?;
+    let url = format!("{}/audio/speech", base.trim_end_matches('/'));
 
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(120))
         .build()
         .map_err(|e| format!("http client: {e}"))?;
 
-    let mut req = client.post(url).json(&request);
-    if let Some(token) = &settings.api_token {
-        req = req.header("Authorization", format!("Bearer {token}"));
+    let instructions = request
+        .instructions
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let default_model = if instructions.is_some() {
+        "gpt-4o-mini-tts"
+    } else {
+        "tts-1"
+    };
+    let mut payload = json!({
+        "model": request.model.as_deref().unwrap_or(default_model),
+        "input": request.text,
+        "voice": request.voice.as_deref().unwrap_or("alloy"),
+        "response_format": "mp3"
+    });
+    if let Some(instructions) = instructions {
+        payload["instructions"] = json!(instructions);
     }
+    let req = client
+        .post(url)
+        .bearer_auth(api_key)
+        .header(header::ACCEPT, "audio/mpeg")
+        .json(&payload);
 
     let response = req
         .send()
         .await
-        .map_err(|e| format!("audio request failed: {e}"))?;
+        .map_err(|e| format!("{provider} audio request failed: {e}"))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -717,7 +858,7 @@ pub async fn generate_audio(
             .text()
             .await
             .unwrap_or_else(|_| "<empty body>".to_string());
-        return Err(format!("audio HTTP {status}: {body}"));
+        return Err(format!("{provider} audio HTTP {status}: {body}"));
     }
 
     let bytes = response
@@ -725,6 +866,63 @@ pub async fn generate_audio(
         .await
         .map_err(|e| format!("read audio bytes: {e}"))?;
     Ok(bytes.to_vec())
+}
+
+pub async fn transcribe_audio(
+    settings: &Settings,
+    audio_path: &Path,
+    provider: Option<&str>,
+) -> Result<Value, String> {
+    let provider = provider
+        .or(settings.llm_provider.as_deref())
+        .unwrap_or("openai")
+        .trim()
+        .to_lowercase();
+    let api_key = provider_api_key(settings, &provider).ok_or_else(|| {
+        format!(
+            "No {provider} API key is stored on this computer. Connect a transcription-capable provider in Settings."
+        )
+    })?;
+    let base = provider_base_url(&provider)
+        .ok_or_else(|| format!("Unsupported transcription provider: {provider}"))?;
+    let bytes = std::fs::read(audio_path)
+        .map_err(|e| format!("read audio {}: {e}", audio_path.display()))?;
+    let filename = audio_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("audio.mp3")
+        .to_string();
+    let part = reqwest::multipart::Part::bytes(bytes)
+        .file_name(filename)
+        .mime_str("audio/mpeg")
+        .map_err(|e| format!("prepare transcription upload: {e}"))?;
+    let form = reqwest::multipart::Form::new()
+        .part("file", part)
+        .text("model", "whisper-1")
+        .text("response_format", "verbose_json")
+        .text("timestamp_granularities[]", "segment");
+    let response = Client::builder()
+        .timeout(std::time::Duration::from_secs(180))
+        .build()
+        .map_err(|e| format!("http client: {e}"))?
+        .post(format!(
+            "{}/audio/transcriptions",
+            base.trim_end_matches('/')
+        ))
+        .bearer_auth(api_key)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| format!("{provider} transcription request failed: {e}"))?;
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("{provider} transcription HTTP {status}: {body}"));
+    }
+    response
+        .json::<Value>()
+        .await
+        .map_err(|e| format!("parse {provider} transcription response: {e}"))
 }
 
 pub async fn get_profile(settings: &Settings) -> Result<Value, String> {
@@ -845,5 +1043,23 @@ mod tests {
             expires_in: 604800,
         };
         assert_eq!(extract_access_token(&response), "dev.user.token");
+    }
+
+    #[test]
+    fn parses_provider_chat_payload() {
+        let payload = parse_provider_chat_payload(
+            "openrouter",
+            br#"{"choices":[{"message":{"content":"ready"}}]}"#,
+        )
+        .expect("valid provider payload");
+        assert_eq!(payload["choices"][0]["message"]["content"], "ready");
+    }
+
+    #[test]
+    fn provider_chat_payload_error_includes_bounded_preview() {
+        let error = parse_provider_chat_payload("openrouter", b"upstream unavailable")
+            .expect_err("invalid provider payload");
+        assert!(error.contains("response JSON"));
+        assert!(error.contains("upstream unavailable"));
     }
 }

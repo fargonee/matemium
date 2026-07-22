@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { AgentTraceEntry, ChatMessage, CodeEdit, Conversation, ProviderModel } from "../api/types";
 import { formatModelMeta, modelDisplayName } from "../modelCatalog";
+import {
+  answeredProjectQuestionIds,
+  extractProjectQuestions,
+  parseProjectPreferenceResponse,
+  type ProjectPreferenceAnswer,
+} from "../utils/projectQuestions";
+import { MarkdownContent } from "./MarkdownContent";
+import { ProjectQuestionPolls } from "./ProjectQuestionPolls";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -12,6 +20,8 @@ interface ChatPanelProps {
   onFixErrors?: () => void;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onSubmitProjectAnswers?: (answers: ProjectPreferenceAnswer[]) => void;
+  onStartProjectBriefing?: () => void;
   onCancel?: () => void;
   canCancel?: boolean;
   onApplyEdit: () => void;
@@ -28,13 +38,14 @@ interface ChatPanelProps {
   localLlmModel?: string;
   onLocalLlmModelChange?: (val: string) => void;
   externalLlmModel?: string;
-  onExternalLlmModelChange?: (val: string) => void;
+  externalLlmProvider?: string;
+  onExternalLlmModelChange?: (val: string, provider?: string) => void;
   externalModelOptions?: ProviderModel[];
   onManageExternalModels?: () => void;
   openRouterFreeDisabledUntil?: string | null;
   reasoningLevel?: string;
   onReasoningLevelChange?: (val: string) => void;
-  downloadedModels?: Record<string, boolean>;
+  localModelOptions?: Array<{ id: string; label: string; ready: boolean }>;
   // Conversation management
   conversations?: Conversation[];
   activeConversationId?: string | null;
@@ -67,6 +78,8 @@ export function ChatPanel({
   onFixErrors,
   onInputChange,
   onSend,
+  onSubmitProjectAnswers,
+  onStartProjectBriefing,
   onCancel,
   canCancel = false,
   onApplyEdit,
@@ -81,13 +94,14 @@ export function ChatPanel({
   localLlmModel = "llm-qwen-coder-3b-q4",
   onLocalLlmModelChange,
   externalLlmModel = "openai/gpt-4o-mini",
+  externalLlmProvider = "openrouter",
   onExternalLlmModelChange,
   externalModelOptions = [],
   onManageExternalModels,
   openRouterFreeDisabledUntil,
   reasoningLevel = "low",
   onReasoningLevelChange,
-  downloadedModels = {},
+  localModelOptions = [],
   conversations = [],
   activeConversationId = null,
   onSelectConversation,
@@ -105,11 +119,23 @@ export function ChatPanel({
   const freeModelRenewal = freeModelDisabled && freeDisabledUntil
     ? freeDisabledUntil.toLocaleString()
     : null;
+  const localModelSelectOptions = (() => {
+    const next = [...localModelOptions];
+    if (localLlmModel && !next.some((option) => option.id === localLlmModel)) {
+      next.unshift({
+        id: localLlmModel,
+        label: modelDisplayName(localLlmModel),
+        ready: false,
+      });
+    }
+    return next;
+  })();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [completedTraceEvents, setCompletedTraceEvents] = useState<AgentTraceEntry[]>([]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
+  const completionTraceListRef = useRef<HTMLOListElement>(null);
   const wasBusyRef = useRef(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const rawTraceEvents = liveAgentTrace.length ? liveAgentTrace : responseMetadata?.trace ?? [];
@@ -119,16 +145,24 @@ export function ChatPanel({
     : (responseMetadata?.trace ?? []).filter((event) => !isHeartbeatEvent(event));
   const visibleExternalModels = externalModelOptions.length
     ? externalModelOptions
-    : [{ id: externalLlmModel, name: modelDisplayName(externalLlmModel), provider: "openrouter" }];
-  const selectedExternalModel = visibleExternalModels.some((model) => model.id === externalLlmModel)
-    ? externalLlmModel
-    : visibleExternalModels[0]?.id ?? externalLlmModel;
+    : [{ id: externalLlmModel, name: modelDisplayName(externalLlmModel), provider: externalLlmProvider || "openrouter" }];
+  const modelOptionValue = (model: ProviderModel) => `${model.provider}::${model.id}`;
+  const selectedExternalModelOption = (() => {
+    const exact = visibleExternalModels.find(
+      (model) => model.id === externalLlmModel && model.provider === externalLlmProvider,
+    );
+    if (exact) return modelOptionValue(exact);
+    const byId = visibleExternalModels.find((model) => model.id === externalLlmModel);
+    return byId ? modelOptionValue(byId) : modelOptionValue(visibleExternalModels[0]);
+  })();
+  const selectedExternalModel = selectedExternalModelOption.split("::").slice(1).join("::");
 
   useEffect(() => {
     if (!useLocalLlm && selectedExternalModel !== externalLlmModel) {
-      onExternalLlmModelChange?.(selectedExternalModel);
+      const selected = visibleExternalModels.find((model) => modelOptionValue(model) === selectedExternalModelOption);
+      onExternalLlmModelChange?.(selectedExternalModel, selected?.provider);
     }
-  }, [externalLlmModel, onExternalLlmModelChange, selectedExternalModel, useLocalLlm]);
+  }, [externalLlmModel, onExternalLlmModelChange, selectedExternalModel, selectedExternalModelOption, useLocalLlm, visibleExternalModels]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -449,7 +483,7 @@ export function ChatPanel({
   }
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
-  const activeTitle = activeConversation ? activeConversation.title : "AI Assistant";
+  const activeTitle = activeConversation ? activeConversation.title : "Project Manager";
   const visibleWorkingNote = workingNote();
   const completionTraceEvents = archivedTraceEvents.length ? archivedTraceEvents : fallbackCompletionTrace();
   const liveTiming = traceTimingSummary(traceEvents);
@@ -647,7 +681,7 @@ export function ChatPanel({
       </h2>
 
       <div role="status" style={{ padding: "7px 12px", borderBottom: "1px solid var(--border-subtle)", background: autonomousEnabled ? "rgba(234, 179, 8, 0.07)" : "rgba(59, 130, 246, 0.05)", fontSize: "0.67rem", color: "var(--text-secondary)", lineHeight: 1.4 }}>
-        <strong style={{ color: "var(--text-primary)" }}>{autonomousEnabled ? "Autonomous agent" : "Single-turn assistant"}</strong>
+        <strong style={{ color: "var(--text-primary)" }}>{autonomousEnabled ? "Project manager · autonomous" : "Project manager · advisory"}</strong>
         {autonomousUnavailableReason && <> · {autonomousUnavailableReason}</>}
         {autonomousEnabled && <> · runtime <code>{configuredRuntime}</code> · Aider workspace agent</>}
         {responseMetadata && (
@@ -664,13 +698,18 @@ export function ChatPanel({
       {/* Main Scrollable History */}
       <div className="chat-history" ref={historyRef}>
         {messages.length === 0 ? (
-          <div style={{ color: "#7c8595", fontSize: "0.8rem" }}>
-            Ask the assistant to refine or extend the scene...
+          <div className="project-manager-empty">
+            <span>Ferganus · project coworker</span>
+            <strong>Turn the idea into a finished product</strong>
+            <p>I’ll guide the current decision, maintain the project artifacts, and carry the production work forward.</p>
+            {onStartProjectBriefing ? <button type="button" disabled={busy || disabled} onClick={onStartProjectBriefing}>Continue with Ferganus</button> : null}
           </div>
         ) : (
           messages.map((message, index) => {
             if (message.role === "assistant") {
-              const { toolCall, toolOutput, cleanContent } = parseResponseBlocks(message.content);
+              const { toolCall, toolOutput, cleanContent: responseContent } = parseResponseBlocks(message.content);
+              const { cleanContent, questions } = extractProjectQuestions(responseContent);
+              const answeredIds = answeredProjectQuestionIds(messages, index);
               return (
                 <div
                   key={`${message.role}-${index}`}
@@ -725,17 +764,32 @@ export function ChatPanel({
                       }}>{safeDiagnostic(toolOutput)}</pre>
                     </details>
                   )}
-                  {cleanContent && <div className="assistant-clean-text">{cleanContent}</div>}
+                  {cleanContent && <MarkdownContent content={cleanContent} />}
+                  {questions.length > 0 && onSubmitProjectAnswers ? (
+                    <ProjectQuestionPolls
+                      questions={questions}
+                      answeredIds={answeredIds}
+                      disabled={busy}
+                      onSubmit={onSubmitProjectAnswers}
+                    />
+                  ) : null}
                 </div>
               );
             }
+
+            const preferenceAnswers = parseProjectPreferenceResponse(message.content);
 
             return (
               <div
                 key={`${message.role}-${index}`}
                 className={`chat-bubble ${message.role}`}
               >
-                <div>{message.content}</div>
+                {preferenceAnswers ? (
+                  <div className="project-preference-response">
+                    <strong>Project preferences</strong>
+                    {preferenceAnswers.map((answer) => <div key={answer.question_id}><span>{answer.question}</span><b>{answer.values.join(", ")}</b></div>)}
+                  </div>
+                ) : <div>{message.content}</div>}
                 {message.references && message.references.length > 0 && (
                   <div className="message-attachments-container" style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
                     {message.references.map((ref) => (
@@ -811,7 +865,20 @@ export function ChatPanel({
         )}
 
         {completionTraceEvents.length > 0 && !busy && (
-          <details aria-label="Completed agent activity" className="agent-activity-complete-card">
+          <details
+            aria-label="Completed agent activity"
+            className="agent-activity-complete-card"
+            onToggle={(event) => {
+              if (!event.currentTarget.open) return;
+
+              const list = completionTraceListRef.current;
+              const history = historyRef.current;
+              window.requestAnimationFrame(() => {
+                list?.scrollTo({ top: list.scrollHeight, behavior: "auto" });
+                history?.scrollTo({ top: history.scrollHeight, behavior: "smooth" });
+              });
+            }}
+          >
             <summary className="agent-activity-complete-summary">
               <span className="agent-activity-complete-title">
                 <span className="agent-live-dot" />
@@ -829,7 +896,7 @@ export function ChatPanel({
                 {completionTiming.tools && <span>Tools <strong>{completionTiming.tools}</strong></span>}
               </div>
             )}
-            <ol className="agent-activity-list">
+            <ol className="agent-activity-list" ref={completionTraceListRef}>
               {completionTraceEvents.map((event, index) => {
                 const elapsed = formatTraceDuration(traceDurationMs(completionTraceEvents, event, index));
                 return (
@@ -1092,26 +1159,34 @@ export function ChatPanel({
                     textOverflow: "ellipsis",
                   }}
                 >
-                  <option value="llm-qwen-coder-3b-q4" disabled={!downloadedModels["llm-qwen-coder-3b-q4"]} style={{ color: downloadedModels["llm-qwen-coder-3b-q4"] ? "var(--text-primary)" : "#5f697a" }}>
-                    Qwen 3B {downloadedModels["llm-qwen-coder-3b-q4"] ? "✓" : "(Not Downloaded)"}
-                  </option>
-                  <option value="llm-qwen-coder-7b-q4" disabled={!downloadedModels["llm-qwen-coder-7b-q4"]} style={{ color: downloadedModels["llm-qwen-coder-7b-q4"] ? "var(--text-primary)" : "#5f697a" }}>
-                    Qwen 7B {downloadedModels["llm-qwen-coder-7b-q4"] ? "✓" : "(Not Downloaded)"}
-                  </option>
-                  <option value="llm-llama-8b-q4" disabled={!downloadedModels["llm-llama-8b-q4"]} style={{ color: downloadedModels["llm-llama-8b-q4"] ? "var(--text-primary)" : "#5f697a" }}>
-                    Llama 8B {downloadedModels["llm-llama-8b-q4"] ? "✓" : "(Not Downloaded)"}
-                  </option>
+                  {localModelSelectOptions.length ? localModelSelectOptions.map((option) => (
+                    <option
+                      key={option.id}
+                      value={option.id}
+                      disabled={!option.ready}
+                      style={{ color: option.ready ? "var(--text-primary)" : "#5f697a" }}
+                    >
+                      {option.label} {option.ready ? "✓" : "(Not Downloaded)"}
+                    </option>
+                  )) : (
+                    <option value={localLlmModel} disabled>
+                      No local models installed
+                    </option>
+                  )}
                 </select>
               ) : (
                 <select
-                  value={selectedExternalModel}
+                  value={selectedExternalModelOption}
                   onChange={(e) => {
                     const next = e.target.value;
                     if (next === "__manage_models__") {
                       onManageExternalModels?.();
                       return;
                     }
-                    onExternalLlmModelChange?.(next);
+                    const selected = visibleExternalModels.find((model) => modelOptionValue(model) === next);
+                    if (selected) {
+                      onExternalLlmModelChange?.(selected.id, selected.provider);
+                    }
                   }}
                   style={{
                     background: "rgba(255, 255, 255, 0.04)",
@@ -1130,7 +1205,7 @@ export function ChatPanel({
                     const disabledByQuota = isFreeModel && freeModelDisabled;
                     const meta = formatModelMeta(model);
                     return (
-                      <option key={model.id} value={model.id} disabled={disabledByQuota}>
+                      <option key={`${model.provider}:${model.id}`} value={modelOptionValue(model)} disabled={disabledByQuota}>
                         {disabledByQuota
                           ? `${model.name} (renews ${freeModelRenewal})`
                           : `${model.name}${meta ? ` · ${meta}` : ""}`}

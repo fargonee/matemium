@@ -966,17 +966,44 @@ fn status_name(status: RunStatus) -> &'static str {
 
 pub fn workspace_fingerprint(workspace: &Path) -> Result<String, AgentRunError> {
     let mut hasher = Sha256::new();
-    for name in [
+    let mut names = vec![
         "project.json",
         "scenes.py",
         "helpers.py",
         "brief/passport.json",
         "brief/description.md",
-        "brief/tape.md",
+        "brief/tapes/main.md",
+        "brief/orchestration.md",
         "brief/roadmap.json",
-        "brief/narration.md",
-    ] {
-        let path = workspace.join(name);
+        "brief/tts-narration.md",
+        "brief/tts-narration-style.md",
+        "brief/audio-description.md",
+        "brief/custom-narration.md",
+        "brief/transcript.md",
+        "brief/timestamps.json",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect::<Vec<_>>();
+    if let Ok(entries) = fs::read_dir(workspace.join("brief/tapes")) {
+        let mut tapes = entries
+            .filter_map(Result::ok)
+            .filter_map(|entry| {
+                let path = entry.path();
+                let filename = entry.file_name().to_string_lossy().into_owned();
+                (path.is_file() && filename.ends_with(".md"))
+                    .then_some(format!("brief/tapes/{filename}"))
+            })
+            .collect::<Vec<_>>();
+        tapes.sort();
+        for tape in tapes {
+            if !names.contains(&tape) {
+                names.push(tape);
+            }
+        }
+    }
+    for name in names {
+        let path = workspace.join(&name);
         hasher.update(name.as_bytes());
         if path.exists() {
             let content = fs::read(&path)

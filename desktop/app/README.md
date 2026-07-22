@@ -5,33 +5,34 @@ Vite + React + Monaco editor for the Tauri shell.
 ## Features (MVP shipping)
 
 - Project list — create, open, delete
-- Project sidebar — navigable curated project structure for Script, Helpers, Brief, Assets, and Renders
+- Phase-aware project sidebar — shows only the shared and selected-path artifacts that are relevant now
 - Monaco Python editor (`scenes.py` + `helpers.py`) with lint markers
 - Section outline from `# ---DIV:` comments
 - Toolbar — Save, Lint, Check, Render (quality selection)
 - Scene picker from `sidecar_list_scenes`
 - Output log + sidecar event stream + progress panel
 - MP4 preview via `convertFileSrc`
-- AI chat panel with Apply edit / diff support
+- Project-manager chat with Description/Passport interviews, recommended option polls, explicit production-path selection, and proactive artifact/Roadmap ownership
+- Managed tape-content files, TTS/custom-audio generation, custom-audio transcription, approval gates, and quality-preserving final audio assembly
 - Settings — server URL, API token, auth (stub or real Supabase/Google)
 - Render modal, bottom dock tabs (progress, terminal, outputs)
 
-## Workspace sidebar target
+## Workspace sidebar lifecycle
 
-When a project is open, the left sidebar should primarily navigate the project contents, not just list projects. It should present the curated production map:
+When a project is open, the left sidebar primarily navigates the active production path. Before the path decision it shows Description, Passport, and Roadmap. Afterward it progressively exposes the relevant branch:
 
 ```
 Current Project
-├── Script
-│   └── scenes.py
-├── Helpers
-│   └── helpers.py
 ├── Brief
-│   ├── Passport
 │   ├── Description
-│   ├── Tape
-│   ├── Roadmap
-│   └── Narration
+│   ├── Passport + production path
+│   ├── Tapes/*.md
+│   ├── Orchestration
+│   ├── Selected-path audio artifacts
+│   └── Roadmap
+├── Authoring
+│   ├── scenes.py
+│   └── helpers.py
 ├── Assets
 │   ├── Images
 │   ├── Video
@@ -41,7 +42,7 @@ Current Project
     └── History
 ```
 
-Each item opens its natural surface: code editor for Script/Helpers, structured Passport editor, AI-owned read-only Roadmap, Markdown/script editors for Tape/Narration/Description, asset browser for Assets, and output history for Renders. The sidebar shows selection, dirty state, validation badges, and collapsed/expanded folders.
+The exact branch and gate ordering are normative in [the AI-led production lifecycle](../../docs/product-production-lifecycle.md). The Roadmap records the current phase and evidence. Ordinary users can work through AI chat and approval controls; raw Markdown, JSON, timestamps, and Python remain available as advanced surfaces.
 
 ## Dev
 

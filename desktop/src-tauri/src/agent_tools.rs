@@ -203,17 +203,28 @@ impl AgentToolPlatform {
 
     pub fn list_workspace(&self) -> ToolResult {
         let mut entries = Vec::new();
-        for name in [
+        let mut names = vec![
             "project.json",
             "scenes.py",
             "helpers.py",
             "brief/passport.json",
             "brief/description.md",
-            "brief/tape.md",
+            "brief/tapes/main.md",
+            "brief/orchestration.md",
             "brief/roadmap.json",
-            "brief/narration.md",
-        ] {
-            let path = self.workspace.join(name);
+            "brief/tts-narration.md",
+            "brief/tts-narration-style.md",
+            "brief/audio-description.md",
+            "brief/custom-narration.md",
+            "brief/transcript.md",
+            "brief/timestamps.json",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+        append_tape_content_files(&self.workspace, &mut names);
+        for name in names {
+            let path = self.workspace.join(&name);
             if path.is_file() {
                 entries.push(
                     json!({"path": name, "bytes": path.metadata().map(|m| m.len()).unwrap_or(0)}),
@@ -304,17 +315,28 @@ impl AgentToolPlatform {
         let mut matches = Vec::new();
         let mut searched_bytes = 0usize;
         let mut truncated = false;
-        for name in [
+        let mut names = vec![
             "project.json",
             "scenes.py",
             "helpers.py",
             "brief/passport.json",
             "brief/description.md",
-            "brief/tape.md",
+            "brief/tapes/main.md",
+            "brief/orchestration.md",
             "brief/roadmap.json",
-            "brief/narration.md",
-        ] {
-            let path = self.workspace.join(name);
+            "brief/tts-narration.md",
+            "brief/tts-narration-style.md",
+            "brief/audio-description.md",
+            "brief/custom-narration.md",
+            "brief/transcript.md",
+            "brief/timestamps.json",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+        append_tape_content_files(&self.workspace, &mut names);
+        for name in names {
+            let path = self.workspace.join(&name);
             let bytes = match fs::read(&path) {
                 Ok(bytes) => bytes,
                 Err(_) => continue,
@@ -335,7 +357,7 @@ impl AgentToolPlatform {
                         truncate_utf8(&mut text, 512);
                         truncated = true;
                     }
-                    matches.push(json!({"path": name, "line": index + 1, "text": text}));
+                    matches.push(json!({"path": name.clone(), "line": index + 1, "text": text}));
                 }
             }
             if truncated {
@@ -549,9 +571,15 @@ impl AgentToolPlatform {
                 "helpers.py",
                 "brief/passport.json",
                 "brief/description.md",
-                "brief/tape.md",
+                "brief/tapes/main.md",
+                "brief/orchestration.md",
                 "brief/roadmap.json",
-                "brief/narration.md",
+                "brief/tts-narration.md",
+                "brief/tts-narration-style.md",
+                "brief/audio-description.md",
+                "brief/custom-narration.md",
+                "brief/transcript.md",
+                "brief/timestamps.json",
             ],
         )
     }
@@ -565,9 +593,15 @@ impl AgentToolPlatform {
                 "helpers.py",
                 "brief/passport.json",
                 "brief/description.md",
-                "brief/tape.md",
+                "brief/tapes/main.md",
+                "brief/orchestration.md",
                 "brief/roadmap.json",
-                "brief/narration.md",
+                "brief/tts-narration.md",
+                "brief/tts-narration-style.md",
+                "brief/audio-description.md",
+                "brief/custom-narration.md",
+                "brief/transcript.md",
+                "brief/timestamps.json",
             ],
         )
     }
@@ -583,7 +617,7 @@ fn resolve_policy_path(
         || candidate
             .components()
             .any(|part| !matches!(part, Component::Normal(_)))
-        || !allowed.contains(&relative)
+        || (!allowed.contains(&relative) && !is_tape_content_path(relative))
     {
         return Err(ToolResult::error(
             ToolStatus::Blocked,
@@ -616,6 +650,38 @@ fn resolve_policy_path(
         ));
     }
     Ok(path_real)
+}
+
+fn is_tape_content_path(relative: &str) -> bool {
+    let Some(filename) = relative.strip_prefix("brief/tapes/") else {
+        return false;
+    };
+    !filename.is_empty()
+        && !filename.contains('/')
+        && filename.ends_with(".md")
+        && filename[..filename.len() - 3]
+            .chars()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-' || ch == '_')
+}
+
+fn append_tape_content_files(workspace: &Path, names: &mut Vec<String>) {
+    let Ok(entries) = fs::read_dir(workspace.join("brief/tapes")) else {
+        return;
+    };
+    let mut tapes = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let filename = entry.file_name().to_string_lossy().into_owned();
+            let relative = format!("brief/tapes/{filename}");
+            (entry.path().is_file() && is_tape_content_path(&relative)).then_some(relative)
+        })
+        .collect::<Vec<_>>();
+    tapes.sort();
+    for tape in tapes {
+        if !names.contains(&tape) {
+            names.push(tape);
+        }
+    }
 }
 
 fn atomic_write(path: &Path, bytes: &[u8]) -> std::io::Result<()> {

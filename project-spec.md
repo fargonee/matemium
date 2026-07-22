@@ -20,6 +20,8 @@ Private modifications are permitted. Redistribution, publication of derivative b
 
 Full product architecture: [`desktop-architecture.md`](desktop-architecture.md). Agent upgrade: [`ai-agent-architecture.md`](ai-agent-architecture.md). Engine rules: [`architecture.md`](architecture.md) (incl. §8).
 
+**Normative AI-led production lifecycle:** [`docs/product-production-lifecycle.md`](docs/product-production-lifecycle.md). Matemium treats the user as the idea owner and the AI as the production coworker. Project creation, Description, Passport/path selection, tape content, orchestration, path-specific audio work, authoring, rendering/repair, and final assembly are distinct gated phases; mute, TTS, and custom-audio projects follow different routes.
+
 **Latest decisions** on vector/RAG, user-owned AI providers, OpenRouter OAuth, lazy sidecar, first-run downloads, local model options, UX gating, and YouTube publishing: [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
 The CLI (`matemium`) and `projects/` layout remain for **engine development and parity testing**.
@@ -299,6 +301,7 @@ Product constraints on when the agent and render become available (strict gating
 | A5 — Bounded project workspace | target update | Migrate helper code from `assets.py` to `helpers.py`; add `brief/`, source asset folders, and sidebar navigation for Script/Helpers/Brief/Assets/Renders |
 | A6 — TinyTeX bootstrap | partial (PAD-2) | Python injection + paths implemented; Rust asset unpacker in PAD-3 |
 | A7 — Agent system prompt | **done** | [`shared/prompts/agent-system.txt`](shared/prompts/agent-system.txt) |
+| A8 — AI project manager | **implemented** | Shared manager policy, Passport-readiness interview, structured chat polls, delegated decisions, and AI-owned Roadmap; see [`project-manager-architecture.md`](project-manager-architecture.md) |
 
 ## Engine next steps (parallel)
 

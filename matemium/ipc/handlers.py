@@ -228,11 +228,24 @@ def handle_retrieve(params: dict[str, Any], events: EventEmitter) -> dict[str, A
             "helpers.py",
             "brief/passport.json",
             "brief/description.md",
-            "brief/tape.md",
+            "brief/tapes/main.md",
+            "brief/orchestration.md",
             "brief/roadmap.json",
-            "brief/narration.md",
+            "brief/tts-narration.md",
+            "brief/tts-narration-style.md",
+            "brief/audio-description.md",
+            "brief/custom-narration.md",
+            "brief/transcript.md",
+            "brief/timestamps.json",
         ]
     )
+    if workspace:
+        tapes_dir = workspace / "brief" / "tapes"
+        if tapes_dir.is_dir():
+            for tape_path in sorted(tapes_dir.glob("*.md")):
+                relative = tape_path.relative_to(workspace).as_posix()
+                if relative not in files:
+                    files.append(relative)
     
     # Auto-scan references/ directory if it exists and append those files for indexing
     if workspace:
@@ -998,6 +1011,10 @@ def _handle_aider_chat(
     openai_api_key = str(params.get("openai_api_key") or "")
     groq_api_key = str(params.get("groq_api_key") or "")
     xai_api_key = str(params.get("xai_api_key") or "")
+    cerebras_api_key = str(params.get("cerebras_api_key") or "")
+    github_api_key = str(params.get("github_api_key") or "")
+    mistral_api_key = str(params.get("mistral_api_key") or "")
+    gemini_api_key = str(params.get("gemini_api_key") or "")
     if use_local_model and not model:
         model = LocalInferenceRunner().model_name
 
@@ -1024,7 +1041,16 @@ def _handle_aider_chat(
                 env["GROQ_API_KEY"] = groq_api_key
             elif provider_name == "xai" and xai_api_key:
                 env["XAI_API_KEY"] = xai_api_key
-        result = AiderAgentRunner(env=env).run(
+            elif provider_name == "cerebras" and cerebras_api_key:
+                env["CEREBRAS_API_KEY"] = cerebras_api_key
+            elif provider_name == "github" and github_api_key:
+                env["GITHUB_TOKEN"] = github_api_key
+            elif provider_name == "mistral" and mistral_api_key:
+                env["MISTRAL_API_KEY"] = mistral_api_key
+            elif provider_name == "gemini" and gemini_api_key:
+                env["GEMINI_API_KEY"] = gemini_api_key
+        runner = AiderAgentRunner(env=env)
+        result = runner.run(
             workspace=workspace,
             prompt=user_prompt,
             model=model or None,
@@ -1035,6 +1061,45 @@ def _handle_aider_chat(
         response_text = result.output or "Aider completed the workspace edit."
         resolved_model = result.model
         agent_trace.extend(result.trace)
+        edited_files = {
+            str(file)
+            for event in result.trace
+            for file in (
+                (event.get("details") or {}).get("files", [])
+                if isinstance(event.get("details"), dict)
+                else []
+            )
+        }
+        if edited_files.intersection({"scenes.py", "helpers.py"}):
+            for attempt in range(4):
+                check = check_project(workspace)
+                agent_trace.append({
+                    "type": "verification_completed",
+                    "summary": "Project check passed." if check.get("ok") else f"Project check failed (recovery {attempt}/3).",
+                    "details": {"ok": bool(check.get("ok")), "errors": check.get("errors", [])},
+                })
+                if check.get("ok"):
+                    break
+                if attempt == 3:
+                    response_text = (
+                        "I could not make the scene pass the local project check after three "
+                        "targeted repairs. I stopped without claiming this authoring phase is complete."
+                    )
+                    break
+                diagnostics = check.get("errors") or []
+                fix_result = runner.run(
+                    workspace=workspace,
+                    prompt=(
+                        "The local Matemium project check failed after your edit. Fix these exact "
+                        f"diagnostics, preserve approved brief decisions, and do not ask the user to debug them:\n{diagnostics}"
+                    ),
+                    model=model or None,
+                    provider=provider or None,
+                    use_local_model=use_local_model,
+                    extra_context=extra_context,
+                )
+                response_text = fix_result.output or response_text
+                agent_trace.extend(fix_result.trace)
     except AiderUnavailableError as exc:
         if use_local_model:
             response_text = (
@@ -1117,7 +1182,6 @@ def handle_local_chat(params: dict[str, Any], _events: EventEmitter) -> dict[str
     if (
         params.get("use_autonomous_agent")
         and params.get("workspace")
-        and _looks_like_workspace_task_request(user_prompt)
     ):
         return _handle_aider_chat(
             params,
@@ -1130,6 +1194,7 @@ def handle_local_chat(params: dict[str, Any], _events: EventEmitter) -> dict[str
     # 1. Read scene authoring system prompt
     from ..paths import ROOT
     prompt_path = ROOT / "shared" / "prompts" / "scene-authoring-system.txt"
+    manager_prompt_path = ROOT / "shared" / "prompts" / "project-manager-system.txt"
     system_prompt = ""
     if prompt_path.is_file():
         try:
@@ -1142,20 +1207,25 @@ def handle_local_chat(params: dict[str, Any], _events: EventEmitter) -> dict[str
             "using CanvasBuilder and CanvasScene — not raw Manim. Respond with concise "
             "guidance and propose concrete Python edits when asked."
         )
+    if manager_prompt_path.is_file():
+        try:
+            manager_prompt = manager_prompt_path.read_text(encoding="utf-8").strip()
+            if manager_prompt:
+                system_prompt = f"{manager_prompt}\n\n{system_prompt}"
+        except Exception:
+            pass
 
     include_workspace_context = _local_chat_needs_workspace_context(
         user_prompt, scenes_excerpt
     )
-    if include_workspace_context:
-        full_messages.append({"role": "system", "content": system_prompt})
-    else:
-        full_messages.append({
-            "role": "system",
-            "content": (
-                "You are Ferganus, a concise Matemium assistant. For casual chat, "
-                "answer directly. Ask for project context only when it is needed."
-            ),
-        })
+    if not include_workspace_context:
+        system_prompt = (
+            f"{system_prompt}\n\n"
+            "Casual-chat constraint: answer directly and briefly. Do not ask for "
+            "project context unless it is needed. For greetings, use available "
+            "project context to give a natural status pulse and a concrete next step."
+        )
+    full_messages.append({"role": "system", "content": system_prompt})
 
     # 2. Append scenes excerpt as system context if provided
     if scenes_excerpt and include_workspace_context:

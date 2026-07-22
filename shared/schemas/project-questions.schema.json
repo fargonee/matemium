@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matemium.app/schemas/project-questions.schema.json",
+  "title": "ProjectQuestions",
+  "type": "object",
+  "required": ["questions"],
+  "properties": {
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["id", "passport_field", "question", "type", "options"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$" },
+          "passport_field": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "question": { "type": "string", "minLength": 1, "maxLength": 300 },
+          "rationale": { "type": "string", "maxLength": 300 },
+          "type": { "type": "string", "enum": ["single", "multi"] },
+          "required": { "type": "boolean", "default": true },
+          "allow_custom": { "type": "boolean", "default": false },
+          "options": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "required": ["id", "label", "description"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$" },
+                "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+                "description": { "type": "string", "maxLength": 240 },
+                "recommended": { "type": "boolean", "default": false }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

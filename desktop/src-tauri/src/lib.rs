@@ -9,6 +9,7 @@ pub mod agent_verifier;
 pub mod assets;
 pub mod cloud;
 pub mod commands;
+pub mod local_models;
 mod media_preview;
 mod outputs;
 mod projects;
@@ -102,6 +103,8 @@ pub fn run() {
             commands::project_open,
             commands::project_save,
             commands::project_save_file,
+            commands::project_create_tape,
+            commands::project_save_tape,
             commands::project_list_media,
             commands::project_import_media,
             commands::project_delete_media,
@@ -110,6 +113,8 @@ pub fn run() {
             commands::sidecar_configure_assets,
             commands::get_asset_status,
             commands::start_asset_download,
+            commands::local_model_catalog_list,
+            commands::local_model_install,
             commands::pause_asset_download,
             commands::cancel_asset_download,
             commands::get_readiness,
@@ -143,6 +148,9 @@ pub fn run() {
             commands::provider_models_list,
             commands::cloud_get_profile,
             commands::cloud_generate_audio,
+            commands::project_mux_audio,
+            commands::project_transcribe_audio,
+            commands::project_approve_audio,
             commands::conversation_list,
             commands::conversation_save,
             commands::conversation_delete,

@@ -1,26 +1,31 @@
 {
-  "current_phase": "concept",
+  "schema_version": 2,
+  "production_path": null,
+  "current_phase": "description",
   "phases": [
     {
-      "id": "concept",
-      "title": "Concept and brief",
+      "id": "project_creation",
+      "title": "Project creation",
+      "status": "done",
+      "progress": 100,
+      "notes": "The project workspace exists and the initial idea can now be developed."
+    },
+    {
+      "id": "description",
+      "title": "Project description",
       "status": "in_progress",
-      "progress": 20,
-      "notes": ""
+      "progress": 0,
+      "notes": "Collaborate with the user until the rare-changing project description is settled."
     },
     {
-      "id": "production",
-      "title": "Scene production",
+      "id": "passport",
+      "title": "Passport and production path",
       "status": "todo",
       "progress": 0,
-      "notes": ""
-    },
-    {
-      "id": "review",
-      "title": "Review and delivery",
-      "status": "todo",
-      "progress": 0,
-      "notes": ""
+      "notes": "Resolve the production identity and explicitly choose mute video, TTS, or custom audio."
     }
-  ]
+  ],
+  "pending_branch": "The AI must replace this with the selected path's remaining lifecycle phases after production_path is approved.",
+  "invalidated_phases": [],
+  "blockers": []
 }

@@ -8,6 +8,7 @@ model/tool loop while Matemium keeps workspace routing, settings, and UI state.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import os
 from pathlib import Path
 import re
@@ -74,6 +75,7 @@ class AiderAgentRunner:
             raise FileNotFoundError(f"Aider workspace does not exist: {workspace_path}")
 
         target_files = self._target_files(workspace_path)
+        read_only_files = self._read_only_files(workspace_path, target_files)
         env = dict(self.env)
         env.setdefault("AIDER_ANALYTICS", "false")
         env.setdefault("AIDER_CHECK_UPDATE", "false")
@@ -105,6 +107,7 @@ class AiderAgentRunner:
             resolved_model,
             "--message",
             task_prompt,
+            *[item for path in read_only_files for item in ("--read", path)],
             *target_files,
         ]
 
@@ -122,7 +125,7 @@ class AiderAgentRunner:
         if completed.returncode != 0:
             raise RuntimeError(f"Aider failed with exit code {completed.returncode}:\n{output}")
         trace = self._trace_from_output(output, target_files)
-        summary = self._summary_from_trace(trace, target_files)
+        summary = self._user_facing_output(output, trace, target_files)
         return AiderRunResult(
             output=summary,
             model=resolved_model,
@@ -293,23 +296,147 @@ class AiderAgentRunner:
         return deduped
 
     def _target_files(self, workspace: Path) -> list[str]:
+        phase: str | None = None
+        roadmap_path = workspace / "brief" / "roadmap.json"
+        if roadmap_path.is_file():
+            try:
+                roadmap = json.loads(roadmap_path.read_text(encoding="utf-8"))
+                current_phase = roadmap.get("current_phase")
+                if isinstance(current_phase, str) and current_phase.strip():
+                    phase = current_phase.strip()
+            except (OSError, json.JSONDecodeError):
+                # A malformed roadmap must remain repairable through the agent.
+                phase = None
+
+        phase_files: dict[str, set[str]] = {
+            "project_creation": {"brief/roadmap.json"},
+            "description": {"brief/description.md", "brief/roadmap.json"},
+            "passport": {"brief/description.md", "brief/passport.json", "brief/roadmap.json"},
+            "tape_content": {"brief/roadmap.json"},
+            "orchestration": {"brief/orchestration.md", "brief/roadmap.json"},
+            "tts_narration": {
+                "brief/tts-narration.md",
+                "brief/tts-narration-style.md",
+                "brief/roadmap.json",
+            },
+            "audio_specification": {
+                "brief/audio-description.md",
+                "brief/custom-narration.md",
+                "brief/roadmap.json",
+            },
+            "audio_generation": {
+                "brief/audio-description.md",
+                "brief/custom-narration.md",
+                "brief/roadmap.json",
+            },
+            "transcription_validation": {
+                "brief/audio-description.md",
+                "brief/custom-narration.md",
+                "brief/transcript.md",
+                "brief/timestamps.json",
+                "brief/roadmap.json",
+            },
+            "content_reconciliation": {
+                "brief/orchestration.md",
+                "brief/roadmap.json",
+            },
+            "authoring": {"scenes.py", "helpers.py", "brief/roadmap.json"},
+            "render_repair": {"scenes.py", "helpers.py", "brief/roadmap.json"},
+            "timing_regulation": {
+                "scenes.py",
+                "helpers.py",
+                "brief/orchestration.md",
+                "brief/tts-narration.md",
+                "brief/timestamps.json",
+                "brief/roadmap.json",
+            },
+            "tts_generation": {
+                "brief/tts-narration.md",
+                "brief/tts-narration-style.md",
+                "brief/roadmap.json",
+            },
+            "mute_delivery": {"brief/roadmap.json"},
+            "final_assembly": {"brief/roadmap.json"},
+        }
+        allowed = phase_files.get(phase) if phase else None
         files = []
         for name in (
             "scenes.py",
             "helpers.py",
             "brief/passport.json",
             "brief/description.md",
-            "brief/tape.md",
+            "brief/tapes/main.md",
+            "brief/orchestration.md",
             "brief/roadmap.json",
-            "brief/narration.md",
+            "brief/tts-narration.md",
+            "brief/tts-narration-style.md",
+            "brief/audio-description.md",
+            "brief/custom-narration.md",
+            "brief/transcript.md",
+            "brief/timestamps.json",
         ):
-            if (workspace / name).is_file():
+            if (workspace / name).is_file() and (allowed is None or name in allowed):
                 files.append(name)
+        tapes_dir = workspace / "brief" / "tapes"
+        if tapes_dir.is_dir():
+            for tape_path in sorted(tapes_dir.glob("*.md")):
+                relative = tape_path.relative_to(workspace).as_posix()
+                tape_allowed = phase in {"tape_content", "orchestration", "content_reconciliation", "timing_regulation"}
+                if relative not in files and (allowed is None or tape_allowed):
+                    files.append(relative)
         if not files:
             raise FileNotFoundError(
                 f"Aider workspace must contain approved project files: {workspace}"
             )
         return files
+
+    def _read_only_files(self, workspace: Path, target_files: Sequence[str]) -> list[str]:
+        """Return approved upstream artifacts as context without granting edit authority."""
+        path: str | None = None
+        passport_path = workspace / "brief" / "passport.json"
+        if passport_path.is_file():
+            try:
+                selected = json.loads(passport_path.read_text(encoding="utf-8")).get(
+                    "production_path"
+                )
+                if selected in {"mute_video", "tts", "custom_audio"}:
+                    path = selected
+            except (OSError, json.JSONDecodeError, AttributeError):
+                pass
+
+        candidates = [
+            "brief/description.md",
+            "brief/passport.json",
+            "brief/orchestration.md",
+            "brief/roadmap.json",
+        ]
+        if path == "tts":
+            candidates.extend(
+                ["brief/tts-narration.md", "brief/tts-narration-style.md", "brief/timestamps.json"]
+            )
+        elif path == "custom_audio":
+            candidates.extend(
+                [
+                    "brief/audio-description.md",
+                    "brief/custom-narration.md",
+                    "brief/transcript.md",
+                    "brief/timestamps.json",
+                ]
+            )
+
+        tapes_dir = workspace / "brief" / "tapes"
+        if tapes_dir.is_dir() and path is not None:
+            candidates.extend(
+                tape.relative_to(workspace).as_posix()
+                for tape in sorted(tapes_dir.glob("*.md"))
+            )
+
+        writable = set(target_files)
+        return [
+            relative
+            for relative in candidates
+            if relative not in writable and (workspace / relative).is_file()
+        ]
 
     def _resolve_model(
         self,
@@ -331,7 +458,17 @@ class AiderAgentRunner:
             selected = "gpt-4o-mini"
         if "/" in selected:
             return selected
-        if provider_name in {"anthropic", "openrouter", "gemini", "groq", "deepseek", "xai"}:
+        if provider_name in {
+            "anthropic",
+            "openrouter",
+            "gemini",
+            "groq",
+            "deepseek",
+            "xai",
+            "cerebras",
+            "github",
+            "mistral",
+        }:
             return f"{provider_name}/{selected}"
         return selected
 
@@ -404,9 +541,22 @@ class AiderAgentRunner:
         instructions = (
             "You are editing a Matemium animation workspace. Keep changes scoped to "
             "scenes.py, helpers.py, and brief/. Use the existing CanvasBuilder and CanvasScene "
-            "style. After editing, summarize the changed files and any validation the "
-            "user should run."
+            "style. Do not assign validation work back to the user; the runtime checks code edits "
+            "and returns diagnostics for correction. End every turn with one "
+            "<matemium_response>...</matemium_response> "
+            "block containing the complete user-facing response. Put any project_questions fenced "
+            "block inside it. The wrapper is transport-only and will be removed before display."
         )
+        try:
+            from ..paths import ROOT
+
+            manager_prompt = (ROOT / "shared" / "prompts" / "project-manager-system.txt").read_text(
+                encoding="utf-8"
+            ).strip()
+            if manager_prompt:
+                instructions = f"{manager_prompt}\n\n{instructions}"
+        except Exception:
+            pass
         context = "\n\n".join(part.strip() for part in extra_context if part.strip())
         if context:
             return f"{instructions}\n\nAdditional context:\n{context}\n\nUser task:\n{prompt}"
@@ -505,6 +655,34 @@ class AiderAgentRunner:
         if edited:
             return f"Done. Aider updated {', '.join(edited)}."
         return f"Aider finished. Checked {', '.join(target_files)}."
+
+    def _user_facing_output(
+        self,
+        output: str,
+        trace: Sequence[dict[str, object]],
+        target_files: Sequence[str],
+    ) -> str:
+        wrapped = re.findall(
+            r"<matemium_response>\s*([\s\S]*?)\s*</matemium_response>",
+            output,
+            flags=re.IGNORECASE,
+        )
+        if wrapped:
+            response = wrapped[-1].strip()
+            if response:
+                return response
+
+        question_block = re.search(
+            r"```project_questions\s*[\s\S]*?```",
+            output,
+            flags=re.IGNORECASE,
+        )
+        if question_block:
+            return (
+                "I need one creative decision before I carry this phase forward.\n\n"
+                f"{question_block.group(0).strip()}"
+            )
+        return self._summary_from_trace(trace, target_files)
 
     def _clean_output_line(self, line: str) -> str:
         cleaned = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", line).strip()

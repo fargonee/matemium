@@ -1154,8 +1154,8 @@ class CanvasBuilder:
         This allows authoring content inside a secondary tape created with add_tape().
 
         Usage:
-            tape_id = builder.add_tape("side_panel", position=(5, 0, 0), rotation=(0, 45, 0))
-            with builder.in_object_space(tape_id):
+            builder.add_tape("side_panel")
+            with builder.in_object_space("side_panel"):
                 builder.add_text("content local to this tape")
                 # normal add_* will target this tape's 2D local space
         """

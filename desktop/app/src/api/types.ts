@@ -14,6 +14,7 @@ export interface ProjectOpen {
   scene_class: string;
   orientation: string;
   files: Record<string, string>;
+  tapes: Record<string, string>;
   project_json: unknown;
   renders_dir: string;
 }
@@ -167,6 +168,43 @@ export interface AudioSpeechRequest {
 
 export type BottomDockTab = "progress" | "output" | "preview";
 
+export interface AssetStatus {
+  id: string;
+  display_name?: string | null;
+  asset_type?: string | null;
+  downloaded: boolean;
+  verified: boolean;
+  path?: string | null;
+  size?: number | null;
+  progress?: number | null;
+  error?: string | null;
+  paused?: boolean | null;
+  source_url?: string | null;
+  expected_sha256?: string | null;
+  install_path?: string | null;
+  extract?: boolean | null;
+  extract_format?: string | null;
+}
+
+export interface LocalModelCatalogEntry {
+  repoId: string;
+  displayName: string;
+  family: string;
+  fileName: string;
+  downloadUrl: string;
+  sizeBytes: number;
+  expectedSha256?: string | null;
+  contextLength?: number | null;
+  parameterSize?: string | null;
+  quantization?: string | null;
+  license?: string | null;
+  tags: string[];
+  assetId: string;
+  installPath: string;
+  sourceRepoUrl: string;
+  installed: boolean;
+}
+
 export interface Settings {
   serverUrl: string;
   apiToken?: string | null;
@@ -184,6 +222,14 @@ export interface Settings {
   groqConnectedAt?: string | null;
   xaiApiKey?: string | null;
   xaiConnectedAt?: string | null;
+  cerebrasApiKey?: string | null;
+  cerebrasConnectedAt?: string | null;
+  githubApiKey?: string | null;
+  githubConnectedAt?: string | null;
+  mistralApiKey?: string | null;
+  mistralConnectedAt?: string | null;
+  geminiApiKey?: string | null;
+  geminiConnectedAt?: string | null;
   useLocalLlm?: boolean;
   localLlmModel?: string;
   externalLlmModel?: string;

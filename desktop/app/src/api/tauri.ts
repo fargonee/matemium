@@ -6,10 +6,12 @@ import type {
   ChatMessage,
   CheckResult,
   ClearCacheResult,
+  AssetStatus,
   Conversation,
   LintResult,
   ListScenesResult,
   MediaPreviewResult,
+  LocalModelCatalogEntry,
   OpenRouterConnectStart,
   OpenRouterConnectionStatus,
   OutputListResult,
@@ -51,6 +53,18 @@ export async function projectSave(projectId: string, content: string): Promise<v
 export async function projectSaveFile(projectId: string, file: string, content: string): Promise<void> {
   return invoke("project_save_file", {
     params: { projectId, file, content },
+  });
+}
+
+export async function projectCreateTape(projectId: string, slug: string, title: string): Promise<ProjectOpen> {
+  return invoke<ProjectOpen>("project_create_tape", {
+    params: { projectId, slug, title, content: null },
+  });
+}
+
+export async function projectSaveTape(projectId: string, slug: string, content: string): Promise<void> {
+  return invoke("project_save_tape", {
+    params: { projectId, slug, title: null, content },
   });
 }
 
@@ -160,8 +174,8 @@ export async function agentRunProvideInput(runId: string, content: string): Prom
   });
 }
 
-export async function getAssetStatus(assetId?: string): Promise<any[]> {
-  return invoke<any[]>("get_asset_status", { assetId: assetId ?? null });
+export async function getAssetStatus(assetId?: string): Promise<AssetStatus[]> {
+  return invoke<AssetStatus[]>("get_asset_status", { assetId: assetId ?? null });
 }
 
 export async function startAssetDownload(assetId: string): Promise<void> {
@@ -174,6 +188,14 @@ export async function pauseAssetDownload(assetId: string): Promise<void> {
 
 export async function cancelAssetDownload(assetId: string): Promise<void> {
   return invoke("cancel_asset_download", { assetId });
+}
+
+export async function localModelCatalogList(query?: string): Promise<LocalModelCatalogEntry[]> {
+  return invoke<LocalModelCatalogEntry[]>("local_model_catalog_list", { query: query ?? null });
+}
+
+export async function localModelInstall(entry: LocalModelCatalogEntry): Promise<void> {
+  return invoke("local_model_install", { entry });
 }
 
 export interface Readiness {
@@ -314,14 +336,49 @@ export async function cloudGenerateAudio(
   text: string,
   voice?: string,
   llmConfig?: { tts_provider?: string; use_personal_llm?: boolean },
-): Promise<{ audioBase64?: string; error?: string }> {
+  project?: { projectId: string; artifactKind: "tts" | "custom_audio" },
+  delivery?: { model?: string; instructions?: string },
+): Promise<{ audioBase64?: string; audioPath?: string | null; mimeType?: string; error?: string }> {
   return invoke("cloud_generate_audio", {
     params: {
       text,
       voice: voice ?? null,
+      model: delivery?.model ?? null,
+      instructions: delivery?.instructions ?? null,
       tts_provider: llmConfig?.tts_provider ?? null,
       use_personal_llm: llmConfig?.use_personal_llm ?? null,
+      projectId: project?.projectId ?? null,
+      artifactKind: project?.artifactKind ?? null,
     },
+  });
+}
+
+export async function projectMuxAudio(
+  projectId: string,
+  videoPath?: string | null,
+  audioPath?: string | null,
+): Promise<{ video: string; audio: string; output: string; videoCodec: "copy"; audioCodec: string }> {
+  return invoke("project_mux_audio", {
+    params: { projectId, videoPath: videoPath ?? null, audioPath: audioPath ?? null },
+  });
+}
+
+export async function projectTranscribeAudio(
+  projectId: string,
+  audioPath?: string | null,
+  provider?: string | null,
+): Promise<{ audio: string; transcript: string; segments: Array<{ start: number; end: number; text: string }>; transcriptPath: string; timestampsPath: string }> {
+  return invoke("project_transcribe_audio", {
+    params: { projectId, audioPath: audioPath ?? null, provider: provider ?? null },
+  });
+}
+
+export async function projectApproveAudio(
+  projectId: string,
+  artifactKind: "tts" | "custom_audio",
+): Promise<{ audio: string; artifactKind: string; validation: "approved" }> {
+  return invoke("project_approve_audio", {
+    params: { projectId, artifactKind },
   });
 }
 

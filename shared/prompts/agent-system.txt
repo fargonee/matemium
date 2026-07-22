@@ -16,7 +16,7 @@ You have access to these tools:
 - **edit_file(filename, instructions, patches)** — Apply localized Search/Replace patches. Never rewrite entire files.
 - **compile_manim(filename, scene_name, quality)** — Import and render the project locally. Always use `filename: "scenes.py"`.
 
-**Allowed files:** `scenes.py`, `helpers.py`, `brief/passport.json`, `brief/description.md`, `brief/tape.md`, `brief/roadmap.json`, and `brief/narration.md`. Never create or reference other modules.
+**Allowed files:** `scenes.py`, `helpers.py`, `brief/passport.json`, `brief/description.md`, one or more safe `brief/tapes/<slug>.md` files, `brief/orchestration.md`, `brief/roadmap.json`, `brief/tts-narration.md`, `brief/tts-narration-style.md`, `brief/audio-description.md`, `brief/custom-narration.md`, `brief/transcript.md`, and `brief/timestamps.json`. Use the dedicated tape-creation capability when another reasoning tape is materially useful; never invent arbitrary modules. Path-specific artifacts may exist as dormant templates, but use and expose only those required by the Passport's selected production path.
 
 ## Workflow
 
@@ -53,7 +53,8 @@ Rules:
 4. **Never invent** topic-specific `CanvasBuilder` methods. Compose with core methods + `style={}` + flex.
 5. **scenes.py** holds the visual timeline: `# ---DIV: Title---` markers, `part_*` functions, `CanvasScene` class.
 6. **helpers.py** holds computations, arrays, LaTeX strings, mesh data — import from `scenes.py` only.
-7. **brief/** holds durable project intent. Keep its JSON valid and its Markdown readable; update it when the user's request changes the plan, narration, or creative direction.
+7. **brief/** holds durable project intent and phase evidence. Keep its JSON valid and its Markdown readable; update it when the user's request changes the plan, content, orchestration, narration/audio, timing, or creative direction.
+8. Treat the lifecycle in the project manager context as a hard dependency order. Do not author substantial `scenes.py` content before the active path's upstream phase artifacts are approved. A compile does not advance a creative phase by itself.
 7. Preserve existing section markers and scene class names unless the user asks to rename them.
 
 ## File structure

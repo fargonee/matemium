@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -15,18 +16,22 @@ use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
-use crate::cloud::{ChatCompletionRequest, ChatMessage, PublishRequest, PublishResponse};
+use crate::cloud::{
+    is_openrouter_free_model, ChatCompletionRequest, ChatMessage, PublishRequest, PublishResponse,
+};
+use crate::local_models::{list_local_model_catalog, LocalModelCatalogEntry};
 use crate::media_preview::playback_path_for_media;
 use crate::outputs::{
     clear_render_cache, delete_output, list_outputs, validate_output_path,
     validate_project_workspace_path, validate_render_output_dir, OutputPathScope,
 };
 use crate::projects::{
-    create_project, delete_project, delete_project_media, import_project_media, list_project_media,
-    list_projects, open_project, save_project_file, save_scenes, workspace_path,
+    create_project, create_tape_content, delete_project, delete_project_media,
+    import_project_media, list_project_media, list_projects, open_project, save_project_file,
+    save_scenes, save_tape_content, workspace_path,
 };
 use crate::state::{AppState, OpenRouterOAuthSession};
-use crate::workspace::{ProviderModelSettings, Settings};
+use crate::workspace::{write_json, ProviderModelSettings, Settings};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -113,6 +118,15 @@ pub struct ProjectSaveFileParams {
     pub project_id: String,
     pub file: String,
     pub content: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectTapeParams {
+    pub project_id: String,
+    pub slug: String,
+    pub title: Option<String>,
+    pub content: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -247,6 +261,34 @@ pub async fn project_save_file(
 }
 
 #[tauri::command]
+pub async fn project_create_tape(
+    state: State<'_, AppState>,
+    params: ProjectTapeParams,
+) -> Result<Value, String> {
+    create_tape_content(
+        &state.paths,
+        &params.project_id,
+        &params.slug,
+        params.title.as_deref().unwrap_or(&params.slug),
+    )?;
+    let project = open_project(&state.paths, &params.project_id)?;
+    serde_json::to_value(project).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn project_save_tape(
+    state: State<'_, AppState>,
+    params: ProjectTapeParams,
+) -> Result<(), String> {
+    save_tape_content(
+        &state.paths,
+        &params.project_id,
+        &params.slug,
+        params.content.as_deref().unwrap_or_default(),
+    )
+}
+
+#[tauri::command]
 pub async fn project_list_media(
     state: State<'_, AppState>,
     params: ProjectMediaParams,
@@ -364,6 +406,39 @@ pub async fn start_asset_download(
 }
 
 #[tauri::command]
+pub async fn local_model_catalog_list(
+    state: State<'_, AppState>,
+    query: Option<String>,
+) -> Result<Value, String> {
+    let entries = list_local_model_catalog(&state, query).await?;
+    serde_json::to_value(entries).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn local_model_install(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    entry: LocalModelCatalogEntry,
+) -> Result<(), String> {
+    let assets = state.assets.clone();
+    assets.add_downloadable_asset(entry.to_downloadable_asset());
+
+    let asset_id = entry.asset_id.clone();
+    let download_url = entry.download_url.clone();
+
+    tokio::spawn(async move {
+        let res = assets
+            .start_download(app.clone(), &asset_id, Some(download_url))
+            .await;
+        if let Err(e) = res {
+            assets.set_error(&asset_id, &e, &app);
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn pause_asset_download(
     state: State<'_, AppState>,
     asset_id: String,
@@ -460,9 +535,15 @@ pub async fn sidecar_retrieve(
             "helpers.py".to_string(),
             "brief/passport.json".to_string(),
             "brief/description.md".to_string(),
-            "brief/tape.md".to_string(),
+            "brief/tapes/main.md".to_string(),
+            "brief/orchestration.md".to_string(),
             "brief/roadmap.json".to_string(),
-            "brief/narration.md".to_string(),
+            "brief/tts-narration.md".to_string(),
+            "brief/tts-narration-style.md".to_string(),
+            "brief/audio-description.md".to_string(),
+            "brief/custom-narration.md".to_string(),
+            "brief/transcript.md".to_string(),
+            "brief/timestamps.json".to_string(),
         ]
     });
     state
@@ -888,9 +969,7 @@ pub async fn cloud_chat(
         .use_autonomous_agent
         .or(settings.use_autonomous_agent)
         .unwrap_or(false);
-    let should_use_agent = use_autonomous_agent
-        && params.project_id.is_some()
-        && looks_like_workspace_task_request(&params.messages);
+    let should_use_agent = use_autonomous_agent && params.project_id.is_some();
 
     if should_use_agent {
         if use_local_llm {
@@ -913,6 +992,10 @@ pub async fn cloud_chat(
             "openai_api_key": settings.openai_api_key,
             "groq_api_key": settings.groq_api_key,
             "xai_api_key": settings.xai_api_key,
+            "cerebras_api_key": settings.cerebras_api_key,
+            "github_api_key": settings.github_api_key,
+            "mistral_api_key": settings.mistral_api_key,
+            "gemini_api_key": settings.gemini_api_key,
             "use_personal_llm": params.use_personal_llm.or(settings.use_personal_llm),
             "use_local_llm": use_local_llm,
             "use_autonomous_agent": true,
@@ -1017,17 +1100,19 @@ pub async fn provider_models_list(
 }
 
 fn is_openrouter_free_request(settings: &Settings, request: &ChatCompletionRequest) -> bool {
-    settings
+    let provider = request
         .llm_provider
         .as_deref()
-        .unwrap_or("openrouter")
-        .eq_ignore_ascii_case("openrouter")
-        && request
-            .model
-            .as_deref()
-            .or(settings.external_llm_model.as_deref())
-            .unwrap_or("openai/gpt-4o-mini")
-            == "openrouter/free"
+        .or(settings.llm_provider.as_deref())
+        .unwrap_or("openrouter");
+    provider.trim().eq_ignore_ascii_case("openrouter")
+        && is_openrouter_free_model(
+            request
+                .model
+                .as_deref()
+                .or(settings.external_llm_model.as_deref())
+                .unwrap_or("openai/gpt-4o-mini"),
+        )
 }
 
 fn active_free_disabled_until(settings: &Settings) -> Option<DateTime<Utc>> {
@@ -1046,37 +1131,6 @@ fn next_utc_midnight() -> DateTime<Utc> {
         .and_hms_opt(0, 0, 0)
         .map(|value| value.and_utc())
         .unwrap_or_else(|| now + ChronoDuration::hours(24))
-}
-
-fn looks_like_workspace_task_request(messages: &[ChatMessage]) -> bool {
-    let prompt = messages
-        .iter()
-        .rev()
-        .find(|message| message.role == "user")
-        .map(|message| message.content.to_lowercase())
-        .unwrap_or_default();
-    let workspace_terms = [
-        "edit",
-        "change",
-        "fix",
-        "update",
-        "modify",
-        "refactor",
-        "implement",
-        "add",
-        "remove",
-        "delete",
-        "create",
-        "write",
-        "patch",
-        "apply",
-        "make",
-        "build",
-        "scenes.py",
-        "helpers.py",
-        "brief",
-    ];
-    workspace_terms.iter().any(|term| prompt.contains(term))
 }
 
 fn openrouter_code_challenge(verifier: &str) -> String {
@@ -1412,18 +1466,111 @@ pub async fn cloud_generate_audio(
     params: CloudAudioParams,
 ) -> Result<Value, String> {
     let settings = state.paths.load_settings()?;
+    let provider_label = params
+        .tts_provider
+        .clone()
+        .or_else(|| settings.llm_provider.clone())
+        .unwrap_or_else(|| "openai".to_string());
+    let model_label = params.model.clone().unwrap_or_else(|| {
+        if params
+            .instructions
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+        {
+            "gpt-4o-mini-tts".to_string()
+        } else {
+            "tts-1".to_string()
+        }
+    });
+    let voice_label = params.voice.clone().unwrap_or_else(|| "alloy".to_string());
+    if let Some(project_id) = params.project_id.as_deref() {
+        let workspace = state.paths.workspace_dir(project_id);
+        let allowed = match params.artifact_kind.as_deref() {
+            Some("custom_audio") => &["audio_generation", "transcription_validation"][..],
+            Some("tts") | None => &["tts_generation"][..],
+            Some(value) => return Err(format!("unsupported audio artifact kind: {value}")),
+        };
+        require_roadmap_phase(&workspace, allowed)?;
+    }
     let request = crate::cloud::AudioSpeechRequest {
         text: params.text,
         voice: params.voice,
-        model: None,
+        model: params.model,
+        instructions: params.instructions,
         tts_provider: params.tts_provider,
         use_personal_llm: params.use_personal_llm,
     };
     let bytes = crate::cloud::generate_audio(&settings, request).await?;
-    // Return base64 for easy frontend handling (consistent with previews)
-    // Using base64 crate compat
-    let encoded = base64::encode(bytes);
-    Ok(serde_json::json!({ "dataBase64": encoded, "mimeType": "audio/mpeg" }))
+    let audio_path = if let Some(project_id) = params.project_id.as_deref() {
+        let workspace = state.paths.workspace_dir(project_id);
+        if !workspace.is_dir() {
+            return Err(format!("project not found: {project_id}"));
+        }
+        let prefix = match params.artifact_kind.as_deref() {
+            Some("custom_audio") => "custom-audio",
+            Some("tts") | None => "tts",
+            Some(value) => return Err(format!("unsupported audio artifact kind: {value}")),
+        };
+        let audio_dir = workspace.join("assets/audio");
+        std::fs::create_dir_all(&audio_dir)
+            .map_err(|e| format!("create {}: {e}", audio_dir.display()))?;
+        let timestamp = Utc::now().format("%Y%m%dT%H%M%SZ");
+        let path = audio_dir.join(format!(
+            "{prefix}-{timestamp}-{}.mp3",
+            uuid::Uuid::new_v4().as_simple()
+        ));
+        std::fs::write(&path, &bytes).map_err(|e| format!("write {}: {e}", path.display()))?;
+        let manifest_path = audio_dir.join("attempts.json");
+        let mut manifest = if manifest_path.is_file() {
+            crate::workspace::read_json_file(&manifest_path)
+                .unwrap_or_else(|_| json!({"attempts": []}))
+        } else {
+            json!({"attempts": []})
+        };
+        let attempts = manifest
+            .get_mut("attempts")
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| "assets/audio/attempts.json has an invalid shape".to_string())?;
+        attempts.push(json!({
+            "id": uuid::Uuid::new_v4().to_string(),
+            "kind": params.artifact_kind.as_deref().unwrap_or("tts"),
+            "path": path.file_name().and_then(|value| value.to_str()).unwrap_or_default(),
+            "provider": provider_label,
+            "model": model_label,
+            "voice": voice_label,
+            "created_at": Utc::now().to_rfc3339(),
+            "validation": "unreviewed"
+        }));
+        write_json(&manifest_path, &manifest)?;
+        match params.artifact_kind.as_deref() {
+            Some("custom_audio") => update_roadmap_phase(
+                &workspace,
+                "audio_generation",
+                "done",
+                100,
+                "transcription_validation",
+                "A new custom-audio attempt was generated. Extract and validate its actual transcript and timing.",
+                Some(&path.display().to_string()),
+            )?,
+            Some("tts") | None => update_roadmap_phase(
+                &workspace,
+                "tts_generation",
+                "in_progress",
+                70,
+                "tts_generation",
+                "A TTS attempt was generated after timing regulation. Preview and approve it or regenerate before final assembly.",
+                Some(&path.display().to_string()),
+            )?,
+            Some(_) => unreachable!("artifact kind validated before provider call"),
+        }
+        Some(path.display().to_string())
+    } else {
+        None
+    };
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Ok(
+        serde_json::json!({ "audioBase64": encoded, "mimeType": "audio/mpeg", "audioPath": audio_path }),
+    )
 }
 
 // LLM profile fetch (provider key status)
@@ -1437,8 +1584,402 @@ pub struct EmptyParams {}
 pub struct CloudAudioParams {
     pub text: String,
     pub voice: Option<String>,
+    pub model: Option<String>,
+    pub instructions: Option<String>,
     pub tts_provider: Option<String>,
     pub use_personal_llm: Option<bool>,
+    pub project_id: Option<String>,
+    pub artifact_kind: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectMuxAudioParams {
+    pub project_id: String,
+    pub video_path: Option<String>,
+    pub audio_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectTranscribeAudioParams {
+    pub project_id: String,
+    pub audio_path: Option<String>,
+    pub provider: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectApproveAudioParams {
+    pub project_id: String,
+    pub artifact_kind: String,
+}
+
+fn newest_managed_project_audio(
+    workspace: &Path,
+    kind: &str,
+    validation: Option<&str>,
+) -> Result<PathBuf, String> {
+    let manifest = crate::workspace::read_json_file(&workspace.join("assets/audio/attempts.json"))?;
+    let attempts = manifest
+        .get("attempts")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "assets/audio/attempts.json has an invalid shape".to_string())?;
+    attempts
+        .iter()
+        .rev()
+        .find(|attempt| {
+            attempt.get("kind").and_then(Value::as_str) == Some(kind)
+                && validation.map_or(true, |required| {
+                    attempt.get("validation").and_then(Value::as_str) == Some(required)
+                })
+        })
+        .and_then(|attempt| attempt.get("path").and_then(Value::as_str))
+        .map(|relative| workspace.join("assets/audio").join(relative))
+        .filter(|path| path.is_file())
+        .ok_or_else(|| {
+            format!(
+                "no {}{kind} audio attempt exists",
+                validation
+                    .map(|value| format!("{value} "))
+                    .unwrap_or_default()
+            )
+        })
+}
+
+fn newest_approved_project_audio(workspace: &Path, kind: &str) -> Result<PathBuf, String> {
+    newest_managed_project_audio(workspace, kind, Some("approved"))
+}
+
+fn require_roadmap_phase(workspace: &Path, allowed: &[&str]) -> Result<(), String> {
+    let roadmap = crate::workspace::read_json_file(&workspace.join("brief/roadmap.json"))?;
+    let current = roadmap
+        .get("current_phase")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "Roadmap has no current phase".to_string())?;
+    if !allowed.contains(&current) {
+        return Err(format!(
+            "This action belongs to phase {} but the project is currently in {current}",
+            allowed.join(" or ")
+        ));
+    }
+    Ok(())
+}
+
+fn update_roadmap_phase(
+    workspace: &Path,
+    completed_phase: &str,
+    status: &str,
+    progress: u64,
+    current_phase: &str,
+    notes: &str,
+    evidence: Option<&str>,
+) -> Result<(), String> {
+    let path = workspace.join("brief/roadmap.json");
+    let mut roadmap = crate::workspace::read_json_file(&path)?;
+    let phases = roadmap
+        .get_mut("phases")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| "roadmap.phases must be an array".to_string())?;
+    let phase = phases
+        .iter_mut()
+        .find(|phase| phase.get("id").and_then(Value::as_str) == Some(completed_phase))
+        .ok_or_else(|| format!("Roadmap does not contain phase {completed_phase}"))?;
+    phase["status"] = json!(status);
+    phase["progress"] = json!(progress);
+    phase["notes"] = json!(notes);
+    if let Some(evidence) = evidence {
+        let evidence_list = phase
+            .as_object_mut()
+            .expect("phase checked as object")
+            .entry("evidence")
+            .or_insert_with(|| json!([]));
+        if let Some(items) = evidence_list.as_array_mut() {
+            if !items.iter().any(|item| item.as_str() == Some(evidence)) {
+                items.push(json!(evidence));
+            }
+        }
+    }
+    if let Some(next) = phases
+        .iter_mut()
+        .find(|phase| phase.get("id").and_then(Value::as_str) == Some(current_phase))
+    {
+        if next.get("status").and_then(Value::as_str) == Some("todo") {
+            next["status"] = json!("in_progress");
+        }
+    }
+    roadmap["current_phase"] = json!(current_phase);
+    write_json(&path, &roadmap)
+}
+
+#[tauri::command]
+pub async fn project_transcribe_audio(
+    state: State<'_, AppState>,
+    params: ProjectTranscribeAudioParams,
+) -> Result<Value, String> {
+    let workspace = state.paths.workspace_dir(&params.project_id);
+    if !workspace.is_dir() {
+        return Err(format!("project not found: {}", params.project_id));
+    }
+    require_roadmap_phase(&workspace, &["transcription_validation"])?;
+    let candidate = match params.audio_path.as_deref() {
+        Some(path) => PathBuf::from(path),
+        None => newest_managed_project_audio(&workspace, "custom_audio", None)?,
+    };
+    let audio = validate_project_workspace_path(
+        &state.paths,
+        &params.project_id,
+        &candidate.display().to_string(),
+    )?;
+    let settings = state.paths.load_settings()?;
+    let payload =
+        crate::cloud::transcribe_audio(&settings, &audio, params.provider.as_deref()).await?;
+    let transcript = payload
+        .get("text")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    if transcript.is_empty() {
+        return Err("transcription response did not contain text".to_string());
+    }
+    let generated_at = Utc::now().to_rfc3339();
+    let relative_audio = audio
+        .strip_prefix(&workspace)
+        .unwrap_or(&audio)
+        .to_string_lossy()
+        .replace('\\', "/");
+    let transcript_document = format!(
+        "# Verified audio transcript\n\n- **Source audio:** `{relative_audio}`\n- **Transcribed at:** {generated_at}\n- **Validation status:** candidate\n\n## Transcript\n\n{transcript}\n"
+    );
+    let segments = payload
+        .get("segments")
+        .and_then(Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|segment| {
+                    Some(json!({
+                        "start": segment.get("start")?.as_f64()?,
+                        "end": segment.get("end")?.as_f64()?,
+                        "text": segment.get("text")?.as_str()?.trim(),
+                        "beat_id": Value::Null
+                    }))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if segments.is_empty() {
+        return Err(
+            "transcription response contained no segment timestamps; existing transcript/timestamps were preserved"
+                .to_string(),
+        );
+    }
+    std::fs::write(workspace.join("brief/transcript.md"), transcript_document)
+        .map_err(|e| format!("write transcript: {e}"))?;
+    let timestamps = json!({
+        "schema_version": 1,
+        "source_audio": relative_audio,
+        "generated_at": generated_at,
+        "status": "candidate",
+        "segments": segments
+    });
+    write_json(&workspace.join("brief/timestamps.json"), &timestamps)?;
+    update_roadmap_phase(
+        &workspace,
+        "transcription_validation",
+        "in_progress",
+        60,
+        "transcription_validation",
+        "Fresh transcript and segment timestamps were extracted. Validate wording, holds, pace, and pronunciation; regenerate if needed.",
+        Some(&relative_audio),
+    )?;
+    let attempts_path = workspace.join("assets/audio/attempts.json");
+    if attempts_path.is_file() {
+        if let Ok(mut manifest) = crate::workspace::read_json_file(&attempts_path) {
+            if let Some(attempts) = manifest.get_mut("attempts").and_then(Value::as_array_mut) {
+                let filename = audio.file_name().and_then(|value| value.to_str());
+                if let Some(attempt) = attempts
+                    .iter_mut()
+                    .rev()
+                    .find(|attempt| attempt.get("path").and_then(Value::as_str) == filename)
+                {
+                    attempt["validation"] = json!("candidate");
+                    attempt["transcribed_at"] = json!(generated_at);
+                    attempt["transcript"] = json!("brief/transcript.md");
+                    attempt["timestamps"] = json!("brief/timestamps.json");
+                    write_json(&attempts_path, &manifest)?;
+                }
+            }
+        }
+    }
+    Ok(json!({
+        "audio": audio.display().to_string(),
+        "transcript": transcript,
+        "segments": timestamps["segments"],
+        "transcriptPath": workspace.join("brief/transcript.md").display().to_string(),
+        "timestampsPath": workspace.join("brief/timestamps.json").display().to_string()
+    }))
+}
+
+#[tauri::command]
+pub async fn project_approve_audio(
+    state: State<'_, AppState>,
+    params: ProjectApproveAudioParams,
+) -> Result<Value, String> {
+    let workspace = state.paths.workspace_dir(&params.project_id);
+    let required_phase = match params.artifact_kind.as_str() {
+        "tts" => "tts_generation",
+        "custom_audio" => "transcription_validation",
+        value => return Err(format!("unsupported audio artifact kind: {value}")),
+    };
+    require_roadmap_phase(&workspace, &[required_phase])?;
+    if params.artifact_kind == "custom_audio" {
+        let timestamps =
+            crate::workspace::read_json_file(&workspace.join("brief/timestamps.json"))?;
+        if timestamps.get("status").and_then(Value::as_str) != Some("verified") {
+            return Err("custom audio timestamps must be verified before approval".to_string());
+        }
+    }
+    let audio = newest_managed_project_audio(&workspace, &params.artifact_kind, None)?;
+    let filename = audio
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "approved audio has no valid filename".to_string())?;
+    let manifest_path = workspace.join("assets/audio/attempts.json");
+    let mut manifest = crate::workspace::read_json_file(&manifest_path)?;
+    let attempts = manifest
+        .get_mut("attempts")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| "assets/audio/attempts.json has an invalid shape".to_string())?;
+    let attempt = attempts
+        .iter_mut()
+        .rev()
+        .find(|attempt| {
+            attempt.get("path").and_then(Value::as_str) == Some(filename)
+                && attempt.get("kind").and_then(Value::as_str)
+                    == Some(params.artifact_kind.as_str())
+        })
+        .ok_or_else(|| {
+            "latest audio file is not a managed attempt for this production path".to_string()
+        })?;
+    attempt["validation"] = json!("approved");
+    attempt["approved_at"] = json!(Utc::now().to_rfc3339());
+    write_json(&manifest_path, &manifest)?;
+    Ok(json!({
+        "audio": audio.display().to_string(),
+        "artifactKind": params.artifact_kind,
+        "validation": "approved"
+    }))
+}
+
+#[tauri::command]
+pub async fn project_mux_audio(
+    state: State<'_, AppState>,
+    params: ProjectMuxAudioParams,
+) -> Result<Value, String> {
+    let workspace = state.paths.workspace_dir(&params.project_id);
+    require_roadmap_phase(&workspace, &["final_assembly"])?;
+    let video_raw = if let Some(path) = params.video_path.as_deref() {
+        path.to_string()
+    } else {
+        list_outputs(&state.paths, &params.project_id)?
+            .entries
+            .into_iter()
+            .filter(|entry| {
+                matches!(entry.kind.as_str(), "video" | "preview")
+                    && !entry.name.starts_with("final-with-audio-")
+            })
+            .max_by(|left, right| left.modified_at.cmp(&right.modified_at))
+            .map(|entry| entry.path)
+            .ok_or_else(|| "no completed MP4 render exists for final assembly".to_string())?
+    };
+    let video = validate_project_workspace_path(&state.paths, &params.project_id, &video_raw)?;
+    if video.extension().and_then(|value| value.to_str()) != Some("mp4") {
+        return Err("final assembly requires an MP4 render".to_string());
+    }
+    let passport = crate::workspace::read_json_file(&workspace.join("brief/passport.json"))?;
+    let production_path = passport
+        .get("production_path")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "Passport has no selected production path".to_string())?;
+    let expected_kind = match production_path {
+        "tts" => "tts",
+        "custom_audio" => "custom_audio",
+        _ => return Err("final audio assembly requires the TTS or custom-audio path".to_string()),
+    };
+    let audio = if let Some(raw) = params.audio_path.as_deref() {
+        validate_project_workspace_path(&state.paths, &params.project_id, raw)?
+    } else {
+        let candidate = newest_approved_project_audio(&workspace, expected_kind)?;
+        validate_project_workspace_path(
+            &state.paths,
+            &params.project_id,
+            &candidate.display().to_string(),
+        )?
+    };
+    if !audio.is_file() {
+        return Err(format!("audio file not found: {}", audio.display()));
+    }
+    let approved = newest_approved_project_audio(&workspace, expected_kind)?;
+    if audio
+        .canonicalize()
+        .map_err(|e| format!("resolve audio: {e}"))?
+        != approved
+            .canonicalize()
+            .map_err(|e| format!("resolve approved audio: {e}"))?
+    {
+        return Err("final assembly must use the latest approved audio attempt".to_string());
+    }
+    let renders = state.paths.renders_dir(&params.project_id);
+    std::fs::create_dir_all(&renders).map_err(|e| format!("create {}: {e}", renders.display()))?;
+    let output = renders.join(format!(
+        "final-with-audio-{}-{}.mp4",
+        Utc::now().format("%Y%m%dT%H%M%SZ"),
+        uuid::Uuid::new_v4().as_simple()
+    ));
+    let result = Command::new("ffmpeg")
+        .args(["-y", "-i"])
+        .arg(&video)
+        .args(["-i"])
+        .arg(&audio)
+        .args([
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-shortest",
+            "-movflags",
+            "+faststart",
+        ])
+        .arg(&output)
+        .output()
+        .map_err(|e| format!("run ffmpeg: {e}"))?;
+    if !result.status.success() {
+        let stderr = String::from_utf8_lossy(&result.stderr);
+        return Err(format!("ffmpeg assembly failed: {}", stderr.trim()));
+    }
+    update_roadmap_phase(
+        &workspace,
+        "final_assembly",
+        "in_progress",
+        90,
+        "final_assembly",
+        "A final candidate was assembled with video stream-copy. Inspect synchronization and approve before marking delivery complete.",
+        Some(&output.display().to_string()),
+    )?;
+    Ok(json!({
+        "video": video.display().to_string(),
+        "audio": audio.display().to_string(),
+        "output": output.display().to_string(),
+        "videoCodec": "copy",
+        "audioCodec": "aac"
+    }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -1793,5 +2334,58 @@ mod video_preview_tests {
         let err =
             validate_media_preview_path(&paths, "/etc/passwd").expect_err("outside data root");
         assert!(err.contains("outside"));
+    }
+}
+
+#[cfg(test)]
+mod openrouter_free_model_tests {
+    use super::*;
+
+    fn settings() -> Settings {
+        Settings {
+            llm_provider: Some("openrouter".to_string()),
+            external_llm_model: Some("openrouter/free".to_string()),
+            ..Settings::default()
+        }
+    }
+
+    fn request(model: Option<&str>) -> ChatCompletionRequest {
+        ChatCompletionRequest {
+            messages: vec![ChatMessage {
+                role: "user".to_string(),
+                content: "test".to_string(),
+                references: None,
+            }],
+            project_id: None,
+            conversation_id: None,
+            scenes_excerpt: None,
+            llm_provider: None,
+            use_personal_llm: None,
+            model: model.map(str::to_string),
+            use_autonomous_agent: None,
+            agent_runtime_version: None,
+        }
+    }
+
+    #[test]
+    fn detects_free_model_variants() {
+        let settings = settings();
+        assert!(is_openrouter_free_request(
+            &settings,
+            &request(Some("google/gemma-4-31b-it:free"))
+        ));
+        assert!(is_openrouter_free_request(
+            &settings,
+            &request(Some("openrouter/free"))
+        ));
+    }
+
+    #[test]
+    fn ignores_non_free_models() {
+        let settings = settings();
+        assert!(!is_openrouter_free_request(
+            &settings,
+            &request(Some("openai/gpt-4o-mini"))
+        ));
     }
 }

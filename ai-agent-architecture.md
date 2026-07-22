@@ -10,6 +10,10 @@ This document records product placement and trust boundaries: local tool executi
 
 The production agent is a persistent state machine. A model response without tool calls is a finish proposal, not evidence of completion. Prompt instructions do not replace orchestrator-enforced policy.
 
+The agent also follows the project-management contract in [`project-manager-architecture.md`](project-manager-architecture.md): it owns Passport discovery, structured preference questions, proactive production planning, and the Roadmap that is read-only to users.
+
+The normative production sequence and its mute, TTS, and custom-audio branches are defined in [`docs/product-production-lifecycle.md`](docs/product-production-lifecycle.md). The bounded tool policy includes the lifecycle's separate tape-content, orchestration, narration/audio, transcript, and timestamp artifacts.
+
 **Product decisions** (vector DB/RAG, lazy loading, first-run downloads, Jina embeddings, strict UX gating, thin YouTube publishing, local+hosted MCP, minimal control-plane sidecar) are documented in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
 **Related:** [`desktop-architecture.md`](desktop-architecture.md) (product boundaries), [`matemium/ipc/PROTOCOL.md`](matemium/ipc/PROTOCOL.md) (sidecar wire format), [`shared/prompts/agent-system.txt`](shared/prompts/agent-system.txt) (agent system prompt), [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md) (latest product architecture).
@@ -44,7 +48,7 @@ Every result uses the typed envelope specified in [`agentic_ai_goal.md`](agentic
 | `edit_file(filename, instructions, patches)` | Apply localized edits | Parse Search/Replace blocks → update editor buffer |
 | `compile_manim(filename, scene_name, quality)` | Verify animation compiles | Sidecar `check_project` + `render_project` (or preview quality) |
 
-**Allowed `filename` values (strict):** `scenes.py`, `helpers.py`, `brief/passport.json`, `brief/description.md`, `brief/tape.md`, `brief/roadmap.json`, and `brief/narration.md`. Media changes use dedicated media tools, not arbitrary path edits.
+**Allowed `filename` values (strict):** `scenes.py`, `helpers.py`, `brief/passport.json`, `brief/description.md`, safe `brief/tapes/<slug>.md` files, `brief/orchestration.md`, `brief/roadmap.json`, `brief/tts-narration.md`, `brief/tts-narration-style.md`, `brief/audio-description.md`, `brief/custom-narration.md`, `brief/transcript.md`, and `brief/timestamps.json`. Media generation, transcription, and assembly use dedicated tools rather than arbitrary file writes.
 
 ### 2.2 Tool schemas (reference)
 
@@ -56,15 +60,7 @@ Every result uses the typed envelope specified in [`agentic_ai_goal.md`](agentic
     "properties": {
       "filename": {
         "type": "string",
-        "enum": [
-          "scenes.py",
-          "helpers.py",
-          "brief/passport.json",
-          "brief/description.md",
-          "brief/tape.md",
-          "brief/roadmap.json",
-          "brief/narration.md"
-        ]
+        "description": "An approved static project file or safe brief/tapes/<slug>.md path"
       }
     },
     "required": ["filename"]
@@ -80,15 +76,7 @@ Every result uses the typed envelope specified in [`agentic_ai_goal.md`](agentic
     "properties": {
       "filename": {
         "type": "string",
-        "enum": [
-          "scenes.py",
-          "helpers.py",
-          "brief/passport.json",
-          "brief/description.md",
-          "brief/tape.md",
-          "brief/roadmap.json",
-          "brief/narration.md"
-        ]
+        "description": "An approved static project file or safe brief/tapes/<slug>.md path"
       },
       "instructions": { "type": "string", "description": "One-line summary of the edit intent" },
       "patches": {
@@ -318,15 +306,18 @@ Agent mode enforces a **bounded project workspace**. It is richer than the old t
 
 ### 7.1 File roles
 
+The target file roles and path-specific artifacts are defined by [`docs/product-production-lifecycle.md`](docs/product-production-lifecycle.md).
+
 | File | Role | UI surface |
 |------|------|------------|
 | **`scenes.py`** | **The Timeline** — `# ---DIV: ---` section markers, `part_*` functions, `CanvasScene` class, readable `CanvasBuilder` layout | Main **Visual Script Workspace** (section cards) |
 | **`helpers.py`** | **The Helper Room** — raw computations, coordinate arrays, custom LaTeX groupings, reusable geometry/data helpers | Secondary code drawer |
 | **`brief/passport.json`** | Structured creative/production identity: topic, audience, difficulty, style, duration, language, constraints, learning goals | Form editor with JSON fallback |
 | **`brief/description.md`** | Human-readable project brief and intent | Markdown editor |
-| **`brief/tape.md`** | Director's tape plan: beats, reveal comments, camera notes, visual intent | Markdown editor with beat navigation |
+| **`brief/tapes/*.md`** | Exact visible mathematical/reasoning content for one or more tapes | Markdown editor with tape and beat navigation |
+| **`brief/orchestration.md`** | 3D world, camera, tape choreography, reveals, transformations, transitions, and pacing intent | Markdown editor with beat references |
 | **`brief/roadmap.json`** | Phases, completion, current working point, blockers | AI-owned file shown as a read-only route in desktop; keep JSON valid and update progress only from supported project evidence |
-| **`brief/narration.md`** | Voiceover, captions, timing hints, pronunciation notes | Markdown/script editor |
+| **Path-specific narration/audio files** | TTS narration/style or custom-audio description/narration, plus verified transcript/timestamps where required | Phase-aware Markdown, script, and timeline editors |
 | **`media/images`, `media/video`, `media/audio`** | User-provided media referenced by project code or brief | Media browser with previews |
 
 ```python
@@ -379,9 +370,10 @@ def matrix_tex() -> str:
 ├── brief/
 │   ├── passport.json
 │   ├── description.md
-│   ├── tape.md
+│   ├── tapes/*.md
+│   ├── orchestration.md
 │   ├── roadmap.json
-│   └── narration.md
+│   └── path-specific narration/audio/transcript/timestamp files
 ├── media/
 │   ├── images/
 │   ├── video/
@@ -389,7 +381,7 @@ def matrix_tex() -> str:
 └── renders/
 ```
 
-Templates: [`shared/templates/scenes.py`](shared/templates/scenes.py) and future `helpers.py` / `brief/` templates under [`shared/templates/`](shared/templates/).
+Templates live under [`shared/templates/`](shared/templates/); legacy `brief/tape.md` and `brief/narration.md` are migrated without deleting the source documents.
 
 ---
 

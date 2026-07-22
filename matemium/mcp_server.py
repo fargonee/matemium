@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -85,10 +86,30 @@ EDITABLE_PROJECT_FILES = [
     "helpers.py",
     "brief/passport.json",
     "brief/description.md",
-    "brief/tape.md",
+    "brief/tapes/main.md",
+    "brief/orchestration.md",
     "brief/roadmap.json",
-    "brief/narration.md",
+    "brief/tts-narration.md",
+    "brief/tts-narration-style.md",
+    "brief/audio-description.md",
+    "brief/custom-narration.md",
+    "brief/transcript.md",
+    "brief/timestamps.json",
 ]
+
+_TAPE_PATH = re.compile(r"^brief/tapes/[a-z0-9][a-z0-9_-]{0,63}\.md$")
+
+
+def _approved_project_path(workspace: Path, filename: str, *, require_exists: bool = True) -> Path:
+    if filename not in EDITABLE_PROJECT_FILES and not _TAPE_PATH.fullmatch(filename):
+        raise ValueError(f"Path is outside the approved project policy: {filename}")
+    root = workspace.resolve()
+    candidate = (root / filename).resolve()
+    if root not in candidate.parents:
+        raise ValueError(f"Path escapes the project workspace: {filename}")
+    if require_exists and not candidate.is_file():
+        raise FileNotFoundError(filename)
+    return candidate
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
@@ -102,7 +123,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "filename": {
                         "type": "string",
-                        "enum": EDITABLE_PROJECT_FILES,
+                        "pattern": r"^(scenes\.py|helpers\.py|brief/(passport\.json|description\.md|orchestration\.md|roadmap\.json|tts-narration\.md|tts-narration-style\.md|audio-description\.md|custom-narration\.md|transcript\.md|timestamps\.json|tapes/[a-z0-9][a-z0-9_-]{0,63}\.md))$",
                     }
                 },
                 "required": ["filename"],
@@ -114,7 +135,7 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "filename": {"type": "string", "enum": EDITABLE_PROJECT_FILES},
+                    "filename": {"type": "string", "pattern": r"^(scenes\.py|helpers\.py|brief/(passport\.json|description\.md|orchestration\.md|roadmap\.json|tts-narration\.md|tts-narration-style\.md|audio-description\.md|custom-narration\.md|transcript\.md|timestamps\.json|tapes/[a-z0-9][a-z0-9_-]{0,63}\.md))$"},
                     "instructions": {"type": "string", "description": "One-line summary of the edit intent"},
                     "patches": {
                         "type": "string",
@@ -155,17 +176,25 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
-            name="run_lifecycle",
-            description="Execute the complete 5-phase multi-agent lifecycle to generate, synchronize, and compile mathematical animations.",
+            name="create_tape_content",
+            description="Create an additional bounded Markdown file for one tape's visible mathematical content. Use only during the tape-content phase.",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "user_prompt": {"type": "string", "description": "The creative prompt explaining the mathematical animation concept"},
-                    "mode": {"type": "string", "enum": ["audio", "mute"], "description": "Audio-First (renders audio + timestamps) vs Mute-Mode (beat-cadence estimations)", "default": "mute"},
-                    "model_tier": {"type": "string", "enum": ["standard", "elite", "deep"], "default": "standard"},
-                    "account_tier": {"type": "string", "enum": ["basic", "premium"], "default": "basic"},
+                    "slug": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+                    "title": {"type": "string", "minLength": 1, "maxLength": 120},
                 },
-                "required": ["user_prompt"],
+                "required": ["slug", "title"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="lifecycle_status",
+            description="Inspect the Passport and AI-owned Roadmap and report the current gated production phase without advancing it.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
             },
         ),
     ]
@@ -181,18 +210,17 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             if not filename:
                 return [TextContent(type="text", text="ERROR: filename required")]
             # For MCP in sidecar, read the file directly from workspace (grounded)
-            # In full setup, workspace comes from env or param
-            ws = os.environ.get("MATEMIUM_ROOT") or "."
-            path = Path(ws) / filename
-            if path.exists():
-                content = path.read_text(encoding="utf-8", errors="replace")
-                return [TextContent(type="text", text=content)]
-            return [TextContent(type="text", text=f"ERROR: {filename} not found")]
+            ws = Path(os.environ.get("MATEMIUM_ROOT") or ".")
+            path = _approved_project_path(ws, filename)
+            content = path.read_text(encoding="utf-8", errors="replace")
+            return [TextContent(type="text", text=content)]
 
         elif name == "edit_file":
             filename = arguments.get("filename")
             patches = arguments.get("patches", "")
             instructions = arguments.get("instructions", "")
+            ws = Path(os.environ.get("MATEMIUM_ROOT") or ".")
+            _approved_project_path(ws, str(filename))
             # Delegate to sidecar logic if possible, but edit is desktop side.
             # For local MCP, simulate or call a handler.
             # In practice, desktop would apply, but for sidecar MCP we can provide patch result.
@@ -256,40 +284,44 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 return [TextContent(type="text", text=json.dumps(resp.result, indent=2))]
             return [TextContent(type="text", text=f"RETRIEVE_FAILED: {resp.error}")]
 
-        elif name == "run_lifecycle":
-            user_prompt = arguments.get("user_prompt")
-            mode_str = arguments.get("mode", "mute")
-            model_tier_str = arguments.get("model_tier", "standard")
-            account_tier_str = arguments.get("account_tier", "basic")
-            
-            from .agent.models import ProcessingMode, ModelTier, AccountTier
-            from .agent.coordinator import run_lifecycle
-            
-            mode = ProcessingMode(mode_str)
-            model_tier = ModelTier(model_tier_str)
-            account_tier = AccountTier(account_tier_str)
-            
-            ws = os.environ.get("MATEMIUM_ROOT") or "."
-            
-            # Execute the 5-phase lifecycle
-            result = run_lifecycle(
-                project_dir=ws,
-                user_prompt=user_prompt,
-                mode=mode,
-                model_tier=model_tier,
-                account_tier=account_tier,
+        elif name == "create_tape_content":
+            slug = str(arguments.get("slug", ""))
+            title = str(arguments.get("title", "")).strip()
+            if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", slug) or not title:
+                return [TextContent(type="text", text="ERROR: valid slug and title required")]
+            ws = Path(os.environ.get("MATEMIUM_ROOT") or ".")
+            filename = f"brief/tapes/{slug}.md"
+            path = _approved_project_path(ws, filename, require_exists=False)
+            if path.exists():
+                return [TextContent(type="text", text=f"ERROR: {filename} already exists")]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                f"# Tape content — {title}\n\n"
+                "Keep only the visible mathematical/reasoning content here. "
+                "Use stable beat identifiers and put staging in brief/orchestration.md.\n\n"
+                "## beat-opening — Opening\n\n"
+                "- **Visible statement:**\n"
+                "- **Mathematical content:**\n"
+                "- **Diagram or labels:**\n"
+                "- **Reveal/hold intent:**\n"
+                "- **Accuracy notes:**\n",
+                encoding="utf-8",
             )
-            
-            # Prepare serializable result dict
+            return [TextContent(type="text", text=json.dumps({"ok": True, "path": filename}))]
+
+        elif name == "lifecycle_status":
+            ws = Path(os.environ.get("MATEMIUM_ROOT") or ".")
+            passport = json.loads(_approved_project_path(ws, "brief/passport.json").read_text(encoding="utf-8"))
+            roadmap = json.loads(_approved_project_path(ws, "brief/roadmap.json").read_text(encoding="utf-8"))
+            phases = roadmap.get("phases") if isinstance(roadmap.get("phases"), list) else []
+            current_id = roadmap.get("current_phase")
+            current = next((phase for phase in phases if phase.get("id") == current_id), None)
             output = {
-                "ok": True,
-                "duration": result.post_production.total_duration,
-                "segments_count": len(result.blueprint.segments),
-                "tokens_spent": result.token_ledger.total_credits_spent(),
-                "artifacts": {
-                    "scenes_created": (Path(ws) / "scenes.py").exists(),
-                    "helpers_created": (Path(ws) / "helpers.py").exists(),
-                }
+                "production_path": passport.get("production_path"),
+                "passport_readiness": passport.get("readiness"),
+                "current_phase": current,
+                "invalidated_phases": roadmap.get("invalidated_phases", []),
+                "blockers": roadmap.get("blockers", []),
             }
             return [TextContent(type="text", text=json.dumps(output, indent=2))]
 

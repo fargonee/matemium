@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matemium.app/schemas/passport.schema.json",
+  "title": "MatemiumProjectPassport",
+  "type": "object",
+  "required": ["schema_version", "title", "status", "production_path", "readiness"],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "title": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["discovery", "ready", "production", "review", "complete"] },
+    "production_path": {
+      "type": ["string", "null"],
+      "enum": [null, "mute_video", "tts", "custom_audio"],
+      "description": "A consequential Phase 2 choice that must be selected explicitly or delegated explicitly."
+    },
+    "readiness": {
+      "type": "object",
+      "required": ["status", "missing_fields"],
+      "properties": {
+        "status": { "type": "string", "enum": ["needs_input", "ready"] },
+        "missing_fields": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

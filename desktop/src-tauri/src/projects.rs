@@ -14,17 +14,31 @@ const HELPERS_TEMPLATE: &str = include_str!("../../../shared/templates/helpers.p
 const PASSPORT_TEMPLATE: &str = include_str!("../../../shared/templates/passport.json");
 const DESCRIPTION_TEMPLATE: &str = include_str!("../../../shared/templates/description.md");
 const TAPE_TEMPLATE: &str = include_str!("../../../shared/templates/tape.md");
+const ORCHESTRATION_TEMPLATE: &str = include_str!("../../../shared/templates/orchestration.md");
 const ROADMAP_TEMPLATE: &str = include_str!("../../../shared/templates/roadmap.json");
 const NARRATION_TEMPLATE: &str = include_str!("../../../shared/templates/narration.md");
+const TTS_STYLE_TEMPLATE: &str = include_str!("../../../shared/templates/tts-narration-style.md");
+const AUDIO_DESCRIPTION_TEMPLATE: &str =
+    include_str!("../../../shared/templates/audio-description.md");
+const CUSTOM_NARRATION_TEMPLATE: &str =
+    include_str!("../../../shared/templates/custom-narration.md");
+const TRANSCRIPT_TEMPLATE: &str = include_str!("../../../shared/templates/transcript.md");
+const TIMESTAMPS_TEMPLATE: &str = include_str!("../../../shared/templates/timestamps.json");
 
-const PROJECT_FILES: [(&str, &str); 7] = [
+const PROJECT_FILES: [(&str, &str); 13] = [
     ("scenes", "scenes.py"),
     ("helpers", "helpers.py"),
     ("passport", "brief/passport.json"),
     ("description", "brief/description.md"),
-    ("tape", "brief/tape.md"),
+    ("tape_content", "brief/tapes/main.md"),
+    ("orchestration", "brief/orchestration.md"),
     ("roadmap", "brief/roadmap.json"),
-    ("narration", "brief/narration.md"),
+    ("tts_narration", "brief/tts-narration.md"),
+    ("tts_style", "brief/tts-narration-style.md"),
+    ("audio_description", "brief/audio-description.md"),
+    ("custom_narration", "brief/custom-narration.md"),
+    ("transcript", "brief/transcript.md"),
+    ("timestamps", "brief/timestamps.json"),
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -231,8 +245,95 @@ pub struct ProjectOpen {
     pub scene_class: String,
     pub orientation: String,
     pub files: BTreeMap<String, String>,
+    pub tapes: BTreeMap<String, String>,
     pub project_json: serde_json::Value,
     pub renders_dir: String,
+}
+
+fn valid_tape_slug(slug: &str) -> bool {
+    !slug.is_empty()
+        && slug.len() <= 64
+        && slug
+            .chars()
+            .next()
+            .is_some_and(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit())
+        && slug
+            .chars()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-' || ch == '_')
+}
+
+fn read_tape_contents(workspace: &Path) -> Result<BTreeMap<String, String>, String> {
+    let mut tapes = BTreeMap::new();
+    let directory = workspace.join("brief/tapes");
+    for entry in
+        fs::read_dir(&directory).map_err(|e| format!("read {}: {e}", directory.display()))?
+    {
+        let entry = entry.map_err(|e| format!("read tape entry: {e}"))?;
+        if !entry.file_type().map_err(|e| e.to_string())?.is_file() {
+            continue;
+        }
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("md") {
+            continue;
+        }
+        let Some(slug) = path.file_stem().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if !valid_tape_slug(slug) {
+            continue;
+        }
+        let content =
+            fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
+        tapes.insert(slug.to_string(), content);
+    }
+    Ok(tapes)
+}
+
+pub fn create_tape_content(
+    paths: &AppPaths,
+    project_id: &str,
+    slug: &str,
+    title: &str,
+) -> Result<(), String> {
+    if !valid_tape_slug(slug) {
+        return Err(
+            "tape slug must contain 1-64 lowercase letters, numbers, hyphens, or underscores"
+                .to_string(),
+        );
+    }
+    let title = title.trim();
+    if title.is_empty() || title.len() > 120 {
+        return Err("tape title must contain 1-120 characters".to_string());
+    }
+    let workspace = paths.workspace_dir(project_id);
+    if !workspace.is_dir() {
+        return Err(format!("project not found: {project_id}"));
+    }
+    let path = workspace.join("brief/tapes").join(format!("{slug}.md"));
+    if path.exists() {
+        return Err(format!("tape content already exists: {slug}"));
+    }
+    let content = TAPE_TEMPLATE.replace("Main tape", title);
+    ensure_file(&path, &content)?;
+    touch_project_updated(paths, project_id)
+}
+
+pub fn save_tape_content(
+    paths: &AppPaths,
+    project_id: &str,
+    slug: &str,
+    content: &str,
+) -> Result<(), String> {
+    if !valid_tape_slug(slug) {
+        return Err("invalid tape slug".to_string());
+    }
+    let workspace = paths.workspace_dir(project_id);
+    let path = workspace.join("brief/tapes").join(format!("{slug}.md"));
+    if !path.is_file() {
+        return Err(format!("tape content not found: {slug}"));
+    }
+    fs::write(&path, content).map_err(|e| format!("write {}: {e}", path.display()))?;
+    touch_project_updated(paths, project_id)
 }
 
 fn project_file_path(workspace: &Path, key: &str) -> Result<PathBuf, String> {
@@ -253,6 +354,242 @@ fn ensure_file(path: &Path, content: &str) -> Result<(), String> {
     fs::write(path, content).map_err(|e| format!("write {}: {e}", path.display()))
 }
 
+fn migrate_lifecycle_json(workspace: &Path) -> Result<(), String> {
+    let passport_path = workspace.join("brief/passport.json");
+    let mut passport = read_json_file(&passport_path)?;
+    let passport_object = passport
+        .as_object_mut()
+        .ok_or_else(|| "brief/passport.json must contain a JSON object".to_string())?;
+    let mut passport_changed = false;
+    if passport_object
+        .get("schema_version")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0)
+        < 2
+    {
+        passport_object.insert("schema_version".into(), serde_json::json!(2));
+        passport_changed = true;
+    }
+    if !passport_object.contains_key("production_path") {
+        passport_object.insert("production_path".into(), serde_json::Value::Null);
+        passport_changed = true;
+    }
+    let production_path_missing = passport_object
+        .get("production_path")
+        .is_some_and(|value| value.is_null());
+    if let Some(missing) = passport_object
+        .get_mut("readiness")
+        .and_then(|value| value.as_object_mut())
+        .and_then(|readiness| readiness.get_mut("missing_fields"))
+        .and_then(|value| value.as_array_mut())
+    {
+        if !missing
+            .iter()
+            .any(|value| value.as_str() == Some("production_path"))
+            && production_path_missing
+        {
+            missing.push(serde_json::json!("production_path"));
+            passport_changed = true;
+        } else if !production_path_missing {
+            let before = missing.len();
+            missing.retain(|value| value.as_str() != Some("production_path"));
+            passport_changed |= before != missing.len();
+        }
+    }
+    if passport_changed {
+        write_json(&passport_path, &passport)?;
+    }
+
+    let roadmap_path = workspace.join("brief/roadmap.json");
+    let roadmap = read_json_file(&roadmap_path)?;
+    let legacy_default = roadmap
+        .get("phases")
+        .and_then(|value| value.as_array())
+        .map(|phases| {
+            phases
+                .iter()
+                .filter_map(|phase| phase.get("id").and_then(|id| id.as_str()))
+                .collect::<Vec<_>>()
+                == ["concept", "production", "review"]
+        })
+        .unwrap_or(false);
+    if legacy_default {
+        let mut lifecycle: serde_json::Value = serde_json::from_str(ROADMAP_TEMPLATE)
+            .map_err(|e| format!("invalid lifecycle roadmap template: {e}"))?;
+        lifecycle
+            .as_object_mut()
+            .expect("roadmap template is an object")
+            .insert("legacy_roadmap".into(), roadmap);
+        write_json(&roadmap_path, &lifecycle)?;
+    } else if let Some(object) = roadmap.as_object() {
+        if !object.contains_key("schema_version") || !object.contains_key("production_path") {
+            let mut migrated = roadmap;
+            let migrated_object = migrated.as_object_mut().expect("checked object");
+            migrated_object
+                .entry("schema_version")
+                .or_insert_with(|| serde_json::json!(2));
+            migrated_object
+                .entry("production_path")
+                .or_insert(serde_json::Value::Null);
+            write_json(&roadmap_path, &migrated)?;
+        }
+    }
+    Ok(())
+}
+
+fn production_path_valid(value: &serde_json::Value) -> bool {
+    value.is_null() || matches!(value.as_str(), Some("mute_video" | "tts" | "custom_audio"))
+}
+
+fn expected_phase_ids(path: Option<&str>) -> &'static [&'static str] {
+    match path {
+        Some("mute_video") => &[
+            "project_creation",
+            "description",
+            "passport",
+            "tape_content",
+            "orchestration",
+            "authoring",
+            "render_repair",
+            "mute_delivery",
+        ],
+        Some("tts") => &[
+            "project_creation",
+            "description",
+            "passport",
+            "tape_content",
+            "orchestration",
+            "tts_narration",
+            "authoring",
+            "render_repair",
+            "timing_regulation",
+            "tts_generation",
+            "final_assembly",
+        ],
+        Some("custom_audio") => &[
+            "project_creation",
+            "description",
+            "passport",
+            "tape_content",
+            "orchestration",
+            "audio_specification",
+            "audio_generation",
+            "transcription_validation",
+            "content_reconciliation",
+            "authoring",
+            "render_repair",
+            "final_assembly",
+        ],
+        _ => &["project_creation", "description", "passport"],
+    }
+}
+
+fn validate_structured_brief(file: &str, value: &serde_json::Value) -> Result<(), String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("{file} must contain a JSON object"))?;
+    match file {
+        "passport" => {
+            if let Some(path) = object.get("production_path") {
+                if !production_path_valid(path) {
+                    return Err(
+                        "passport.production_path must be null, mute_video, tts, or custom_audio"
+                            .to_string(),
+                    );
+                }
+            }
+        }
+        "roadmap" => {
+            if let Some(path) = object.get("production_path") {
+                if !production_path_valid(path) {
+                    return Err(
+                        "roadmap.production_path must be null, mute_video, tts, or custom_audio"
+                            .to_string(),
+                    );
+                }
+            }
+            let phases = object
+                .get("phases")
+                .and_then(|value| value.as_array())
+                .ok_or_else(|| "roadmap.phases must be an array".to_string())?;
+            let path = object
+                .get("production_path")
+                .and_then(|value| value.as_str());
+            let actual_ids = phases
+                .iter()
+                .filter_map(|phase| phase.get("id").and_then(|value| value.as_str()))
+                .collect::<Vec<_>>();
+            if actual_ids != expected_phase_ids(path) {
+                return Err(format!(
+                    "roadmap phases do not match the {:?} production lifecycle",
+                    path.unwrap_or("unselected")
+                ));
+            }
+            let current = object
+                .get("current_phase")
+                .and_then(|value| value.as_str())
+                .ok_or_else(|| "roadmap.current_phase must be a string".to_string())?;
+            let mut current_exists = false;
+            for phase in phases {
+                let phase = phase
+                    .as_object()
+                    .ok_or_else(|| "each roadmap phase must be an object".to_string())?;
+                let id = phase
+                    .get("id")
+                    .and_then(|value| value.as_str())
+                    .ok_or_else(|| "each roadmap phase needs an id".to_string())?;
+                current_exists |= id == current;
+                if !matches!(
+                    phase.get("status").and_then(|value| value.as_str()),
+                    Some("todo" | "in_progress" | "done")
+                ) {
+                    return Err(format!("roadmap phase {id} has an invalid status"));
+                }
+            }
+            if !current_exists {
+                return Err("roadmap.current_phase must reference a phase id".to_string());
+            }
+        }
+        "timestamps" => {
+            let segments = object
+                .get("segments")
+                .and_then(|value| value.as_array())
+                .ok_or_else(|| "timestamps.segments must be an array".to_string())?;
+            for segment in segments {
+                let start = segment.get("start").and_then(|value| value.as_f64());
+                let end = segment.get("end").and_then(|value| value.as_f64());
+                let text = segment.get("text").and_then(|value| value.as_str());
+                if start.map_or(true, |value| value < 0.0)
+                    || end.map_or(true, |value| value <= 0.0)
+                    || start.zip(end).map_or(true, |(start, end)| end < start)
+                    || text.is_none()
+                {
+                    return Err("each timestamp segment needs start <= end and text".to_string());
+                }
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn migrate_legacy_assets_imports(source: &str) -> String {
+    source
+        .split_inclusive('\n')
+        .map(|line| {
+            let indent_len = line.len() - line.trim_start_matches([' ', '\t']).len();
+            let (indent, code) = line.split_at(indent_len);
+            if let Some(rest) = code.strip_prefix("from .assets import ") {
+                format!("{indent}from .helpers import {rest}")
+            } else if let Some(rest) = code.strip_prefix("from assets import ") {
+                format!("{indent}from helpers import {rest}")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect()
+}
+
 fn ensure_workspace_structure(workspace: &Path, project_name: &str) -> Result<(), String> {
     let helpers = workspace.join("helpers.py");
     let legacy_assets = workspace.join("assets.py");
@@ -262,15 +599,65 @@ fn ensure_workspace_structure(workspace: &Path, project_name: &str) -> Result<()
     }
 
     ensure_file(&helpers, HELPERS_TEMPLATE)?;
+    if helpers.is_file() && !legacy_assets.is_file() {
+        let scenes = workspace.join("scenes.py");
+        if scenes.is_file() {
+            let source = fs::read_to_string(&scenes)
+                .map_err(|e| format!("read {}: {e}", scenes.display()))?;
+            let migrated = migrate_legacy_assets_imports(&source);
+            if migrated != source {
+                fs::write(&scenes, migrated)
+                    .map_err(|e| format!("migrate imports in {}: {e}", scenes.display()))?;
+            }
+        }
+    }
     let passport = PASSPORT_TEMPLATE.replace("Untitled project", project_name);
     ensure_file(&workspace.join("brief/passport.json"), &passport)?;
     ensure_file(
         &workspace.join("brief/description.md"),
         DESCRIPTION_TEMPLATE,
     )?;
-    ensure_file(&workspace.join("brief/tape.md"), TAPE_TEMPLATE)?;
+    let tape_content = workspace.join("brief/tapes/main.md");
+    let legacy_tape = workspace.join("brief/tape.md");
+    if !tape_content.exists() && legacy_tape.is_file() {
+        let legacy = fs::read_to_string(&legacy_tape)
+            .map_err(|e| format!("read {}: {e}", legacy_tape.display()))?;
+        ensure_file(&tape_content, &legacy)?;
+    } else {
+        ensure_file(&tape_content, TAPE_TEMPLATE)?;
+    }
+    ensure_file(
+        &workspace.join("brief/orchestration.md"),
+        ORCHESTRATION_TEMPLATE,
+    )?;
     ensure_file(&workspace.join("brief/roadmap.json"), ROADMAP_TEMPLATE)?;
-    ensure_file(&workspace.join("brief/narration.md"), NARRATION_TEMPLATE)?;
+    let tts_narration = workspace.join("brief/tts-narration.md");
+    let legacy_narration = workspace.join("brief/narration.md");
+    if !tts_narration.exists() && legacy_narration.is_file() {
+        let legacy = fs::read_to_string(&legacy_narration)
+            .map_err(|e| format!("read {}: {e}", legacy_narration.display()))?;
+        ensure_file(&tts_narration, &legacy)?;
+    } else {
+        ensure_file(&tts_narration, NARRATION_TEMPLATE)?;
+    }
+    ensure_file(
+        &workspace.join("brief/tts-narration-style.md"),
+        TTS_STYLE_TEMPLATE,
+    )?;
+    ensure_file(
+        &workspace.join("brief/audio-description.md"),
+        AUDIO_DESCRIPTION_TEMPLATE,
+    )?;
+    ensure_file(
+        &workspace.join("brief/custom-narration.md"),
+        CUSTOM_NARRATION_TEMPLATE,
+    )?;
+    ensure_file(&workspace.join("brief/transcript.md"), TRANSCRIPT_TEMPLATE)?;
+    ensure_file(
+        &workspace.join("brief/timestamps.json"),
+        TIMESTAMPS_TEMPLATE,
+    )?;
+    migrate_lifecycle_json(workspace)?;
     for directory in ["assets/images", "assets/video", "assets/audio", "renders"] {
         fs::create_dir_all(workspace.join(directory))
             .map_err(|e| format!("create {directory}: {e}"))?;
@@ -367,6 +754,7 @@ pub fn open_project(paths: &AppPaths, project_id: &str) -> Result<ProjectOpen, S
         files.insert(key.to_string(), content);
     }
     let project_json = read_json_file(&project_json_path)?;
+    let tapes = read_tape_contents(&workspace)?;
 
     Ok(ProjectOpen {
         id: meta.id,
@@ -375,6 +763,7 @@ pub fn open_project(paths: &AppPaths, project_id: &str) -> Result<ProjectOpen, S
         scene_class: meta.scene_class,
         orientation: meta.orientation,
         files,
+        tapes,
         project_json,
         renders_dir: paths.renders_dir(project_id).display().to_string(),
     })
@@ -412,9 +801,10 @@ pub fn save_project_file(
         return Err(format!("project not found: {project_id}"));
     }
 
-    if matches!(file, "passport" | "roadmap") {
-        serde_json::from_str::<serde_json::Value>(content)
+    if matches!(file, "passport" | "roadmap" | "timestamps") {
+        let value = serde_json::from_str::<serde_json::Value>(content)
             .map_err(|e| format!("invalid JSON for {file}: {e}"))?;
+        validate_structured_brief(file, &value)?;
     }
     let path = project_file_path(&workspace, file)?;
     fs::write(&path, content).map_err(|e| format!("write {}: {e}", path.display()))?;
@@ -496,10 +886,40 @@ mod tests {
         let workspace = paths.workspace_dir(&created.id);
         fs::remove_file(workspace.join("helpers.py")).expect("remove helpers");
         fs::write(workspace.join("assets.py"), "LEGACY_VALUE = 42\n").expect("legacy file");
+        fs::write(
+            workspace.join("scenes.py"),
+            "from .assets import LEGACY_VALUE\n",
+        )
+        .expect("legacy scenes import");
 
         let opened = open_project(&paths, &created.id).expect("open");
         assert_eq!(opened.files["helpers"], "LEGACY_VALUE = 42\n");
+        assert_eq!(
+            opened.files["scenes"],
+            "from .helpers import LEGACY_VALUE\n"
+        );
         assert!(!workspace.join("assets.py").exists());
+        let _ = fs::remove_dir_all(&paths.data_root);
+    }
+
+    #[test]
+    fn open_repairs_imports_in_an_already_migrated_workspace() {
+        let paths = temp_paths();
+        paths.ensure().expect("ensure");
+        let created = create_project(&paths, "Already migrated".to_string()).expect("create");
+        let workspace = paths.workspace_dir(&created.id);
+        fs::write(
+            workspace.join("scenes.py"),
+            "from assets import add_compare_row\n",
+        )
+        .expect("legacy scenes import");
+
+        let opened = open_project(&paths, &created.id).expect("open");
+
+        assert_eq!(
+            opened.files["scenes"],
+            "from helpers import add_compare_row\n"
+        );
         let _ = fs::remove_dir_all(&paths.data_root);
     }
 
@@ -512,6 +932,20 @@ mod tests {
         assert!(save_project_file(&paths, &created.id, "passport", "not json").is_err());
         save_project_file(&paths, &created.id, "passport", "{\"status\":\"draft\"}\n")
             .expect("valid passport");
+        assert!(save_project_file(
+            &paths,
+            &created.id,
+            "passport",
+            "{\"production_path\":\"surprise_me\"}\n"
+        )
+        .is_err());
+        assert!(save_project_file(
+            &paths,
+            &created.id,
+            "timestamps",
+            "{\"segments\":[{\"start\":4,\"end\":2,\"text\":\"backwards\"}]}\n"
+        )
+        .is_err());
 
         let source = paths.data_root.join("diagram.png");
         fs::write(&source, b"png fixture").expect("source asset");
@@ -529,6 +963,109 @@ mod tests {
         assert!(list_project_media(&paths, &created.id, "images")
             .unwrap()
             .is_empty());
+        let _ = fs::remove_dir_all(&paths.data_root);
+    }
+
+    #[test]
+    fn new_project_has_phase_aware_brief_artifacts() {
+        let paths = temp_paths();
+        paths.ensure().expect("ensure");
+        let created = create_project(&paths, "Lifecycle".to_string()).expect("create");
+        let passport: serde_json::Value =
+            serde_json::from_str(&created.files["passport"]).expect("passport json");
+        let roadmap: serde_json::Value =
+            serde_json::from_str(&created.files["roadmap"]).expect("roadmap json");
+
+        assert_eq!(passport["schema_version"], 2);
+        assert!(passport["production_path"].is_null());
+        assert_eq!(roadmap["schema_version"], 2);
+        assert_eq!(roadmap["current_phase"], "description");
+        assert_eq!(roadmap["phases"][0]["id"], "project_creation");
+        assert_eq!(roadmap["phases"][1]["id"], "description");
+        assert_eq!(roadmap["phases"][2]["id"], "passport");
+        for key in [
+            "tape_content",
+            "orchestration",
+            "tts_narration",
+            "tts_style",
+            "audio_description",
+            "custom_narration",
+            "transcript",
+            "timestamps",
+        ] {
+            assert!(
+                created.files.contains_key(key),
+                "missing lifecycle file {key}"
+            );
+        }
+        assert!(paths
+            .workspace_dir(&created.id)
+            .join("brief/tapes/main.md")
+            .is_file());
+        let _ = fs::remove_dir_all(&paths.data_root);
+    }
+
+    #[test]
+    fn open_migrates_legacy_brief_without_losing_source_documents() {
+        let paths = temp_paths();
+        paths.ensure().expect("ensure");
+        let created = create_project(&paths, "Legacy brief".to_string()).expect("create");
+        let workspace = paths.workspace_dir(&created.id);
+        fs::remove_file(workspace.join("brief/tapes/main.md")).expect("remove new tape");
+        fs::remove_file(workspace.join("brief/tts-narration.md")).expect("remove new narration");
+        fs::write(workspace.join("brief/tape.md"), "# My legacy tape\n").expect("legacy tape");
+        fs::write(
+            workspace.join("brief/narration.md"),
+            "# My legacy narration\n",
+        )
+        .expect("legacy narration");
+        fs::write(
+            workspace.join("brief/passport.json"),
+            r#"{"title":"Legacy brief","status":"discovery","readiness":{"status":"needs_input","missing_fields":[]}}"#,
+        )
+        .expect("legacy passport");
+        fs::write(
+            workspace.join("brief/roadmap.json"),
+            r#"{"current_phase":"concept","phases":[{"id":"concept"},{"id":"production"},{"id":"review"}]}"#,
+        )
+        .expect("legacy roadmap");
+
+        let opened = open_project(&paths, &created.id).expect("open migrated");
+        assert_eq!(opened.files["tape_content"], "# My legacy tape\n");
+        assert_eq!(opened.files["tts_narration"], "# My legacy narration\n");
+        let passport: serde_json::Value =
+            serde_json::from_str(&opened.files["passport"]).expect("passport");
+        let roadmap: serde_json::Value =
+            serde_json::from_str(&opened.files["roadmap"]).expect("roadmap");
+        assert_eq!(passport["schema_version"], 2);
+        assert!(passport["production_path"].is_null());
+        assert_eq!(roadmap["current_phase"], "description");
+        assert_eq!(roadmap["legacy_roadmap"]["current_phase"], "concept");
+        let _ = fs::remove_dir_all(&paths.data_root);
+    }
+
+    #[test]
+    fn multiple_tape_content_files_roundtrip() {
+        let paths = temp_paths();
+        paths.ensure().expect("ensure");
+        let created = create_project(&paths, "Multiple tapes".to_string()).expect("create");
+        create_tape_content(&paths, &created.id, "comparison", "Comparison")
+            .expect("create second tape");
+        save_tape_content(
+            &paths,
+            &created.id,
+            "comparison",
+            "# Tape content — Comparison\n\n## beat-example\n",
+        )
+        .expect("save second tape");
+        assert!(create_tape_content(&paths, &created.id, "../escape", "Escape").is_err());
+
+        let reopened = open_project(&paths, &created.id).expect("reopen");
+        assert!(reopened.tapes.contains_key("main"));
+        assert_eq!(
+            reopened.tapes["comparison"],
+            "# Tape content — Comparison\n\n## beat-example\n"
+        );
         let _ = fs::remove_dir_all(&paths.data_root);
     }
 }

@@ -20,21 +20,22 @@ def part_intro(b: CanvasBuilder) -> None:
 
 def part_conclusion(b: CanvasBuilder) -> None:
     b.add_math(r"x^2 - 5x + 6 = (x-2)(x-3)")
-    # 3D world example using clarified model:
-    # - set_tape_pose makes the tape a 3D object
-    # - observe_object for normal 3D view of tape or solids
-    # - scroll_tape to enter classic tape-scroll-mode (internal reveal/scroll)
-    b.set_tape_pose(rotation=(30, 0, 0))
-    b.add_3d("z = x^2 - y^2")
-    b.observe_object("solid1")  # normal 3D cinematic on the solid
     b.add_text("Conclusion: x = 2 or x = 3")
-    # Free 3D object
-    from canvas.dsl import WorldObject, WorldTransform, Vector3, CanvasElement
-    solid = CanvasElement(id="solid1", type="Solid3D", content={"shape": "cube"})
-    wo = WorldObject(id="wo1", element=solid, transform=WorldTransform(position=Vector3(5, 0, 5)))
-    b.add_world_object(wo)
-    # Scroll the (possibly angled) tape using its internal logic
-    b.scroll_tape(local_y=5.0)
+
+
+def part_compare_tapes(b: CanvasBuilder) -> None:
+    left = b.add_tape("method_tape")
+    left.add_heading("Method")
+    left.add_body("Use factoring to rewrite the expression.")
+    left.add_math(r"x^2 - 5x + 6 = (x-2)(x-3)")
+
+    right = b.add_tape("check_tape")
+    right.add_heading("Check")
+    right.add_body("Substitute each root back into the original equation.")
+    right.add_math(r"x=2:\;4-10+6=0")
+    right.add_math(r"x=3:\;9-15+6=0")
+
+    left.add_observation("When content returns to this tape, the engine switches the visible tape context automatically.")
 
 
 # ---DIV: Main scene---
@@ -50,4 +51,5 @@ class MyScene(CanvasScene):
         )
         part_intro(builder)
         part_conclusion(builder)
+        part_compare_tapes(builder)
         super().__init__(dsl=builder.build(), **kwargs)

@@ -14,6 +14,8 @@ Given one user objective, the agent should inspect the active Matemium workspace
 
 Autonomy means choosing the next useful action within an explicit policy and budget. It does not mean unrestricted filesystem or shell access.
 
+For whole-project production, the runtime executes the phase and artifact contract in [`docs/product-production-lifecycle.md`](docs/product-production-lifecycle.md). Runtime task state and the user-facing production Roadmap are related but distinct: a single lifecycle phase may require multiple resumable agent runs, and a successful run must not falsely advance an unapproved or unverified production phase.
+
 ## 2. Required properties
 
 The production runtime must provide:
@@ -231,6 +233,7 @@ Migration should preserve the classic chat mode until the new runtime passes eva
 ## 16. Source-of-truth documents
 
 - This file defines autonomous runtime behavior and guarantees.
+- [`docs/product-production-lifecycle.md`](docs/product-production-lifecycle.md) defines the normative idea-to-product phases, production-path branches, and artifact dependencies.
 - [`ai-agent-architecture.md`](ai-agent-architecture.md) defines product boundaries and tool placement.
 - [`TODO-react-agentic-ai-transition.md`](TODO-react-agentic-ai-transition.md) tracks migration work and must not claim completion without the corresponding release gate.
 - [`matemium/ipc/PROTOCOL.md`](matemium/ipc/PROTOCOL.md) defines sidecar transport contracts.

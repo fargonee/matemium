@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const STORAGE_KEY = "matemium-panel-layout";
 
 export const BOTTOM_COLLAPSE_THRESHOLD = 48;
+const BOTTOM_CLOSED_HEIGHT = 24;
 export const RESIZE_HANDLE_SIZE = 8;
 export const MIN_MAIN_COLUMN_WIDTH = 240;
 export const MIN_EDITOR_STAGE_HEIGHT = 0;
@@ -31,7 +32,7 @@ type NumericLayoutKey = Exclude<keyof PanelLayout, "bottomPanelOpen" | "editorOp
 const LIMITS: Record<NumericLayoutKey, { min: number; max: number }> = {
   sidebarWidth: { min: 180, max: 480 },
   chatWidth: { min: 240, max: 560 },
-  bottomHeight: { min: BOTTOM_COLLAPSE_THRESHOLD, max: 2000 },
+  bottomHeight: { min: BOTTOM_CLOSED_HEIGHT, max: 2000 },
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -157,6 +158,9 @@ export function usePanelLayout() {
   const setEditorRegionHeight = useCallback((height: number) => {
     editorRegionHeightRef.current = height;
     setLayout((prev) => {
+      if (!prev.bottomPanelOpen) {
+        return prev;
+      }
       const { min, max } = bottomHeightLimits(height);
       const clamped = clamp(prev.bottomHeight, min, max);
       if (clamped !== prev.bottomHeight) {
@@ -215,7 +219,7 @@ export function usePanelLayout() {
         return {
           ...prev,
           bottomPanelOpen: false,
-          bottomHeight: DEFAULT_LAYOUT.bottomHeight,
+          bottomHeight: BOTTOM_CLOSED_HEIGHT,
           editorOpen: true,
         };
       }
@@ -231,7 +235,7 @@ export function usePanelLayout() {
 
   const setBottomPanelOpen = useCallback((open: boolean) => {
     setLayout((prev) => {
-      if (!open) return { ...prev, bottomPanelOpen: false, editorOpen: true };
+      if (!open) return { ...prev, bottomPanelOpen: false, editorOpen: true, bottomHeight: BOTTOM_CLOSED_HEIGHT };
       const { min, max } = bottomHeightLimits(editorRegionHeightRef.current);
       // When opening (especially on Render to show progress), force a
       // reasonable fixed height so the main editor + viewport don't get

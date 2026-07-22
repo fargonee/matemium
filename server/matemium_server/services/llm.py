@@ -27,6 +27,7 @@ from ..models import (
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCENE_AUTHORING_PROMPT_PATH = _REPO_ROOT / "shared" / "prompts" / "scene-authoring-system.txt"
+_PROJECT_MANAGER_PROMPT_PATH = _REPO_ROOT / "shared" / "prompts" / "project-manager-system.txt"
 
 # Default bases for common providers (extend as needed)
 PROVIDER_BASES: dict[str, str] = {
@@ -36,6 +37,10 @@ PROVIDER_BASES: dict[str, str] = {
     "openrouter": "https://openrouter.ai/api/v1",
     "together": "https://api.together.xyz/v1",
     "fireworks": "https://api.fireworks.ai/inference/v1",
+    "cerebras": "https://api.cerebras.ai/v1",
+    "github": "https://models.github.ai/inference",
+    "mistral": "https://api.mistral.ai/v1",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
 }
 
 DEFAULT_CHAT_MODEL = "openai/gpt-4o-mini"
@@ -47,7 +52,9 @@ DEFAULT_TTS_VOICE = "alloy"
 def scene_authoring_system_prompt() -> str:
     """System prompt prepended to every third-party LLM chat for scenes.py authoring."""
     try:
-        return _SCENE_AUTHORING_PROMPT_PATH.read_text(encoding="utf-8").strip()
+        manager = _PROJECT_MANAGER_PROMPT_PATH.read_text(encoding="utf-8").strip()
+        authoring = _SCENE_AUTHORING_PROMPT_PATH.read_text(encoding="utf-8").strip()
+        return f"{manager}\n\n{authoring}"
     except OSError:
         return (
             "You are Ferganus, a Matemium assistant. Users author animations in scenes.py "

@@ -188,6 +188,8 @@ def test_plain_local_chat_does_not_send_workspace_context(
 
     assert result["message"]["content"] == "Hello."
     assert len(captured_messages) == 2
+    assert "Your name is Ferganus" in captured_messages[0]["content"]
+    assert "natural status pulse" in captured_messages[0]["content"]
     assert "Current scenes.py" not in captured_messages[0]["content"]
     assert "LargeScene" not in "\n".join(message["content"] for message in captured_messages)
 
@@ -256,6 +258,10 @@ def test_autonomous_local_chat_routes_workspace_task_to_aider(
         )
 
     monkeypatch.setattr("matemium.agent.aider_runner.AiderAgentRunner.run", fake_run)
+    monkeypatch.setattr(
+        "matemium.ipc.handlers.check_project",
+        lambda workspace: {"ok": True, "errors": [], "warnings": []},
+    )
     monkeypatch.setattr(
         "matemium.agent.local_runner.LocalInferenceRunner.is_ollama_running",
         lambda self: True,

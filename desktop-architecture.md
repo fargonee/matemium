@@ -123,9 +123,10 @@ Each user project maps to a directory on disk (app data dir, not the dev repo):
 ├── brief/
 │   ├── passport.json  # structured creative/production identity
 │   ├── description.md # human-readable project brief
-│   ├── tape.md        # director's tape plan: beats, comments, camera/reveal notes
+│   ├── tapes/         # one or more files containing what appears on reasoning tapes
+│   ├── orchestration.md # 3D world, tape, camera, reveal, and transition choreography
 │   ├── roadmap.json   # phases, completion, current focus, blockers
-│   └── narration.md   # voiceover, captions, timing and pronunciation notes
+│   └── path-specific narration, audio, transcript, and timing files
 ├── assets/
 │   ├── images/
 │   ├── video/
@@ -144,12 +145,17 @@ Each user project maps to a directory on disk (app data dir, not the dev repo):
 | `helpers.py` | Human + AI | Computations, LaTeX helpers, geometry/data builders | Secondary code editor |
 | `brief/passport.json` | Human + AI | Topic, audience, difficulty, style, duration, language, constraints, learning goals | Form editor with JSON fallback |
 | `brief/description.md` | Human + AI | Freeform project brief and intent | Markdown editor |
-| `brief/tape.md` | Human + AI | Full tape plan with comments about what happens and how it appears in video | Markdown editor with beat navigation |
+| `brief/tapes/*.md` | Human + AI | The exact mathematical/reasoning content shown on one or more tapes, separate from staging | Markdown editor with tape/beat navigation |
+| `brief/orchestration.md` | Human + AI | 3D-world staging, tape relationships, camera, reveals, transformations, transitions, and pacing intent | Markdown editor with beat references |
 | `brief/roadmap.json` | AI-owned, human-readable | Phases, completion, current working point, blockers | Read-only production route; users steer changes through AI |
-| `brief/narration.md` | Human + AI | Voiceover, captions, timing notes, pronunciation | Markdown/script editor |
+| `brief/tts-narration.md` and optional `brief/tts-narration-style.md` | Human + AI | TTS script, delivery, pronunciation, holds, and timing | Markdown/script editor; TTS path only |
+| `brief/audio-description.md` and `brief/custom-narration.md` | Human + AI | Custom-audio performance specification and script | Markdown/script editor; custom-audio path only |
+| `brief/transcript.md` and `brief/timestamps.json` | AI + external tools | Latest verified actual transcript and alignment used as timing authority | Transcript/timeline review; custom-audio path only |
 | `assets/*` | Human + AI | User-provided images, video, audio | Asset browser with preview |
 
 The `brief/` files are not rendered directly. They are persistent project memory for the user, the UI, and the AI agent. `scenes.py` is still the only required render entrypoint.
+
+The workspace is phase- and production-path-aware. It may pre-provision dormant path-specific templates for reliable local editing, but the UI and AI expose or use them only when the selected path requires them. See the normative lifecycle in [`docs/product-production-lifecycle.md`](docs/product-production-lifecycle.md). The older single `brief/tape.md`/`brief/narration.md` shape is migrated for compatibility and must not force tape content, orchestration, narration, and timing back into one document.
 
 **Dev repo equivalent:**
 
@@ -167,7 +173,7 @@ The UI must make this structure feel like one coherent project, not a file tree 
 - **Top-level sidebar groups:** Script, Helpers, Brief, Assets, Renders. Projects/workspace switching can live above this tree or in a compact header, but once a project is open the sidebar's main job is navigating that project's files and production state.
 - **Script view:** `scenes.py` as the default first screen, with section outline, diagnostics, render controls, and AI patch review.
 - **Helpers view:** `helpers.py` for advanced reusable code; visible but secondary.
-- **Brief view:** tabs/indexes for Passport, Description, Tape, Roadmap, and Narration. Passport gets a friendly form, Markdown files get an editor with preview, and Roadmap is an AI-owned read-only production route with no raw JSON escape hatch.
+- **Brief view:** a phase-aware index for Description, Passport, tape content, Orchestration, Roadmap, and only the narration/audio/transcript artifacts required by the selected production path. Passport gets a friendly form, Markdown files get an editor with preview, and Roadmap is an AI-owned read-only production route with no raw JSON escape hatch.
 - **Assets view:** source images, video, and audio grouped by type with thumbnails/previews and clear import/reference actions for `scenes.py`. Keep these under `assets/`; `<workspace>/media/` is reserved for generated Manim cache data.
 - **Renders view:** app-managed render outputs, latest preview, export/cut artifacts, and render history.
 - **AI context:** the agent can read and update the brief deliberately, but code changes still flow through `scenes.py`/`helpers.py` and compile verification.

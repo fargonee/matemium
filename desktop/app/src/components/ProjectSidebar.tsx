@@ -5,7 +5,7 @@ import type { ProjectFile } from "../utils/workspacePrefs";
 import { SectionOutline } from "./SectionOutline";
 
 export type SidebarView = "project";
-export type WorkspaceItem = ProjectFile | "media-images" | "media-video" | "media-audio" | "renders";
+export type WorkspaceItem = ProjectFile | `tape:${string}` | "media-images" | "media-video" | "media-audio" | "renders";
 
 interface ProjectSidebarProps {
   projectName: string;
@@ -13,16 +13,34 @@ interface ProjectSidebarProps {
   dirtyFiles: Record<ProjectFile, boolean>;
   validationErrors: Partial<Record<ProjectFile, string>>;
   sections: SectionItem[];
+  productionPath: "mute_video" | "tts" | "custom_audio" | null;
+  tapeSlugs: string[];
   onSelect: (item: WorkspaceItem) => void;
   onJump: (line: number) => void;
+  onCreateTape: () => void;
 }
 
-const BRIEF_FILES: Array<{ id: ProjectFile; label: string; kind: string }> = [
-  { id: "passport", label: "Passport", kind: "JSON" },
+const SHARED_BRIEF_FILES: Array<{ id: ProjectFile; label: string; kind: string }> = [
   { id: "description", label: "Description", kind: "MD" },
-  { id: "tape", label: "Tape", kind: "MD" },
+  { id: "passport", label: "Passport", kind: "JSON" },
   { id: "roadmap", label: "Roadmap", kind: "JSON" },
-  { id: "narration", label: "Narration", kind: "MD" },
+];
+
+const CONTENT_FILES: Array<{ id: ProjectFile; label: string; kind: string }> = [
+  { id: "tape_content", label: "Tape content", kind: "MD" },
+  { id: "orchestration", label: "Orchestration", kind: "MD" },
+];
+
+const TTS_FILES: Array<{ id: ProjectFile; label: string; kind: string }> = [
+  { id: "tts_narration", label: "TTS narration", kind: "MD" },
+  { id: "tts_style", label: "TTS style", kind: "MD" },
+];
+
+const CUSTOM_AUDIO_FILES: Array<{ id: ProjectFile; label: string; kind: string }> = [
+  { id: "audio_description", label: "Audio description", kind: "MD" },
+  { id: "custom_narration", label: "Custom narration", kind: "MD" },
+  { id: "transcript", label: "Verified transcript", kind: "MD" },
+  { id: "timestamps", label: "Timestamps", kind: "JSON" },
 ];
 
 export function ProjectSidebar({
@@ -31,12 +49,21 @@ export function ProjectSidebar({
   dirtyFiles,
   validationErrors,
   sections,
+  productionPath,
+  tapeSlugs,
   onSelect,
   onJump,
+  onCreateTape,
 }: ProjectSidebarProps) {
   const [openGroups, setOpenGroups] = useState({ brief: true, media: true, renders: true });
   const toggle = (group: keyof typeof openGroups) =>
     setOpenGroups((current) => ({ ...current, [group]: !current[group] }));
+  const briefFiles = [
+    ...SHARED_BRIEF_FILES,
+    ...(productionPath ? CONTENT_FILES : []),
+    ...(productionPath === "tts" ? TTS_FILES : []),
+    ...(productionPath === "custom_audio" ? CUSTOM_AUDIO_FILES : []),
+  ];
 
   const fileButton = (id: ProjectFile, label: string, kind: string) => (
     <button
@@ -72,10 +99,22 @@ export function ProjectSidebar({
           <button type="button" className="project-tree-group-button" onClick={() => toggle("brief")}>
             <span className="tree-chevron">{openGroups.brief ? "v" : ">"}</span>
             <span>Brief</span>
-            <span className="tree-count">5</span>
+            <span className="tree-count">{briefFiles.length + Math.max(0, tapeSlugs.length - 1)}</span>
           </button>
           {openGroups.brief ? <div className="project-tree-children">
-            {BRIEF_FILES.map((file) => <div key={file.id}>{fileButton(file.id, file.label, file.kind)}</div>)}
+            {briefFiles.map((file) => <div key={file.id}>
+              {file.id === "tape_content" ? <>
+                {fileButton(file.id, "Tape · main", file.kind)}
+                {tapeSlugs.filter((slug) => slug !== "main").map((slug) => (
+                  <button key={slug} type="button" className={`project-tree-item ${activeItem === `tape:${slug}` ? "active" : ""}`} onClick={() => onSelect(`tape:${slug}`)}>
+                    <span className="file-kind file-kind-md">MD</span><span className="project-tree-label">Tape · {slug}</span>
+                  </button>
+                ))}
+                <button type="button" className="project-tree-item" onClick={onCreateTape} title="Add another tape-content file">
+                  <span className="file-kind">+</span><span className="project-tree-label">Add tape</span>
+                </button>
+              </> : fileButton(file.id, file.label, file.kind)}
+            </div>)}
           </div> : null}
         </div>
 

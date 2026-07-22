@@ -49,6 +49,8 @@ pub struct Manifest {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AssetStatus {
     pub id: String,
+    pub display_name: Option<String>,
+    pub asset_type: Option<String>,
     pub downloaded: bool,
     pub verified: bool,
     pub path: Option<String>,
@@ -56,6 +58,35 @@ pub struct AssetStatus {
     pub progress: Option<f32>,
     pub error: Option<String>,
     pub paused: Option<bool>,
+    pub source_url: Option<String>,
+    pub expected_sha256: Option<String>,
+    pub install_path: Option<String>,
+    pub extract: Option<bool>,
+    pub extract_format: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DownloadableAssetSpec {
+    pub id: String,
+    pub display_name: Option<String>,
+    pub asset_type: Option<String>,
+    pub source_url: String,
+    pub expected_sha256: Option<String>,
+    pub size: u64,
+    pub extract: bool,
+    pub extract_format: String,
+    pub install_path: String,
+}
+
+#[derive(Debug, Clone)]
+struct DownloadSpec {
+    display_name: Option<String>,
+    asset_type: Option<String>,
+    url: String,
+    expected_sha: String,
+    install_path: String,
+    extract: bool,
+    size: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -105,6 +136,42 @@ impl AssetManager {
             };
 
             if let Some(asset) = state.assets.iter_mut().find(|a| a.id == spec.id) {
+                if asset.display_name.is_none() {
+                    asset.display_name = Some(spec.name.clone());
+                    modified = true;
+                }
+                let expected_type = Some(
+                    if spec.id.starts_with("llm-") {
+                        "local_model"
+                    } else {
+                        "utility"
+                    }
+                    .to_string(),
+                );
+                if asset.asset_type.is_none() {
+                    asset.asset_type = expected_type;
+                    modified = true;
+                }
+                if asset.source_url.is_none() {
+                    asset.source_url = Some(spec.url.clone());
+                    modified = true;
+                }
+                if asset.expected_sha256.is_none() {
+                    asset.expected_sha256 = Some(spec.sha256.clone());
+                    modified = true;
+                }
+                if asset.install_path.is_none() {
+                    asset.install_path = Some(spec.install_path.clone());
+                    modified = true;
+                }
+                if asset.extract.is_none() {
+                    asset.extract = Some(spec.extract);
+                    modified = true;
+                }
+                if asset.extract_format.is_none() {
+                    asset.extract_format = Some(spec.extract_format.clone());
+                    modified = true;
+                }
                 // If the file exists but is not marked verified in the loaded state, auto-verify it!
                 if exists_and_matches && (!asset.verified || asset.path.is_none()) {
                     asset.downloaded = true;
@@ -130,6 +197,15 @@ impl AssetManager {
 
                 state.assets.push(AssetStatus {
                     id: spec.id.clone(),
+                    display_name: Some(spec.name.clone()),
+                    asset_type: Some(
+                        if spec.id.starts_with("llm-") {
+                            "local_model"
+                        } else {
+                            "utility"
+                        }
+                        .to_string(),
+                    ),
                     downloaded,
                     verified,
                     path,
@@ -137,6 +213,11 @@ impl AssetManager {
                     progress,
                     error: None,
                     paused: Some(false),
+                    source_url: Some(spec.url.clone()),
+                    expected_sha256: Some(spec.sha256.clone()),
+                    install_path: Some(spec.install_path.clone()),
+                    extract: Some(spec.extract),
+                    extract_format: Some(spec.extract_format.clone()),
                 });
                 modified = true;
             }
@@ -160,6 +241,72 @@ impl AssetManager {
         }
 
         manager
+    }
+
+    pub fn add_downloadable_asset(&self, spec: DownloadableAssetSpec) {
+        let mut state = self.state.lock().unwrap();
+        let final_path = self.paths.assets_root.join(&spec.install_path);
+        let exists_and_matches = final_path.is_file()
+            && fs::metadata(&final_path)
+                .map(|meta| meta.len() == spec.size)
+                .unwrap_or(false);
+        let mut next = state
+            .assets
+            .iter()
+            .find(|asset| asset.id == spec.id)
+            .cloned()
+            .unwrap_or_default();
+        next.id = spec.id.clone();
+        next.display_name = spec.display_name.clone();
+        next.asset_type = spec.asset_type.clone();
+        next.downloaded = next.downloaded || exists_and_matches;
+        next.verified = next.verified || exists_and_matches;
+        next.path = if exists_and_matches {
+            Some(final_path.to_string_lossy().to_string())
+        } else {
+            next.path.filter(|path| Path::new(path).is_file())
+        };
+        next.size = Some(spec.size);
+        next.progress = if next.downloaded && next.verified {
+            Some(100.0)
+        } else {
+            next.progress.or(Some(0.0))
+        };
+        if next.downloaded && next.verified {
+            next.error = None;
+        }
+        next.paused = Some(false);
+        next.source_url = Some(spec.source_url.clone());
+        next.expected_sha256 = spec.expected_sha256.clone();
+        next.install_path = Some(spec.install_path.clone());
+        next.extract = Some(spec.extract);
+        next.extract_format = Some(spec.extract_format.clone());
+        if let Some(existing) = state.assets.iter_mut().find(|asset| asset.id == spec.id) {
+            *existing = next;
+        } else {
+            state.assets.push(next);
+        }
+        drop(state);
+        self.save_state();
+    }
+
+    fn download_spec_from_status(&self, asset_id: &str) -> Option<DownloadSpec> {
+        let state = self.state.lock().unwrap();
+        let status = state.assets.iter().find(|asset| asset.id == asset_id)?;
+        let url = status.source_url.clone()?;
+        let install_path = status.install_path.clone()?;
+        Some(DownloadSpec {
+            display_name: status.display_name.clone(),
+            asset_type: status.asset_type.clone(),
+            url,
+            expected_sha: status
+                .expected_sha256
+                .clone()
+                .unwrap_or_else(|| "PLACEHOLDER_REPLACE_WITH_REAL".to_string()),
+            install_path,
+            extract: status.extract.unwrap_or(false),
+            size: status.size.unwrap_or(0),
+        })
     }
 
     /// Retrieve the authoritative asset manifest, resolving relative development paths
@@ -289,18 +436,19 @@ impl AssetManager {
             active.contains(asset_id)
         };
         if !is_active {
-            let manifest = Self::get_manifest();
-            if let Some(asset_spec) = manifest.assets.iter().find(|a| a.id == asset_id) {
-                let temp_file = self
-                    .paths
-                    .assets_root
-                    .join(&asset_spec.install_path)
-                    .parent()
-                    .map(|p| p.join(format!("{}.download.tmp", asset_id)));
-                if let Some(path) = temp_file {
-                    if path.is_file() {
-                        let _ = fs::remove_file(path);
-                    }
+            let temp_file = self
+                .download_spec_from_status(asset_id)
+                .map(|spec| {
+                    self.paths
+                        .assets_root
+                        .join(&spec.install_path)
+                        .parent()
+                        .map(|p| p.join(format!("{}.download.tmp", asset_id)))
+                })
+                .flatten();
+            if let Some(path) = temp_file {
+                if path.is_file() {
+                    let _ = fs::remove_file(path);
                 }
             }
         }
@@ -357,14 +505,32 @@ impl AssetManager {
         };
 
         let manifest = Self::get_manifest();
+        let dynamic_spec = self.download_spec_from_status(asset_id);
         let asset_spec = manifest
             .assets
             .iter()
             .find(|a| a.id == asset_id)
+            .map(|asset| DownloadSpec {
+                display_name: Some(asset.name.clone()),
+                asset_type: Some(
+                    if asset.id.starts_with("llm-") {
+                        "local_model"
+                    } else {
+                        "utility"
+                    }
+                    .to_string(),
+                ),
+                url: asset.url.clone(),
+                expected_sha: asset.sha256.clone(),
+                install_path: asset.install_path.clone(),
+                extract: asset.extract,
+                size: asset.size,
+            })
+            .or(dynamic_spec)
             .ok_or_else(|| format!("Unknown asset specification: {}", asset_id))?;
 
         let url = manifest_url.unwrap_or_else(|| asset_spec.url.clone());
-        let expected_sha = asset_spec.sha256.clone();
+        let expected_sha = asset_spec.expected_sha.clone();
         let install_path = asset_spec.install_path.clone();
         let extract = asset_spec.extract;
 
@@ -373,6 +539,28 @@ impl AssetManager {
             .parent()
             .ok_or_else(|| "Invalid asset installation path".to_string())?
             .to_path_buf();
+
+        let already_ready = final_path.is_file()
+            && fs::metadata(&final_path)
+                .map(|meta| meta.len() == asset_spec.size)
+                .unwrap_or(false);
+        if already_ready {
+            {
+                let mut state = self.state.lock().unwrap();
+                if let Some(asset) = state.assets.iter_mut().find(|a| a.id == asset_id) {
+                    asset.downloaded = true;
+                    asset.verified = true;
+                    asset.path = Some(final_path.to_string_lossy().to_string());
+                    asset.size = Some(asset_spec.size);
+                    asset.progress = Some(100.0);
+                    asset.error = None;
+                    asset.paused = Some(false);
+                }
+            }
+            self.save_state();
+            self.emit_progress(&app, asset_id, 100.0, "complete");
+            return Ok(());
+        }
 
         // Clear any previous cancellation and pause state
         {
@@ -412,6 +600,8 @@ impl AssetManager {
             } else {
                 state.assets.push(AssetStatus {
                     id: asset_id.to_string(),
+                    display_name: asset_spec.display_name.clone(),
+                    asset_type: asset_spec.asset_type.clone(),
                     downloaded: false,
                     verified: false,
                     path: None,
@@ -419,6 +609,17 @@ impl AssetManager {
                     progress: Some(initial_progress),
                     error: None,
                     paused: Some(false),
+                    source_url: Some(url.clone()),
+                    expected_sha256: Some(expected_sha.clone()),
+                    install_path: Some(install_path.clone()),
+                    extract: Some(extract),
+                    extract_format: Some(if url.ends_with(".tar.gz") {
+                        "tar.gz".to_string()
+                    } else if url.ends_with(".zip") {
+                        "zip".to_string()
+                    } else {
+                        "none".to_string()
+                    }),
                 });
             }
         }

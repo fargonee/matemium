@@ -137,6 +137,14 @@ def load_scenes_module(workspace: Path, *, path: str | None = None) -> ModuleTyp
                         sspec.loader.exec_module(smod)
                         sys.modules[base] = smod
 
+            # `assets.py` was renamed to `helpers.py` when `assets/` became the
+            # media container. Keep legacy imports working for workspaces whose
+            # scenes have not yet been rewritten, including alias-style imports.
+            helpers_module = sys.modules.get(f"{pkg_name}.helpers")
+            if helpers_module is not None and not (scene_dir / "assets.py").is_file():
+                sys.modules[f"{pkg_name}.assets"] = helpers_module
+                sys.modules["assets"] = helpers_module
+
             # Load scenes.py under the package so __package__ is set and relatives work.
             qual_name = f"{pkg_name}.scenes"
             spec = importlib.util.spec_from_file_location(qual_name, file_path)

@@ -10,6 +10,74 @@ from matemium.agent import aider_runner
 from matemium.agent.aider_runner import AiderAgentRunner
 
 
+def test_target_files_enforce_lifecycle_phase(tmp_path: Path) -> None:
+    (tmp_path / "brief" / "tapes").mkdir(parents=True)
+    for relative in (
+        "scenes.py",
+        "helpers.py",
+        "brief/description.md",
+        "brief/passport.json",
+        "brief/tapes/main.md",
+        "brief/orchestration.md",
+    ):
+        path = tmp_path / relative
+        path.write_text("placeholder\n", encoding="utf-8")
+    (tmp_path / "brief" / "roadmap.json").write_text(
+        '{"current_phase":"tape_content"}\n', encoding="utf-8"
+    )
+
+    targets = AiderAgentRunner(env={})._target_files(tmp_path)
+
+    assert targets == ["brief/roadmap.json", "brief/tapes/main.md"]
+    assert "scenes.py" not in targets
+    assert "helpers.py" not in targets
+
+
+def test_target_files_allow_code_during_authoring(tmp_path: Path) -> None:
+    (tmp_path / "brief").mkdir(parents=True)
+    (tmp_path / "scenes.py").write_text("class Demo:\n    pass\n", encoding="utf-8")
+    (tmp_path / "helpers.py").write_text("ASSETS = {}\n", encoding="utf-8")
+    (tmp_path / "brief" / "roadmap.json").write_text(
+        '{"current_phase":"authoring"}\n', encoding="utf-8"
+    )
+
+    targets = AiderAgentRunner(env={})._target_files(tmp_path)
+
+    assert targets == ["scenes.py", "helpers.py", "brief/roadmap.json"]
+
+
+def test_authoring_reads_approved_briefs_without_making_them_writable(tmp_path: Path) -> None:
+    (tmp_path / "brief" / "tapes").mkdir(parents=True)
+    for relative in (
+        "scenes.py",
+        "helpers.py",
+        "brief/description.md",
+        "brief/orchestration.md",
+        "brief/tapes/main.md",
+        "brief/tts-narration.md",
+        "brief/tts-narration-style.md",
+        "brief/timestamps.json",
+    ):
+        (tmp_path / relative).write_text("placeholder\n", encoding="utf-8")
+    (tmp_path / "brief" / "passport.json").write_text(
+        '{"production_path":"tts"}\n', encoding="utf-8"
+    )
+    (tmp_path / "brief" / "roadmap.json").write_text(
+        '{"current_phase":"authoring"}\n', encoding="utf-8"
+    )
+    runner = AiderAgentRunner(env={})
+
+    writable = runner._target_files(tmp_path)
+    read_only = runner._read_only_files(tmp_path, writable)
+
+    assert writable == ["scenes.py", "helpers.py", "brief/roadmap.json"]
+    assert "brief/passport.json" in read_only
+    assert "brief/tapes/main.md" in read_only
+    assert "brief/orchestration.md" in read_only
+    assert "brief/tts-narration.md" in read_only
+    assert not set(writable).intersection(read_only)
+
+
 def test_aider_runner_uses_workspace_files_and_local_model(
     tmp_path: Path,
     monkeypatch,
@@ -234,3 +302,28 @@ def test_missing_aider_mentions_launcher_configuration(tmp_path: Path, monkeypat
         AiderAgentRunner(
             env={"MATEMIUM_ROOT": str(tmp_path / "empty-root")},
         ).run(workspace=workspace, prompt="add a title")
+
+
+def test_aider_runner_preserves_project_questions_for_the_ui(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "scenes.py").write_text("class Demo:\n    pass\n", encoding="utf-8")
+    monkeypatch.setattr("shutil.which", lambda executable: f"/usr/bin/{executable}")
+    response = """<matemium_response>
+The production path changes what I make next. Choose one route.
+
+```project_questions
+{"questions":[{"id":"production_path","passport_field":"production_path","question":"Which route should we use?","type":"single","required":true,"allow_custom":false,"options":[{"id":"mute_video","label":"Mute video","description":"You add audio later.","recommended":true},{"id":"tts","label":"TTS","description":"Matemium generates narration.","recommended":false}]}]}
+```
+</matemium_response>"""
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda cmd, **kwargs: subprocess.CompletedProcess(cmd, 0, stdout=response, stderr=""),
+    )
+
+    result = AiderAgentRunner(env={}, timeout_seconds=1).run(
+        workspace=tmp_path,
+        prompt="help me choose",
+    )
+
+    assert result.output.startswith("The production path changes")
+    assert "```project_questions" in result.output
+    assert "<matemium_response>" not in result.output

@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import * as api from "../api/tauri";
 import config from "../config.json";
-import type { ProviderModel, Settings } from "../api/types";
+import type { AssetStatus, LocalModelCatalogEntry, ProviderModel, Settings } from "../api/types";
 import {
   DEFAULT_PINNED_MODELS,
   formatModelMeta,
@@ -10,6 +10,7 @@ import {
   pinnedModelIds,
   providerModelState,
 } from "../modelCatalog";
+import { formatBytes } from "../utils/formatBytes";
 import { formatError } from "../utils/errors";
 
 interface SettingsScreenProps {
@@ -56,7 +57,186 @@ const PROVIDERS = [
     status: "Manual key",
     description: "Direct xAI requests from this computer.",
   },
+  {
+    id: "cerebras",
+    name: "Cerebras Cloud",
+    status: "Manual key",
+    description: "Direct Cerebras Cloud requests from this computer.",
+  },
+  {
+    id: "github",
+    name: "GitHub Models",
+    status: "Manual key",
+    description: "Direct GitHub Models requests using a GitHub token with Models access.",
+  },
+  {
+    id: "mistral",
+    name: "Mistral",
+    status: "Manual key",
+    description: "Direct Mistral API requests from this computer.",
+  },
+  {
+    id: "gemini",
+    name: "Google AI Studio",
+    status: "Manual key",
+    description: "Direct Gemini API requests using a Google AI Studio key.",
+  },
 ];
+
+type LocalSystemProfile = {
+  cores: number | null;
+  memoryGB: number | null;
+  platform: string;
+};
+
+type ModelRecommendation = {
+  recommended: boolean;
+  label?: string;
+  reason: string;
+};
+
+type LocalModelCatalogCache = {
+  query: string;
+  entries: LocalModelCatalogEntry[];
+};
+
+const LOCAL_MODEL_CATALOG_CACHE_KEY = "matemium-local-model-catalog";
+
+const BUILTIN_LOCAL_MODELS = [
+  {
+    id: "llm-qwen-coder-3b-q4",
+    name: "Lite Tier: Qwen-2.5-Coder-3B-Instruct",
+    meta: "1.9 GB · Q4_K_M",
+    description: "Optimized for low RAM (4GB+) and CPU-only devices. Ultra-fast generation.",
+  },
+  {
+    id: "llm-qwen-coder-7b-q4",
+    name: "Balanced Tier: Qwen-2.5-Coder-7B-Instruct",
+    meta: "4.7 GB · Q4_K_M",
+    description: "Perfect math layouts and coding correctness. Recommended for dedicated GPUs and M1/M2/M3 Macs.",
+  },
+  {
+    id: "llm-llama-8b-q4",
+    name: "Elite Tier: Llama-3-8B-Instruct",
+    meta: "4.9 GB · Q4_K_M",
+    description: "Exceptional pedagogy and scripting style. Best for top-tier workstations.",
+  },
+];
+
+function readLocalSystemProfile(): LocalSystemProfile {
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  return {
+    cores: typeof nav.hardwareConcurrency === "number" ? nav.hardwareConcurrency : null,
+    memoryGB: typeof nav.deviceMemory === "number" ? nav.deviceMemory : null,
+    platform: nav.platform || nav.userAgent || "unknown",
+  };
+}
+
+function formatSystemProfile(profile: LocalSystemProfile): string {
+  const parts: string[] = [];
+  parts.push(profile.cores ? `${profile.cores} cores` : "cores unknown");
+  parts.push(profile.memoryGB ? `${profile.memoryGB} GB RAM` : "RAM unknown");
+  const platform = (() => {
+    const raw = profile.platform.toLowerCase();
+    if (raw.includes("mac")) return "macOS";
+    if (raw.includes("win")) return "Windows";
+    if (raw.includes("linux")) return "Linux";
+    return "this device";
+  })();
+  parts.push(platform);
+  return parts.join(" · ");
+}
+
+function recommendLocalModel(modelId: string, profile: LocalSystemProfile): ModelRecommendation {
+  const memory = profile.memoryGB;
+  const cores = profile.cores ?? 0;
+
+  const lowSpec = memory === null || memory < 8 || cores <= 4;
+  const midSpec = (memory ?? 0) >= 8 && (memory ?? 0) < 16 && cores >= 4;
+  const highSpec = (memory ?? 0) >= 16 && cores >= 6;
+
+  if (modelId === "llm-qwen-coder-3b-q4") {
+    return {
+      recommended: lowSpec,
+      label: lowSpec ? "Recommended" : undefined,
+      reason: lowSpec
+        ? "Best fit for lighter systems and CPU-only use."
+        : "Safe fallback if you want the smallest local footprint.",
+    };
+  }
+
+  if (modelId === "llm-qwen-coder-7b-q4") {
+    return {
+      recommended: midSpec,
+      label: midSpec ? "Recommended" : undefined,
+      reason: midSpec
+        ? "Balanced fit for this system's reported RAM and CPU class."
+        : "Usually better on mid-range systems with more headroom.",
+    };
+  }
+
+  if (modelId === "llm-llama-8b-q4") {
+    return {
+      recommended: highSpec,
+      label: highSpec ? "Recommended" : undefined,
+      reason: highSpec
+        ? "Best fit for higher-memory systems with more CPU headroom."
+        : "Best reserved for stronger machines with more RAM.",
+    };
+  }
+
+  return {
+    recommended: false,
+    reason: "No local recommendation available.",
+  };
+}
+
+function loadLocalModelCatalogCache(): LocalModelCatalogCache | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_MODEL_CATALOG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LocalModelCatalogCache>;
+    if (!Array.isArray(parsed.entries)) return null;
+    return {
+      query: typeof parsed.query === "string" ? parsed.query : "",
+      entries: parsed.entries,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveLocalModelCatalogCache(cache: LocalModelCatalogCache): void {
+  localStorage.setItem(LOCAL_MODEL_CATALOG_CACHE_KEY, JSON.stringify(cache));
+}
+
+function recommendBrowseModel(entry: LocalModelCatalogEntry, profile: LocalSystemProfile): ModelRecommendation {
+  const sizeGB = entry.sizeBytes / (1024 ** 3);
+  const memory = profile.memoryGB;
+  if (sizeGB <= 2.5) {
+    return {
+      recommended: memory === null || memory >= 4,
+      label: memory === null || memory >= 4 ? "Recommended" : undefined,
+      reason: "Small enough for most systems and the safest local entry to start with.",
+    };
+  }
+  if (sizeGB <= 5.2) {
+    return {
+      recommended: memory === null || memory >= 8,
+      label: memory === null || memory >= 8 ? "Recommended" : undefined,
+      reason: "Balanced size for mid-range machines with more headroom.",
+    };
+  }
+  return {
+    recommended: memory !== null && memory >= 16,
+    label: memory !== null && memory >= 16 ? "Recommended" : undefined,
+    reason: "Large local model that fits best on higher-memory systems.",
+  };
+}
+
+function isLocalModelReady(status?: AssetStatus): boolean {
+  return !!(status?.downloaded && status?.verified);
+}
 
 export function SettingsScreen({
   settings,
@@ -66,6 +246,7 @@ export function SettingsScreen({
   onClose,
   onSave,
 }: SettingsScreenProps) {
+  const cachedLocalModelCatalog = useMemo(loadLocalModelCatalogCache, []);
   const [activeSection, setActiveSection] = useState<SettingsSection>(initialSection);
   const [email, setEmail] = useState("dev@matemium.app");
   const [password, setPassword] = useState("test");
@@ -83,8 +264,26 @@ export function SettingsScreen({
   const [modelSearch, setModelSearch] = useState("");
   const [modelBusyProvider, setModelBusyProvider] = useState<string | null>(null);
   const [modelError, setModelError] = useState<string | null>(null);
+  const [localModelCatalog, setLocalModelCatalog] = useState<LocalModelCatalogEntry[]>(
+    () => cachedLocalModelCatalog?.entries ?? [],
+  );
+  const [localModelCatalogQuery, setLocalModelCatalogQuery] = useState(
+    () => cachedLocalModelCatalog?.query ?? "",
+  );
+  const [localModelCatalogLoading, setLocalModelCatalogLoading] = useState(false);
+  const [localModelCatalogLoaded, setLocalModelCatalogLoaded] = useState(
+    () => !!cachedLocalModelCatalog,
+  );
+  const [localModelCatalogError, setLocalModelCatalogError] = useState<string | null>(null);
+  const [localModelBusyId, setLocalModelBusyId] = useState<string | null>(null);
 
-  const [assetStatuses, setAssetStatuses] = useState<Record<string, { downloaded: boolean; verified: boolean; progress?: number; error?: string; paused?: boolean }>>({});
+  const [assetStatuses, setAssetStatuses] = useState<Record<string, AssetStatus>>({});
+  const systemProfile = useMemo(readLocalSystemProfile, []);
+  const localModelRecommendations = useMemo(() => ({
+    "llm-qwen-coder-3b-q4": recommendLocalModel("llm-qwen-coder-3b-q4", systemProfile),
+    "llm-qwen-coder-7b-q4": recommendLocalModel("llm-qwen-coder-7b-q4", systemProfile),
+    "llm-llama-8b-q4": recommendLocalModel("llm-llama-8b-q4", systemProfile),
+  }), [systemProfile]);
 
   useEffect(() => {
     setActiveSection(initialSection);
@@ -92,16 +291,12 @@ export function SettingsScreen({
 
   const refreshStatuses = async () => {
     try {
-      const qwen3b = await api.getAssetStatus("llm-qwen-coder-3b-q4");
-      const qwen7b = await api.getAssetStatus("llm-qwen-coder-7b-q4");
-      const llama8b = await api.getAssetStatus("llm-llama-8b-q4");
-
-      const next: typeof assetStatuses = {};
-      if (qwen3b?.[0]) next["llm-qwen-coder-3b-q4"] = qwen3b[0];
-      if (qwen7b?.[0]) next["llm-qwen-coder-7b-q4"] = qwen7b[0];
-      if (llama8b?.[0]) next["llm-llama-8b-q4"] = llama8b[0];
-
-      setAssetStatuses(prev => ({ ...prev, ...next }));
+      const statuses = await api.getAssetStatus();
+      const next: Record<string, AssetStatus> = {};
+      statuses.forEach((status) => {
+        next[status.id] = status;
+      });
+      setAssetStatuses(next);
     } catch (e) {
       console.error("Failed to fetch asset statuses", e);
     }
@@ -114,23 +309,37 @@ export function SettingsScreen({
     void import("@tauri-apps/api/event").then(({ listen }) => {
       listen("asset-progress", (event: any) => {
         const payload = event.payload as { id: string; pct: number; message: string };
-        if (["llm-qwen-coder-3b-q4", "llm-qwen-coder-7b-q4", "llm-llama-8b-q4"].includes(payload.id)) {
-          setAssetStatuses(prev => ({
-            ...prev,
-            [payload.id]: {
-              downloaded: payload.pct === 100 && payload.message === "complete",
-              verified: payload.pct === 100 && payload.message === "complete",
-              progress: payload.pct,
-              error: payload.message.startsWith("failed") ? payload.message : undefined,
-              paused: payload.message === "paused",
-            }
-          }));
-        }
+        setAssetStatuses(prev => ({
+          ...prev,
+          [payload.id]: {
+            id: payload.id,
+            display_name: prev[payload.id]?.display_name,
+            asset_type: prev[payload.id]?.asset_type,
+            downloaded: payload.pct === 100 && payload.message === "complete",
+            verified: payload.pct === 100 && payload.message === "complete",
+            path: prev[payload.id]?.path,
+            size: prev[payload.id]?.size,
+            progress: payload.pct,
+            error: payload.message.startsWith("failed") ? payload.message : undefined,
+            paused: payload.message === "paused",
+            source_url: prev[payload.id]?.source_url,
+            expected_sha256: prev[payload.id]?.expected_sha256,
+            install_path: prev[payload.id]?.install_path,
+            extract: prev[payload.id]?.extract,
+            extract_format: prev[payload.id]?.extract_format,
+          }
+        }));
       }).then(fn => { unlisten = fn; });
     });
 
     return () => { unlisten?.(); };
   }, []);
+
+  useEffect(() => {
+    if (activeSection === "ai" && !localModelCatalogLoaded && localModelCatalog.length === 0) {
+      void handleRefreshLocalModelCatalog(localModelCatalogQuery);
+    }
+  }, [activeSection, localModelCatalog.length, localModelCatalogLoaded, localModelCatalogQuery]);
 
   const handleStartDownload = async (modelId: string) => {
     try {
@@ -347,6 +556,14 @@ export function SettingsScreen({
         return settings.groqApiKey ?? null;
       case "xai":
         return settings.xaiApiKey ?? null;
+      case "cerebras":
+        return settings.cerebrasApiKey ?? null;
+      case "github":
+        return settings.githubApiKey ?? null;
+      case "mistral":
+        return settings.mistralApiKey ?? null;
+      case "gemini":
+        return settings.geminiApiKey ?? null;
       default:
         return null;
     }
@@ -362,6 +579,14 @@ export function SettingsScreen({
         return settings.groqConnectedAt ?? null;
       case "xai":
         return settings.xaiConnectedAt ?? null;
+      case "cerebras":
+        return settings.cerebrasConnectedAt ?? null;
+      case "github":
+        return settings.githubConnectedAt ?? null;
+      case "mistral":
+        return settings.mistralConnectedAt ?? null;
+      case "gemini":
+        return settings.geminiConnectedAt ?? null;
       default:
         return null;
     }
@@ -387,6 +612,18 @@ export function SettingsScreen({
     } else if (providerId === "xai") {
       next.xaiApiKey = key;
       next.xaiConnectedAt = connectedAt;
+    } else if (providerId === "cerebras") {
+      next.cerebrasApiKey = key;
+      next.cerebrasConnectedAt = connectedAt;
+    } else if (providerId === "github") {
+      next.githubApiKey = key;
+      next.githubConnectedAt = connectedAt;
+    } else if (providerId === "mistral") {
+      next.mistralApiKey = key;
+      next.mistralConnectedAt = connectedAt;
+    } else if (providerId === "gemini") {
+      next.geminiApiKey = key;
+      next.geminiConnectedAt = connectedAt;
     }
     return next;
   };
@@ -483,6 +720,65 @@ export function SettingsScreen({
     }
   };
 
+  const handleRefreshConnectedProviderModels = async () => {
+    const connected = PROVIDERS.filter((item) => !!providerApiKey(item.id));
+    if (!connected.length) {
+      setModelError("Connect at least one provider before refreshing model catalogs.");
+      return;
+    }
+    setModelError(null);
+    setModelBusyProvider("all");
+    const failures: string[] = [];
+    try {
+      for (const provider of connected) {
+        try {
+          await api.providerModelsList(provider.id, true);
+        } catch (error) {
+          failures.push(`${provider.name}: ${formatError(error)}`);
+        }
+      }
+      onChange(await api.settingsGet());
+      if (failures.length) {
+        setModelError(failures.join("  "));
+      }
+    } finally {
+      setModelBusyProvider(null);
+    }
+  };
+
+  const handleRefreshLocalModelCatalog = async (query = localModelCatalogQuery) => {
+    setLocalModelCatalogLoading(true);
+    setLocalModelCatalogError(null);
+    try {
+      const entries = await api.localModelCatalogList(query.trim() || undefined);
+      setLocalModelCatalog(entries);
+      setLocalModelCatalogQuery(query);
+      saveLocalModelCatalogCache({ query, entries });
+    } catch (error) {
+      setLocalModelCatalogError(formatError(error));
+    } finally {
+      setLocalModelCatalogLoaded(true);
+      setLocalModelCatalogLoading(false);
+    }
+  };
+
+  const handleInstallLocalModel = async (entry: LocalModelCatalogEntry) => {
+    if (isLocalModelReady(assetStatuses[entry.assetId]) || entry.installed) {
+      return;
+    }
+    setModelError(null);
+    setLocalModelBusyId(entry.assetId);
+    try {
+      await api.localModelInstall(entry);
+      await refreshStatuses();
+      await handleRefreshLocalModelCatalog();
+    } catch (error) {
+      setLocalModelCatalogError(formatError(error));
+    } finally {
+      setLocalModelBusyId(null);
+    }
+  };
+
   const updateProviderPinnedModels = async (providerId: string, pinned: string[]) => {
     const currentProviderModels = settings.providerModels ?? {};
     const currentState = currentProviderModels[providerId] ?? {};
@@ -514,7 +810,16 @@ export function SettingsScreen({
 
   const displayedProviderModels = (providerId: string, catalog: ProviderModel[]) => {
     const defaults = DEFAULT_PINNED_MODELS[providerId] ?? [];
-    const merged = [...defaults, ...catalog].filter(
+    const pinnedMissingFromCatalog = pinnedModelIds(settings, providerId)
+      .filter((id) => !catalog.some((model) => model.id === id))
+      .map((id) => defaults.find((model) => model.id === id) ?? {
+        id,
+        name: modelDisplayName(id),
+        provider: providerId,
+        badges: ["Pinned"],
+      });
+    const source = catalog.length ? [...pinnedMissingFromCatalog, ...catalog] : defaults;
+    const merged = source.filter(
       (model, index, list) => list.findIndex((candidate) => candidate.id === model.id) === index,
     );
     const query = modelSearch.trim().toLowerCase();
@@ -873,10 +1178,20 @@ export function SettingsScreen({
         return (
           <div className="settings-section settings-section-wide">
             <div className="settings-section-header">
-              <h3>Model Picker</h3>
-              <p className="settings-section-desc">
-                Choose which cloud models appear in the chat dropdown. Catalogs and pinned models are stored locally on this computer.
-              </p>
+              <div>
+                <h3>Model Browser</h3>
+                <p className="settings-section-desc">
+                  Fetch provider model catalogs, keep them cached locally, and pin the models that should appear in the chat picker across connected providers.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn"
+                disabled={modelBusyProvider === "all"}
+                onClick={() => void handleRefreshConnectedProviderModels()}
+              >
+                {modelBusyProvider === "all" ? "Refreshing catalogs..." : "Refresh connected catalogs"}
+              </button>
             </div>
 
             <div className="settings-model-management-grid">
@@ -887,6 +1202,7 @@ export function SettingsScreen({
                     const active = selectedModelProvider === item.id;
                     const connected = !!providerApiKey(item.id);
                     const count = pinnedModelIds(settings, item.id).length;
+                    const catalogCount = providerModelState(settings, item.id).catalog?.length ?? 0;
                     return (
                       <button
                         key={item.id}
@@ -899,7 +1215,7 @@ export function SettingsScreen({
                           {connected && <span className="settings-provider-dot" />}
                         </div>
                         <div className="settings-provider-item-meta">
-                          {connected ? `${count} in picker` : "Connect provider first"}
+                          {connected ? `${count} pinned · ${catalogCount} cached` : "Connect provider first"}
                         </div>
                       </button>
                     );
@@ -913,14 +1229,14 @@ export function SettingsScreen({
                     <div>
                       <div className="settings-provider-name">{provider.name}</div>
                       <div className="settings-hint">
-                        Pinned models appear in the chat dropdown when this provider is active.
+                        Pinned models from every connected provider appear in the chat dropdown.
                       </div>
                     </div>
                     {providerConnected ? (
                       <button
                         type="button"
                         className="btn"
-                        disabled={refreshingModels}
+                        disabled={refreshingModels || modelBusyProvider === "all"}
                         onClick={() => void handleRefreshProviderModels(provider.id)}
                       >
                         {refreshingModels ? "Refreshing..." : catalog.length ? "Refresh catalog" : "Browse catalog"}
@@ -1025,85 +1341,169 @@ export function SettingsScreen({
       }
       case "ai":
         return (
-          <div className="settings-section" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="settings-section settings-section-wide settings-offline-ai-section" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div className="settings-section-header">
               <h3>AI &amp; LLM</h3>
               <p className="settings-section-desc">
                 Choose how the AI assistant and generation features work.
               </p>
+              <div className="settings-hint">
+                Detected device: {formatSystemProfile(systemProfile)}. Recommendations stay conservative and only change labels here.
+              </div>
             </div>
 
-            {/* Local model asset management */}
-            <div className="settings-card">
-              <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-                Local model downloads <span style={{
-                  borderRadius: 4,
-                  padding: "2px 6px",
-                  fontSize: 10,
-                  background: "var(--accent-dim, rgba(6, 182, 212, 0.15))",
-                  color: "var(--accent-color, #06b6d4)",
-                  fontWeight: 700,
-                  textTransform: "uppercase"
-                }}>Offline Assets</span>
+            <div className="settings-card settings-offline-ai-card">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                    Local model downloads <span style={{
+                      borderRadius: 4,
+                      padding: "2px 6px",
+                      fontSize: 10,
+                      background: "var(--accent-dim, rgba(6, 182, 212, 0.15))",
+                      color: "var(--accent-color, #06b6d4)",
+                      fontWeight: 700,
+                      textTransform: "uppercase"
+                    }}>Offline Assets</span>
+                  </div>
+                  <div className="settings-hint" style={{ marginTop: 2 }}>
+                    Built-in local assets and official Hugging Face GGUF models are shown together.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={localModelCatalogLoading}
+                  onClick={() => void handleRefreshLocalModelCatalog()}
+                >
+                  {localModelCatalogLoading ? "Loading..." : "Refresh catalog"}
+                </button>
               </div>
-              <div className="settings-hint" style={{ marginTop: 2 }}>
-                Download local models here. Choose Local or Cloud, and pick the active model, from the chat header.
+
+              <div className="settings-model-toolbar" style={{ marginTop: 12 }}>
+                <input
+                  className="settings-input"
+                  value={localModelCatalogQuery}
+                  onChange={(event) => setLocalModelCatalogQuery(event.target.value)}
+                  placeholder="Search local models"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void handleRefreshLocalModelCatalog();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={localModelCatalogLoading}
+                  onClick={() => void handleRefreshLocalModelCatalog()}
+                >
+                  Search
+                </button>
               </div>
 
-              <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-                {/* Model 1: Qwen 3B */}
-                <div className="settings-model-row" style={{
-                  border: "1px solid var(--border-color)",
-                  borderRadius: 6,
-                  padding: 12,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>Lite Tier: Qwen-2.5-Coder-3B-Instruct (1.9 GB)</div>
-                    <div className="settings-hint" style={{ fontSize: 11 }}>
-                      Optimized for low RAM (4GB+) and CPU-only devices. Ultra-fast generation.
-                    </div>
-                  </div>
-                  {renderModelStatus("llm-qwen-coder-3b-q4")}
-                </div>
+              {localModelCatalogError && <p className="settings-error">{localModelCatalogError}</p>}
 
-                {/* Model 2: Qwen 7B */}
-                <div className="settings-model-row" style={{
-                  border: "1px solid var(--border-color)",
-                  borderRadius: 6,
-                  padding: 12,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>Balanced Tier: Qwen-2.5-Coder-7B-Instruct (4.7 GB)</div>
-                    <div className="settings-hint" style={{ fontSize: 11 }}>
-                      Perfect math layouts and coding correctness. Recommended for dedicated GPUs and M1/M2/M3 Macs.
+              <div className="settings-model-catalog settings-model-catalog-large" style={{ marginTop: 12 }}>
+                {BUILTIN_LOCAL_MODELS.map((model) => {
+                  const recommendation = localModelRecommendations[model.id as keyof typeof localModelRecommendations];
+                  return (
+                    <div key={model.id} className="settings-model-catalog-row settings-local-model-row">
+                      <div className="settings-model-catalog-main">
+                        <div className="settings-model-name">{model.name}</div>
+                        <div className="settings-model-meta">{model.meta}</div>
+                        <div className="settings-hint" style={{ fontSize: 11 }}>{model.description}</div>
+                        {recommendation?.recommended ? (
+                          <div className="settings-model-badges">
+                            <span className="settings-model-badge settings-model-badge-recommended" title={recommendation.reason}>
+                              {recommendation.label ?? "Recommended"}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div>{renderModelStatus(model.id)}</div>
                     </div>
-                  </div>
-                  {renderModelStatus("llm-qwen-coder-7b-q4")}
-                </div>
-
-                {/* Model 3: Llama 8B */}
-                <div className="settings-model-row" style={{
-                  border: "1px solid var(--border-color)",
-                  borderRadius: 6,
-                  padding: 12,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>Elite Tier: Llama-3-8B-Instruct (4.9 GB)</div>
-                    <div className="settings-hint" style={{ fontSize: 11 }}>
-                      Exceptional pedagogy and scripting style. Best for top-tier workstations.
+                  );
+                })}
+                {Object.values(assetStatuses)
+                  .filter((status) => status.asset_type === "local_model")
+                  .filter((status) => !BUILTIN_LOCAL_MODELS.some((model) => model.id === status.id))
+                  .filter((status) => !localModelCatalog.some((entry) => entry.assetId === status.id))
+                  .map((status) => (
+                    <div key={status.id} className="settings-model-catalog-row settings-local-model-row">
+                      <div className="settings-model-catalog-main">
+                        <div className="settings-model-name">{status.display_name ?? modelDisplayName(status.id)}</div>
+                        <div className="settings-model-id">{status.id}</div>
+                        <div className="settings-model-meta">
+                          {typeof status.size === "number" ? formatBytes(status.size) : "Local model"}
+                        </div>
+                        {isLocalModelReady(status) ? (
+                          <div className="settings-model-badges">
+                            <span className="settings-model-badge">Installed</span>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div>{renderModelStatus(status.id)}</div>
                     </div>
+                  ))}
+                {localModelCatalog.map((entry) => {
+                  const status = assetStatuses[entry.assetId];
+                  const recommended = recommendBrowseModel(entry, systemProfile);
+                  const ready = isLocalModelReady(status) || entry.installed;
+                  const installing = localModelBusyId === entry.assetId || (typeof status?.progress === "number" && !ready);
+                  return (
+                    <div key={entry.assetId} className="settings-model-catalog-row settings-local-model-row">
+                      <div className="settings-model-catalog-main">
+                        <div className="settings-model-name">{entry.displayName}</div>
+                        <div className="settings-model-id">{entry.repoId} · {entry.fileName}</div>
+                        <div className="settings-model-meta">
+                          {formatBytes(entry.sizeBytes)}{entry.quantization ? ` · ${entry.quantization}` : ""}
+                          {entry.contextLength ? ` · ${Math.round(entry.contextLength / 1000)}k ctx` : ""}
+                          {entry.parameterSize ? ` · ${entry.parameterSize}` : ""}
+                        </div>
+                        <div className="settings-model-badges">
+                          {recommended.recommended ? (
+                            <span className="settings-model-badge settings-model-badge-recommended" title={recommended.reason}>
+                              Recommended
+                            </span>
+                          ) : null}
+                          {ready ? <span className="settings-model-badge">Installed</span> : null}
+                          {entry.license ? <span className="settings-model-badge">{entry.license}</span> : null}
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
+                        {status ? (
+                          renderModelStatus(entry.assetId)
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            disabled={ready || installing}
+                            onClick={() => void handleInstallLocalModel(entry)}
+                          >
+                            {ready ? "Installed" : installing ? "Installing..." : "Install"}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => window.open(entry.sourceRepoUrl, "_blank", "noreferrer")}
+                        >
+                          Open repo
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {localModelCatalogLoading && !localModelCatalog.length ? (
+                  <div className="settings-empty-models">Loading local model catalog...</div>
+                ) : null}
+                {!localModelCatalogLoading && !localModelCatalog.length ? (
+                  <div className="settings-empty-models">
+                    Search the catalog to browse more local GGUF models.
                   </div>
-                  {renderModelStatus("llm-llama-8b-q4")}
-                </div>
+                ) : null}
               </div>
             </div>
 

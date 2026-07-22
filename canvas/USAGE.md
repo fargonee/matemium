@@ -72,12 +72,16 @@ Run it:
 
 **Layout & composition**
 
+- `add_tape("name")` — create a secondary tape; returns a `TapeBuilder`
+- `tape.add_heading(...)`, `tape.add_body(...)`, `tape.add_math(...)`, etc. — author directly into that tape
 - `add_flex_row([...], gap=..., justify_content=..., align_items=...)`
 - `add_flex_column([...], gap=...)`
 - **Each flex item is its own timeline element** (separate id, individual `add_camera_focus`)
 - `builder.last_flex_ids` — ids just placed by the latest flex row/column
 - `element_spec(CanvasElement(...))` — any custom element in a flex row (topic code uses this from project `helpers.py`)
 - `text_spec`, `math_spec`, `observation_spec` — flex item dicts
+
+Multiple tapes do not require manual scene choreography. When the timeline reveals an element from a different tape, `CanvasScene` automatically switches the active tape context: inactive tape content is hidden/dimmed and the camera returns to tape-scroll view for the active tape. Use this for compare/contrast lessons instead of hand-authored drag/drop, stacking, or lift animations.
 
 **Camera & focus**
 
@@ -99,9 +103,12 @@ Old pure-tape videos continue to work exactly as before (they implicitly use tap
 
 Authoring examples:
 - `add_object("Solid3D", position=(x,y,z), ...)`
-- `set_tape_pose(rotation=(30,0,0))`
-- `add_camera_keyframe(target=ObjectAnchor("my_tape"))`          # 3D view of the tape plane
+- `left = add_tape("left")`; `right = add_tape("right")`; then author with `left.add_body(...)` / `right.add_body(...)`
+- reveal content from `left`, then `right`, then `left` again; the engine handles the visible tape switch automatically
+- `add_camera_keyframe(target=ObjectAnchor("my_tape"))`          # 3D view of the tape plane, when available
 - `add_camera_keyframe(target=TapeScroll("root_tape", local_y=5))` # enter classic tape scroll + reveal
+
+`add_solid_lift(...)` is specifically for raising 3D solids above a tape for orbit/inspection. Do not use it as a tape switching or tape stacking mechanism.
 
 See `3D-WORLD-DESCRIPTION.md` for the mental model.
 

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matemium.app/schemas/roadmap.schema.json",
+  "title": "MatemiumProductionRoadmap",
+  "type": "object",
+  "required": ["schema_version", "production_path", "current_phase", "phases", "invalidated_phases", "blockers"],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "production_path": { "type": ["string", "null"], "enum": [null, "mute_video", "tts", "custom_audio"] },
+    "current_phase": { "type": "string", "minLength": 1 },
+    "phases": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "status", "progress", "notes"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "title": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["todo", "in_progress", "done"] },
+          "progress": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "notes": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": true
+      }
+    },
+    "invalidated_phases": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "blockers": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}
