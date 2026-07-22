@@ -29,8 +29,8 @@ def create_app() -> FastAPI:
         title="Matemium Cloud",
         version=__version__,
         description=(
-            "Cloud bridge for Matemium — Supabase auth, Lemon Squeezy billing, "
-            "entitlements, and chat LLM proxy for the desktop client and website."
+            "Cloud bridge for Matemium — Supabase auth, profile sync, "
+            "and BYO chat helpers for the desktop client and website."
         ),
     )
 

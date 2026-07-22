@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Optional
 
@@ -46,6 +47,8 @@ class FSApplyDiffPatchTool(BaseTool):
         except Exception as e:
             return f"Error reading file: {e}"
 
+        before_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()[:12]
+
         # Import apply_patch programmatically
         try:
             from matemium.agent.writer import apply_patch
@@ -58,7 +61,13 @@ class FSApplyDiffPatchTool(BaseTool):
         except Exception as e:
             return f"Error writing updated file: {e}"
 
-        return f"Successfully applied patch to {args.file_path}."
+        after_hash = hashlib.sha256(updated.encode("utf-8")).hexdigest()[:12]
+        return (
+            f"Successfully applied patch to {args.file_path}. "
+            f"sha256: {before_hash} -> {after_hash}; "
+            f"remaining search occurrences: {updated.count(args.search)}; "
+            f"replacement occurrences: {updated.count(args.replace)}."
+        )
 
 
 class RunCompilerArgs(BaseModel):

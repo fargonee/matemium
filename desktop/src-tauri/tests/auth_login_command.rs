@@ -16,7 +16,9 @@ async fn server_healthy(base: &str) -> bool {
 fn sync_settings_server_url(paths: &AppPaths, base: &str) {
     let mut settings = paths.load_settings().expect("load settings");
     settings.server_url = base.to_string();
-    paths.save_settings(&settings).expect("save settings for test");
+    paths
+        .save_settings(&settings)
+        .expect("save settings for test");
 }
 
 #[tokio::test]
@@ -68,11 +70,16 @@ async fn auth_login_then_chat_sends_bearer_header() {
             messages: vec![ChatMessage {
                 role: "user".to_string(),
                 content: "add heading".to_string(),
+                references: None,
             }],
             project_id: None,
+            conversation_id: None,
             scenes_excerpt: None,
             llm_provider: None,
             use_personal_llm: None,
+            model: None,
+            use_autonomous_agent: None,
+            agent_runtime_version: None,
         },
     )
     .await

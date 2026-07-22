@@ -13,6 +13,8 @@ import type {
   Settings,
   SidecarEventPayload,
   VideoOrientation,
+  ChatCompletionResponse,
+  AgentTraceEntry,
 } from "./api/types";
 import "./App.css";
 import { ChatPanel } from "./components/ChatPanel";
@@ -20,7 +22,10 @@ import { CodeEditor, type CodeEditorHandle } from "./components/Editor";
 import { ProjectsLanding } from "./components/ProjectsLanding";
 import { CommunityGallery } from "./components/CommunityGallery";
 import { ObsidianLoadingScreen } from "./components/ObsidianLoadingScreen";
-import { ProjectSidebar, type SidebarView } from "./components/ProjectSidebar";
+import { ProjectSidebar, type WorkspaceItem } from "./components/ProjectSidebar";
+import { BriefJsonEditor, STRUCTURED_BRIEF_FILES } from "./components/BriefJsonEditor";
+import { OutputsExplorer } from "./components/OutputsExplorer";
+import { ProjectMediaLibrary } from "./components/ProjectMediaLibrary";
 import { MediaPreviewModal } from "./components/MediaPreviewModal";
 import { RenderModal } from "./components/RenderModal";
 import { SettingsScreen } from "./components/SettingsScreen";
@@ -29,6 +34,7 @@ import { ResizeHandle } from "./components/ResizeHandle";
 import { resolveBottomDockDefault, useBottomDockTab } from "./hooks/useBottomDockTab";
 import { usePanelLayout } from "./hooks/usePanelLayout";
 import { useSidecarEvents } from "./hooks/useSidecarEvents";
+import { pinnedModelOptions } from "./modelCatalog";
 import { applyCodeEdit } from "./utils/codeEdit";
 import { formatError, tailLines } from "./utils/errors";
 import { parseSections } from "./utils/sections";
@@ -54,7 +60,33 @@ import {
 } from "./utils/workspacePrefs";
 type StatusKind = "idle" | "ok" | "error" | "busy";
 
-const EMPTY_DIRTY: Record<ProjectFile, boolean> = { scenes: false, assets: false };
+const PROJECT_FILES: ProjectFile[] = ["scenes", "helpers", "passport", "description", "tape", "roadmap", "narration"];
+const EMPTY_CONTENTS: Record<ProjectFile, string> = {
+  scenes: "", helpers: "", passport: "", description: "", tape: "", roadmap: "", narration: "",
+};
+const EMPTY_DIRTY: Record<ProjectFile, boolean> = {
+  scenes: false, helpers: false, passport: false, description: false, tape: false, roadmap: false, narration: false,
+};
+const FILE_LABELS: Record<ProjectFile, string> = {
+  scenes: "scenes.py", helpers: "helpers.py", passport: "Passport", description: "Description",
+  tape: "Tape", roadmap: "Roadmap", narration: "Narration",
+};
+
+function projectFiles(opened: ProjectOpen): Record<ProjectFile, string> {
+  return Object.fromEntries(PROJECT_FILES.map((file) => [file, opened.files[file] ?? ""])) as Record<ProjectFile, string>;
+}
+
+function briefValidationErrors(files: Record<ProjectFile, string>): Partial<Record<ProjectFile, string>> {
+  const errors: Partial<Record<ProjectFile, string>> = {};
+  for (const file of ["passport", "roadmap"] as const) {
+    try {
+      JSON.parse(files[file]);
+    } catch {
+      errors[file] = "Invalid JSON";
+    }
+  }
+  return errors;
+}
 
 export default function App() {
   const inTauri = api.runningInTauri();
@@ -62,16 +94,18 @@ export default function App() {
   const appBodyRef = useRef<HTMLDivElement>(null);
   const editorBottomRef = useRef<HTMLDivElement>(null);
   const renderCancelledRef = useRef(false);
+  const activeChatRequestRef = useRef(0);
+  const chatCancelRequestedRef = useRef(false);
 
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [project, setProject] = useState<ProjectOpen | null>(null);
-  const [fileContents, setFileContents] = useState({ scenes: "", assets: "" });
+  const [fileContents, setFileContents] = useState<Record<ProjectFile, string>>(EMPTY_CONTENTS);
   const [dirtyFiles, setDirtyFiles] = useState(EMPTY_DIRTY);
   const [activeFile, setActiveFile] = useState<ProjectFile>(
     () => loadGlobalPrefs().activeFile,
   );
-  const [sidebarView, setSidebarView] = useState<SidebarView>(
-    () => loadGlobalPrefs().sidebarView,
+  const [activeWorkspaceItem, setActiveWorkspaceItem] = useState<WorkspaceItem>(
+    () => loadGlobalPrefs().activeFile,
   );
   const [newName, setNewName] = useState("");
   const [scenes, setScenes] = useState<string[]>([]);
@@ -84,6 +118,7 @@ export default function App() {
   const [status, setStatus] = useState("Ready");
   const [statusKind, setStatusKind] = useState<StatusKind>("idle");
   const [busy, setBusy] = useState(false);
+  const [chatBusy, setChatBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [linting, setLinting] = useState(false);
 
@@ -92,25 +127,30 @@ export default function App() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState("");
   const [pendingEdit, setPendingEdit] = useState<CodeEdit | null>(null);
-  const [chatProgressStep, setChatProgressStep] = useState<
+  const [, setChatProgressStep] = useState<
     "idle" | "preparing" | "retrieving" | "thinking" | "processing" | "refreshing"
   >("idle");
   const [chatContextMatches, setChatContextMatches] = useState<Array<{ file: string; score?: number }>>([]);
   const [appliedEditErrors, setAppliedEditErrors] = useState<LintDiagnostic[]>([]);
   const [uploadedReferences, setUploadedReferences] = useState<string[]>([]);
+  const [lastChatResponse, setLastChatResponse] = useState<ChatCompletionResponse | null>(null);
+  const [liveAgentTrace, setLiveAgentTrace] = useState<AgentTraceEntry[]>([]);
+  const liveAgentTraceKeysRef = useRef<Set<string>>(new Set());
 
   const [settings, setSettings] = useState<Settings>({
     serverUrl: config.serverUrl,
     apiToken: null,
     bottomDockDefault: "progress",
-    usePersonalLlm: false,
-    llmProvider: "openai",
+    usePersonalLlm: true,
+    llmProvider: "openrouter",
+    useAutonomousAgent: true,
   });
   const [llmProfile, setLlmProfile] = useState<LLMConfig | null>(null);
   const [pipeline, setPipeline] = useState<RenderPipelineState>(INITIAL_PIPELINE_STATE);
   const { tab: bottomDockTab, selectTab: selectBottomDockTab, focusProgress } =
     useBottomDockTab(resolveBottomDockDefault(settings));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialSection, setSettingsInitialSection] = useState<"general" | "models">("general");
   const [renderOpen, setRenderOpen] = useState(false);
   const [outputsRefreshToken, setOutputsRefreshToken] = useState(0);
   const [mediaPreview, setMediaPreview] = useState<MediaPreviewItem | null>(null);
@@ -252,13 +292,9 @@ export default function App() {
     return prefs.scene || sceneFallback || "";
   }, []);
 
-  const updateSidebarView = useCallback((view: SidebarView) => {
-    setSidebarView(view);
-    saveGlobalPrefs({ sidebarView: view });
-  }, []);
-
   const updateActiveFile = useCallback((file: ProjectFile) => {
     setActiveFile(file);
+    setActiveWorkspaceItem(file);
     saveGlobalPrefs({ activeFile: file });
   }, []);
 
@@ -309,6 +345,20 @@ export default function App() {
         payload.data.code ??
         JSON.stringify(payload.data);
       appendLog(`[${payload.event}] ${String(detail)}`);
+      if (payload.event === "agent_event") {
+        const entry = {
+          type: String(payload.data.event_type ?? "progress"),
+          summary: typeof payload.data.summary === "string" ? payload.data.summary : undefined,
+          details: payload.data.details && typeof payload.data.details === "object" ? payload.data.details as Record<string, unknown> : undefined,
+          sequence: typeof payload.data.sequence === "number" ? payload.data.sequence : undefined,
+          timestamp_ms: typeof payload.data.timestamp_ms === "number" ? payload.data.timestamp_ms : Date.now(),
+        };
+        const key = `${entry.sequence ?? "no-seq"}:${entry.type}:${entry.summary ?? ""}`;
+        if (!liveAgentTraceKeysRef.current.has(key)) {
+          liveAgentTraceKeysRef.current.add(key);
+          setLiveAgentTrace((previous) => [...previous.slice(-99), entry]);
+        }
+      }
       setPipeline((prev) => applySidecarEvent(prev, payload));
       if (
         payload.event === "render_started" ||
@@ -318,7 +368,7 @@ export default function App() {
       }
       if (payload.event === "render_complete") {
         setOutputsRefreshToken((n) => n + 1);
-        updateSidebarView("outputs");
+        setActiveWorkspaceItem("renders");
         const video =
           typeof payload.data.video === "string" ? payload.data.video : null;
         if (video) {
@@ -327,7 +377,7 @@ export default function App() {
         }
       }
     },
-    [appendLog, focusProgress, updateSidebarView],
+    [appendLog, focusProgress],
   );
 
   useSidecarEvents(handleSidecarEvent);
@@ -398,19 +448,30 @@ export default function App() {
   useEffect(() => {
     // we can also listen for asset-progress
     let unlistenAsset: (() => void) | undefined;
+    let unlistenSidecar: (() => void) | undefined;
     void import("@tauri-apps/api/event").then(({ listen }) => {
       listen("asset-progress", () => { void refreshReadiness(); }).then(fn => { unlistenAsset = fn; });
       listen("sidecar-event", (e: any) => {
         if (e.payload?.event === "loading_phase" || e.payload?.event === "status_update") {
           void refreshReadiness();
         }
-      }).then(() => {});
+      }).then(fn => { unlistenSidecar = fn; });
     });
-    return () => { unlistenAsset?.(); };
+    return () => {
+      unlistenAsset?.();
+      unlistenSidecar?.();
+    };
   }, [refreshReadiness]);
 
-  const isReady = (readiness?.fullyReady || readiness?.phase === "ready" || (readiness?.assetsReady && readiness?.engineReady)) && localModelReady;
-  const readinessMessage = !localModelReady 
+  const coreReady = Boolean(
+    readiness?.fullyReady
+      || readiness?.phase === "ready"
+      || (readiness?.assetsReady && readiness?.engineReady),
+  );
+  // A downloaded GGUF is required only when Aider uses the local model
+  // transport. Cloud-backed Aider still executes beside the workspace.
+  const isReady = coreReady && (!settings.useLocalLlm || localModelReady);
+  const readinessMessage = settings.useLocalLlm && !localModelReady
     ? (localModelStatusMsg || "Waiting for offline model...") 
     : (readiness?.message || "Checking readiness...");
 
@@ -441,17 +502,14 @@ export default function App() {
       }
       setSaving(true);
       try {
-        if (file === "scenes") {
-          await api.projectSave(projectId, fileContents.scenes);
-        } else {
-          await api.projectSaveAssets(projectId, fileContents.assets);
-        }
+        if (file === "scenes") await api.projectSave(projectId, fileContents.scenes);
+        else await api.projectSaveFile(projectId, file, fileContents[file]);
         setDirtyFiles((prev) => ({ ...prev, [file]: false }));
       } finally {
         setSaving(false);
       }
     },
-    [dirtyFiles, fileContents.assets, fileContents.scenes, project?.id, isReady, readinessMessage],
+    [dirtyFiles, fileContents, project?.id, isReady, readinessMessage],
   );
 
   const flushDirtyFiles = useCallback(
@@ -463,18 +521,15 @@ export default function App() {
       for (const file of pending) {
         setSaving(true);
         try {
-          if (file === "scenes") {
-            await api.projectSave(projectId, fileContents.scenes);
-          } else {
-            await api.projectSaveAssets(projectId, fileContents.assets);
-          }
+          if (file === "scenes") await api.projectSave(projectId, fileContents.scenes);
+          else await api.projectSaveFile(projectId, file, fileContents[file]);
           setDirtyFiles((prev) => ({ ...prev, [file]: false }));
         } finally {
           setSaving(false);
         }
       }
     },
-    [dirtyFiles, fileContents.assets, fileContents.scenes, project?.id],
+    [dirtyFiles, fileContents, project?.id],
   );
 
   const runLint = useCallback(
@@ -533,10 +588,7 @@ export default function App() {
 
       const opened = await api.projectOpen(projectId);
       setProject(opened);
-      setFileContents({
-        scenes: opened.scenes_content,
-        assets: opened.assets_content ?? "",
-      });
+      setFileContents(projectFiles(opened));
       setDirtyFiles(EMPTY_DIRTY);
       setDiagnostics([]);
       setPendingEdit(null);
@@ -553,7 +605,7 @@ export default function App() {
           const newConv: Conversation = {
             id: Date.now().toString(),
             title: "New Conversation",
-            createdAt: new Date().toISOString(),
+            created_at: new Date().toISOString(),
             messages: [],
           };
           await api.saveConversation(opened.id, newConv);
@@ -581,7 +633,7 @@ export default function App() {
     }
     await refreshProjects();
     setProject(null);
-    setFileContents({ scenes: "", assets: "" });
+    setFileContents(EMPTY_CONTENTS);
     setDirtyFiles(EMPTY_DIRTY);
     setScenes([]);
     setSelectedScene("");
@@ -654,7 +706,7 @@ export default function App() {
 
   useEffect(() => {
     if (!project) return;
-    const hasDirty = dirtyFiles.scenes || dirtyFiles.assets;
+    const hasDirty = Object.values(dirtyFiles).some(Boolean);
     if (!hasDirty) return;
 
     const timer = window.setTimeout(() => {
@@ -663,8 +715,8 @@ export default function App() {
           await saveFile("scenes");
           await runLint({ silent: true });
         }
-        if (dirtyFiles.assets) {
-          await saveFile("assets");
+        for (const file of PROJECT_FILES.filter((candidate) => candidate !== "scenes" && dirtyFiles[candidate])) {
+          await saveFile(file);
         }
       })();
     }, 800);
@@ -704,7 +756,7 @@ export default function App() {
       await api.projectDelete(projectId);
       if (project?.id === projectId) {
         setProject(null);
-        setFileContents({ scenes: "", assets: "" });
+        setFileContents(EMPTY_CONTENTS);
         setDirtyFiles(EMPTY_DIRTY);
         setScenes([]);
         setSelectedScene("");
@@ -759,7 +811,7 @@ export default function App() {
         outputDir,
       );
       setOutputsRefreshToken((n) => n + 1);
-      updateSidebarView("outputs");
+      setActiveWorkspaceItem("renders");
       await refreshProjects();
       const aspect = result.aspect_ratio ?? (orientation === "landscape" ? "16:9" : "9:16");
       const dims =
@@ -802,9 +854,7 @@ export default function App() {
     }
     try {
       setBusy(true);
-      const llmConfig = settings.usePersonalLlm
-        ? { tts_provider: settings.llmProvider, use_personal_llm: true }
-        : undefined;
+      const llmConfig = { tts_provider: settings.llmProvider || "openrouter", use_personal_llm: true };
       const res = await api.cloudGenerateAudio(text, "alloy", llmConfig);
       if (res.audioBase64) {
         appendLog(`[audio] generated ${text.length} chars`);
@@ -853,15 +903,23 @@ export default function App() {
       const newConv: Conversation = {
         id: Date.now().toString(),
         title: `Conversation ${conversations.length + 1}`,
-        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
         messages: [],
       };
       await api.saveConversation(project.id, newConv);
       setConversations((prev) => [newConv, ...prev]);
       setActiveConversationId(newConv.id);
       setChatMessages([]);
+      setChatInput("");
+      setPendingEdit(null);
+      setAppliedEditErrors([]);
+      setChatContextMatches([]);
+      setLastChatResponse(null);
+      setLiveAgentTrace([]);
+      setStatusMessage("Started new conversation", "ok");
     } catch (e) {
       console.error("Failed to start new conversation:", e);
+      setStatusMessage(formatError(e), "error");
     }
   }, [project, conversations.length]);
 
@@ -881,7 +939,7 @@ export default function App() {
           const newConv: Conversation = {
             id: Date.now().toString(),
             title: "New Conversation",
-            createdAt: new Date().toISOString(),
+            created_at: new Date().toISOString(),
             messages: [],
           };
           await api.saveConversation(project.id, newConv);
@@ -932,19 +990,52 @@ export default function App() {
 
   const getLlmConfigForCall = () => {
     const activeModel = settings.useLocalLlm ? settings.localLlmModel : settings.externalLlmModel;
-    if (settings.usePersonalLlm && settings.llmProvider) {
+    if (!settings.useLocalLlm) {
       return {
-        llm_provider: settings.llmProvider,
+        llm_provider: settings.llmProvider || "openrouter",
         use_personal_llm: true,
         model: activeModel,
         use_autonomous_agent: !!settings.useAutonomousAgent,
+        agent_runtime_version: "aider-v1",
       };
     }
     return {
       model: activeModel,
       use_autonomous_agent: !!settings.useAutonomousAgent,
+      agent_runtime_version: "aider-v1",
     };
   };
+
+  const handleCancelChat = useCallback(async () => {
+    if (!chatBusy) return;
+
+    chatCancelRequestedRef.current = true;
+    activeChatRequestRef.current += 1;
+    setChatBusy(false);
+    setBusy(false);
+    setChatProgressStep("idle");
+    setStatusMessage("Chat cancelled", "idle");
+    appendLog("[chat] cancelled by user");
+    setLiveAgentTrace((previous) => [
+      ...previous.slice(-99),
+      {
+        type: "terminal",
+        summary: "Chat task cancelled by user.",
+        details: { outcome: "cancelled" },
+        sequence: previous.length + 1,
+      },
+    ]);
+    setChatMessages((previous) => [
+      ...previous,
+      { role: "assistant", content: "Cancelled by user." },
+    ]);
+
+    try {
+      await api.sidecarCancel();
+    } catch (error) {
+      appendLog(`[chat-cancel-error] ${formatError(error)}`);
+    }
+  }, [appendLog, chatBusy, setStatusMessage]);
 
   const handleChatSend = async (promptOverride?: string) => {
     const inputContent = promptOverride !== undefined ? promptOverride : chatInput;
@@ -953,6 +1044,11 @@ export default function App() {
       setStatusMessage("App not ready — " + readinessMessage, "idle");
       return;
     }
+    const requestId = activeChatRequestRef.current + 1;
+    activeChatRequestRef.current = requestId;
+    chatCancelRequestedRef.current = false;
+    const isCurrentChatRequest = () =>
+      activeChatRequestRef.current === requestId && !chatCancelRequestedRef.current;
 
     const activeReferences = [...uploadedReferences];
     const userMessage: ChatMessage = {
@@ -968,12 +1064,25 @@ export default function App() {
     setUploadedReferences([]); // Clear the visual selection chips immediately!
     setChatContextMatches([]);
     setAppliedEditErrors([]);
+    liveAgentTraceKeysRef.current.clear();
+    setLiveAgentTrace([]);
 
     try {
       setBusy(true);
+      setChatBusy(true);
       setChatProgressStep("preparing");
       const llmConfig = getLlmConfigForCall();
-      let scenesExcerpt = fileContents.scenes;
+      if (settings.useAutonomousAgent && project) {
+        // Aider works against disk. Flush the editor first so its
+        // precondition is the exact content the user currently sees.
+        for (const file of PROJECT_FILES) {
+          if (file === "scenes") await api.projectSave(project.id, fileContents.scenes);
+          else await api.projectSaveFile(project.id, file, fileContents[file]);
+          if (!isCurrentChatRequest()) return;
+        }
+        setDirtyFiles(EMPTY_DIRTY);
+      }
+      const scenesExcerpt = fileContents.scenes;
       let finalMessages = [...nextMessages];
 
       // Inject reasoning level system prompts if medium or high to guide model behavior
@@ -985,7 +1094,7 @@ export default function App() {
       } else if (settings.reasoningLevel === "high") {
         finalMessages.push({
           role: "system",
-          content: "System instruction override: Perform highly rigorous mathematical verification, visual overlap analysis, and deep multi-step planning. Elaborate your reasoning exhaustively within <thought> tags before proposing any code edits."
+          content: "Perform rigorous mathematical verification, visual-overlap analysis, and careful planning. Return only concise conclusions, proposed actions, and evidence; do not expose private chain-of-thought."
         });
       }
 
@@ -995,10 +1104,16 @@ export default function App() {
         try {
           const searchFiles = [
             "scenes.py",
-            "assets.py",
+            "helpers.py",
+            "brief/passport.json",
+            "brief/description.md",
+            "brief/tape.md",
+            "brief/roadmap.json",
+            "brief/narration.md",
             ...activeReferences.map((name) => `references/${name}`),
           ];
           const rag = await api.sidecarRetrieve(project.id, inputContent.trim(), 6, searchFiles);
+          if (!isCurrentChatRequest()) return;
           if (rag.results && rag.results.length > 0) {
             const seen = new Set<string>();
             const matches: Array<{ file: string; score?: number }> = [];
@@ -1017,10 +1132,14 @@ export default function App() {
             const codebaseChunks = rag.results.filter((r: any) => !r.file.startsWith("references/"));
             const referenceChunks = rag.results.filter((r: any) => r.file.startsWith("references/"));
 
-            // Codebase context goes to scenesExcerpt as Python comments
+            // Retrieval context is supplemental. Keep scenesExcerpt as the exact
+            // current file so edit preconditions can be validated generically.
             const codebaseText = codebaseChunks.map((r: any) => `# File: ${r.file}\n${r.chunk}`).join("\n\n---\n\n") || "";
             if (codebaseText) {
-              scenesExcerpt = codebaseText + "\n\n# --- full scenes below if needed ---\n" + fileContents.scenes.slice(0, 3000);
+              finalMessages.push({
+                role: "system",
+                content: `Retrieved workspace excerpts (untrusted reference context; current scenes.py is supplied separately):\n${codebaseText}`,
+              });
             }
 
             // Reference context goes directly into finalMessages to guarantee the AI sees them clearly as prompt attachments
@@ -1028,7 +1147,9 @@ export default function App() {
               const referenceText = referenceChunks.map((r: any) => `[ATTACHMENT FILE: ${r.file}]\n${r.chunk}`).join("\n\n---\n\n");
               const enrichedUserContent = `### Active Reference Attachments:\n${referenceText}\n\n### User Question:\n${inputContent.trim()}`;
               
-              finalMessages[finalMessages.length - 1] = {
+              let userIndex = finalMessages.length - 1;
+              while (userIndex > 0 && finalMessages[userIndex].role !== "user") userIndex -= 1;
+              finalMessages[userIndex] = {
                 role: "user",
                 content: enrichedUserContent,
               };
@@ -1041,16 +1162,32 @@ export default function App() {
       const response = await api.cloudChat(
         finalMessages,
         project?.id,
+        activeConversationId,
         scenesExcerpt,
         llmConfig,
       );
+      if (!isCurrentChatRequest()) return;
       setChatProgressStep("processing");
+      setLastChatResponse(response);
       setChatMessages((prev) => [...prev, response.message]);
       if (response.code_edit) {
         setPendingEdit(response.code_edit);
       }
-      appendLog(`[chat] model=${response.model} stub=${response.stub ?? false} personal=${!!llmConfig}`);
-
+      if (settings.useAutonomousAgent && project) {
+        const refreshed = await api.projectOpen(project.id);
+        if (!isCurrentChatRequest()) return;
+        setProject(refreshed);
+        setFileContents(projectFiles(refreshed));
+        setDirtyFiles(EMPTY_DIRTY);
+        setPendingEdit(null);
+        const sceneResult = await api.sidecarListScenes(project.id);
+        if (!isCurrentChatRequest()) return;
+        setScenes(sceneResult.scenes ?? []);
+        if (selectedScene && !(sceneResult.scenes ?? []).includes(selectedScene)) {
+          setSelectedScene(sceneResult.scenes?.[0] ?? "");
+        }
+      }
+      appendLog(`[chat] model=${response.model} runtime=${response.agent_runtime_version ?? "single-turn"} source=${response.billing_mode ?? (settings.useLocalLlm ? "local" : "byo_external")} stub=${response.stub ?? false}`);
       // Consume and clear temporary reference files after successful message send
       if (project && activeReferences.length > 0) {
         for (const name of activeReferences) {
@@ -1062,22 +1199,32 @@ export default function App() {
         }
       }
 
-      // Refresh credits/profile after platform use
-      if (!llmConfig && settings.apiToken) {
+      // Refresh provider/profile metadata after external provider use.
+      if (!settings.useLocalLlm && settings.apiToken) {
         setChatProgressStep("refreshing");
         void refreshLlmProfile();
       }
     } catch (error) {
+      if (!isCurrentChatRequest() || chatCancelRequestedRef.current) {
+        return;
+      }
       const errMsg = formatError(error);
       setStatusMessage(errMsg, "error");
       appendLog(`[chat-error] ${errMsg}`);
-      // Handle insufficient credits nicely (402 from server)
-      if (errMsg.includes("402") || errMsg.toLowerCase().includes("credit")) {
-        setStatusMessage("Insufficient platform credits. Buy more on the web dashboard.", "error");
+      if (errMsg.toLowerCase().includes("openrouter free model quota")) {
+        try {
+          setSettings(await api.settingsGet());
+        } catch {}
+      }
+      if (errMsg.includes("402") || errMsg.toLowerCase().includes("api key")) {
+        setStatusMessage("Connect OpenRouter or add your provider API key in settings.", "error");
       }
     } finally {
-      setBusy(false);
-      setChatProgressStep("idle");
+      if (activeChatRequestRef.current === requestId) {
+        setBusy(false);
+        setChatBusy(false);
+        setChatProgressStep("idle");
+      }
     }
   };
 
@@ -1229,7 +1376,7 @@ export default function App() {
       setSettings(nextSettings);
       setSettingsOpen(false);
       setStatusMessage("Settings saved", "ok");
-      // Refresh LLM profile/credits when token or prefs saved
+      // Refresh provider profile when token or prefs are saved.
       if (nextSettings.apiToken) {
         void refreshLlmProfile();
       }
@@ -1240,10 +1387,16 @@ export default function App() {
   };
 
   const activeCode = fileContents[activeFile];
+  const activeIsProjectFile = PROJECT_FILES.includes(activeWorkspaceItem as ProjectFile);
+  const workspaceLabel = activeIsProjectFile
+    ? FILE_LABELS[activeWorkspaceItem as ProjectFile]
+    : activeWorkspaceItem === "renders"
+      ? "Output history"
+      : activeWorkspaceItem.replace("media-", "").replace(/^./, (letter) => letter.toUpperCase());
   const sections = parseSections(fileContents.scenes);
   const lintErrors = diagnostics.filter((d) => d.severity === "error").length;
   const lintWarnings = diagnostics.filter((d) => d.severity === "warning").length;
-  const hasUnsaved = dirtyFiles.scenes || dirtyFiles.assets;
+  const hasUnsaved = Object.values(dirtyFiles).some(Boolean);
 
   if (!inTauri) {
     return (
@@ -1288,15 +1441,22 @@ export default function App() {
         {llmProfile && (
           <span 
             className="llm-status" 
-            title="Click to refresh credits. Platform uses our tokens (margin priced). Personal = your keys from web."
+            title="Click to refresh provider status. External AI uses your connected provider key."
             onClick={() => void refreshLlmProfile()}
           >
-            {settings.usePersonalLlm ? 'Personal' : `Platform • ${llmProfile.llm_credits ?? '—'} credits`}
+            {settings.useLocalLlm ? "Local" : "BYO provider"}
             {llmProfile.llm_provider && ` (${llmProfile.llm_provider})`}
           </span>
         )}
 
-        <button type="button" className="btn btn-ghost" onClick={() => setSettingsOpen(true)}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => {
+            setSettingsInitialSection("general");
+            setSettingsOpen(true);
+          }}
+        >
           Settings
         </button>
         <span className={`status-pill ${statusKind}`}>{busy ? "Working…" : status}</span>
@@ -1334,15 +1494,16 @@ export default function App() {
               <>
                 <aside className="sidebar">
                   <ProjectSidebar
-                    view={sidebarView}
-                    onViewChange={updateSidebarView}
+                    projectName={project.name}
+                    activeItem={activeWorkspaceItem}
+                    dirtyFiles={dirtyFiles}
+                    validationErrors={briefValidationErrors(fileContents)}
                     sections={sections}
-                    projectId={project.id}
-                    busy={busy}
-                    outputsRefreshToken={outputsRefreshToken}
+                    onSelect={(item) => {
+                      if (PROJECT_FILES.includes(item as ProjectFile)) updateActiveFile(item as ProjectFile);
+                      else setActiveWorkspaceItem(item);
+                    }}
                     onJump={(line) => editorRef.current?.jumpToLine(line)}
-                    onStatus={(message, kind = "ok") => setStatusMessage(message, kind)}
-                    onPreviewMedia={setMediaPreview}
                   />
                 </aside>
                 <ResizeHandle
@@ -1359,22 +1520,8 @@ export default function App() {
             <>
               <div className="toolbar toolbar-editor">
                 <div className="editor-file-tabs">
-                  <button
-                    type="button"
-                    className={`editor-file-tab ${activeFile === "scenes" ? "active" : ""}`}
-                    onClick={() => updateActiveFile("scenes")}
-                  >
-                    scenes.py
-                    {dirtyFiles.scenes ? <span className="file-dirty">•</span> : null}
-                  </button>
-                  <button
-                    type="button"
-                    className={`editor-file-tab ${activeFile === "assets" ? "active" : ""}`}
-                    onClick={() => updateActiveFile("assets")}
-                  >
-                    assets.py
-                    {dirtyFiles.assets ? <span className="file-dirty">•</span> : null}
-                  </button>
+                  <span className="workspace-surface-title">{workspaceLabel}</span>
+                  {activeIsProjectFile && dirtyFiles[activeWorkspaceItem as ProjectFile] ? <span className="file-dirty">Unsaved</span> : null}
                 </div>
                 <button
                   type="button"
@@ -1421,16 +1568,35 @@ export default function App() {
               <div className="editor-bottom-region" ref={editorBottomRef}>
                 {layout.editorOpen ? (
                   <div className="editor-stage">
-                    <CodeEditor
-                      ref={editorRef}
-                      value={activeCode}
-                      diagnostics={activeFile === "scenes" ? diagnostics : []}
-                      onChange={(value) => {
+                    {activeWorkspaceItem === "renders" ? (
+                      <div className="workspace-browser-surface">
+                        <OutputsExplorer projectId={project.id} busy={busy} refreshToken={outputsRefreshToken} onStatus={(message, kind = "ok") => setStatusMessage(message, kind)} onPreviewMedia={setMediaPreview} />
+                      </div>
+                    ) : activeWorkspaceItem.startsWith("media-") ? (
+                      <ProjectMediaLibrary
+                        projectId={project.id}
+                        category={activeWorkspaceItem.replace("media-", "") as "images" | "video" | "audio"}
+                        onStatus={(message, kind = "ok") => setStatusMessage(message, kind)}
+                        onPreview={setMediaPreview}
+                      />
+                    ) : STRUCTURED_BRIEF_FILES.includes(activeFile) ? (
+                      <BriefJsonEditor file={activeFile as "passport" | "roadmap"} value={activeCode} readOnly={!isReady} onChange={(value) => {
                         setFileContents((prev) => ({ ...prev, [activeFile]: value }));
                         setDirtyFiles((prev) => ({ ...prev, [activeFile]: true }));
-                      }}
-                      readOnly={!isReady}
-                    />
+                      }} />
+                    ) : (
+                      <CodeEditor
+                        ref={editorRef}
+                        value={activeCode}
+                        language={activeFile === "scenes" || activeFile === "helpers" ? "python" : "markdown"}
+                        diagnostics={activeFile === "scenes" ? diagnostics : []}
+                        onChange={(value) => {
+                          setFileContents((prev) => ({ ...prev, [activeFile]: value }));
+                          setDirtyFiles((prev) => ({ ...prev, [activeFile]: true }));
+                        }}
+                        readOnly={!isReady}
+                      />
+                    )}
                     {!isReady && (
                       <div className="editor-locked-overlay">
                         <div className="locked-message">
@@ -1555,18 +1721,19 @@ export default function App() {
                 pendingEdit={pendingEdit}
                 input={chatInput}
                 busy={busy}
-                progressStep={chatProgressStep}
                 contextMatches={chatContextMatches}
                 validationErrors={appliedEditErrors}
                 onFixErrors={handleFixAppliedEditErrors}
                 onInputChange={setChatInput}
                 onSend={() => void handleChatSend()}
+                onCancel={() => void handleCancelChat()}
+                canCancel={chatBusy}
                 onApplyEdit={handleApplyEdit}
                 llmStatus={
                   llmProfile
-                    ? settings.usePersonalLlm
-                      ? `Personal (${settings.llmProvider || "BYO"})`
-                      : `Platform (${llmProfile.llm_credits ?? "?"} credits)`
+                    ? settings.useLocalLlm
+                      ? "Local"
+                      : `BYO (${settings.llmProvider || llmProfile.llm_provider || "OpenRouter"})`
                     : undefined
                 }
                 onGenerateAudio={() => void handleGenerateAudio()}
@@ -1578,8 +1745,17 @@ export default function App() {
                 onToggleLocalLlm={(val) => void handleUpdateSettingsField({ useLocalLlm: val })}
                 localLlmModel={settings.localLlmModel || "llm-qwen-coder-3b-q4"}
                 onLocalLlmModelChange={(val) => void handleUpdateSettingsField({ localLlmModel: val })}
-                externalLlmModel={settings.externalLlmModel || "gpt-4o-mini"}
-                onExternalLlmModelChange={(val) => void handleUpdateSettingsField({ externalLlmModel: val })}
+                externalLlmModel={settings.externalLlmModel || "openai/gpt-4o-mini"}
+                externalModelOptions={pinnedModelOptions(settings, settings.llmProvider || "openrouter")}
+                onManageExternalModels={() => {
+                  setSettingsInitialSection("models");
+                  setSettingsOpen(true);
+                }}
+                onExternalLlmModelChange={(val) => void handleUpdateSettingsField({
+                  externalLlmModel: val,
+                  ...(val === "openrouter/free" ? { llmProvider: "openrouter" } : {}),
+                })}
+                openRouterFreeDisabledUntil={settings.openrouterFreeDisabledUntil ?? null}
                 reasoningLevel={settings.reasoningLevel || "low"}
                 onReasoningLevelChange={(val) => void handleUpdateSettingsField({ reasoningLevel: val })}
                 downloadedModels={downloadedModels}
@@ -1588,6 +1764,19 @@ export default function App() {
                 onSelectConversation={handleSelectConversation}
                 onNewConversation={handleNewConversation}
                 onDeleteConversation={handleDeleteConversation}
+                autonomousEnabled={!!settings.useAutonomousAgent}
+                onToggleAutonomous={(enabled) => void handleUpdateSettingsField({ useAutonomousAgent: enabled })}
+                configuredRuntime="aider-v1"
+                responseMetadata={lastChatResponse ? {
+                  runtime: lastChatResponse.agent_runtime_version ?? "single-turn",
+                  model: lastChatResponse.model,
+                  provider: lastChatResponse.provider ?? (settings.useLocalLlm ? "local" : settings.llmProvider || "openrouter"),
+                  billingMode: lastChatResponse.billing_mode ?? (settings.useLocalLlm ? "local" : "byo_external"),
+                  requestId: lastChatResponse.request_id ?? lastChatResponse.id,
+                  stub: !!lastChatResponse.stub,
+                  trace: lastChatResponse.agent_trace ?? [],
+                } : undefined}
+                liveAgentTrace={liveAgentTrace}
               />
             </aside>
           </>
@@ -1599,6 +1788,7 @@ export default function App() {
         <SettingsScreen
           settings={settings}
           busy={busy}
+          initialSection={settingsInitialSection}
           onChange={setSettings}
           onClose={() => setSettingsOpen(false)}
           onSave={handleSaveSettings}

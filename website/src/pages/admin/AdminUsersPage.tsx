@@ -193,7 +193,7 @@ export function AdminUsersPage() {
               </div>
               <div>
                 <div className="text-text-subtle">Subscription</div>
-                <div>{detail.subscription?.status ?? "—"} / {detail.subscription?.plan ?? "—"}</div>
+                <div>Not applicable</div>
               </div>
             </div>
           )}
@@ -239,7 +239,7 @@ export function AdminUsersPage() {
                 value={editCalls} /* reuse state for demo; in full app add separate */
                 onChange={(e) => setEditCalls(parseInt(e.target.value || "0"))}
                 className="w-full rounded border border-border bg-bg px-3 py-1.5 text-sm"
-                title="Note: full credits editing available via direct PATCH in real use"
+                title="AI token editing is disabled; users bring their own provider keys."
               />
             </div>
           </div>

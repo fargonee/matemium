@@ -26,6 +26,8 @@ export function SettingsModal({
   const [password, setPassword] = useState("test");
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [openRouterBusy, setOpenRouterBusy] = useState(false);
+  const [openRouterError, setOpenRouterError] = useState<string | null>(null);
 
   if (!open) return null;
 
@@ -96,23 +98,65 @@ export function SettingsModal({
 
         {/* LLM section - beautiful and central to experience */}
         <div style={{ background: '#1a1f2a', padding: '10px 12px', borderRadius: 8, marginBottom: 14 }}>
-          <div style={{ fontWeight: 600, marginBottom: 6, fontSize: '0.85rem' }}>🤖 LLM Mode</div>
+          <div style={{ fontWeight: 600, marginBottom: 6, fontSize: '0.85rem' }}>LLM Mode</div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', marginBottom: 6 }}>
-            <input type="checkbox" checked={!!settings.usePersonalLlm} onChange={e => onChange({ ...settings, usePersonalLlm: e.target.checked })} />
-            Use my personal keys (BYO)
+            <input type="checkbox" checked disabled onChange={() => onChange({ ...settings, usePersonalLlm: true })} />
+            Use connected provider keys (BYO)
           </label>
-          <select value={settings.llmProvider || 'openai'} onChange={e => onChange({ ...settings, llmProvider: e.target.value })} style={{ width: '100%', marginBottom: 6 }}>
+          <select value={settings.llmProvider || 'openrouter'} onChange={e => onChange({ ...settings, llmProvider: e.target.value })} style={{ width: '100%', marginBottom: 6 }}>
+            <option value="openrouter">OpenRouter</option>
             <option value="openai">OpenAI / Compatible</option>
             <option value="groq">Groq</option>
             <option value="xai">xAI</option>
-            <option value="openrouter">OpenRouter</option>
           </select>
           <div style={{ fontSize: '0.7rem', color: '#9aa0a6' }}>
-            Manage keys &amp; buy credits in the web dashboard. Desktop just picks the mode.
+            External AI talks directly to OpenRouter from this computer. The API key stays in local desktop settings.
           </div>
-          <button type="button" className="btn" style={{ marginTop: 6, fontSize: '0.75rem' }} onClick={() => window.open(`${config.serverUrl}/dashboard`, '_blank')}>
-            Open web dashboard →
-          </button>
+          {settings.openrouterApiKey ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={openRouterBusy}
+              style={{ marginTop: 6, fontSize: '0.75rem' }}
+              onClick={async () => {
+                setOpenRouterBusy(true);
+                setOpenRouterError(null);
+                try {
+                  await api.openrouterDisconnect();
+                  onChange(await api.settingsGet());
+                } catch (error) {
+                  setOpenRouterError(formatError(error));
+                } finally {
+                  setOpenRouterBusy(false);
+                }
+              }}
+            >
+              Disconnect OpenRouter
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn"
+              disabled={openRouterBusy}
+              style={{ marginTop: 6, fontSize: '0.75rem' }}
+              onClick={async () => {
+                setOpenRouterBusy(true);
+                setOpenRouterError(null);
+                try {
+                  await api.openrouterPrepareConnect();
+                  await api.openrouterCompleteConnect();
+                  onChange(await api.settingsGet());
+                } catch (error) {
+                  setOpenRouterError(formatError(error));
+                } finally {
+                  setOpenRouterBusy(false);
+                }
+              }}
+            >
+              {openRouterBusy ? "Waiting for OpenRouter..." : "Connect OpenRouter Account"}
+            </button>
+          )}
+          {openRouterError && <p style={{ color: '#ff8a8a', fontSize: '0.7rem', marginTop: 4 }}>{openRouterError}</p>}
         </div>
 
         <div style={{ marginBottom: 10 }}>

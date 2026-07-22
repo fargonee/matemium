@@ -13,12 +13,15 @@ export interface ProjectOpen {
   description: string;
   scene_class: string;
   orientation: string;
-  scenes_path: string;
-  scenes_content: string;
-  assets_path: string;
-  assets_content: string;
+  files: Record<string, string>;
   project_json: unknown;
   renders_dir: string;
+}
+
+export interface ProjectMediaEntry {
+  name: string;
+  path: string;
+  bytes: number;
 }
 
 export interface LintDiagnostic {
@@ -82,9 +85,22 @@ export interface ChatCompletionResponse {
   code_edit?: CodeEdit | null;
   model: string;
   stub?: boolean;
+  agent_runtime_version?: string | null;
+  provider?: string | null;
+  billing_mode?: "byo_external" | "local" | null;
+  request_id?: string | null;
+  agent_trace?: AgentTraceEntry[];
 }
 
-// Extended for new LLM-agnostic server features (BYO keys + platform credits)
+export interface AgentTraceEntry {
+  type: string;
+  summary?: string;
+  details?: Record<string, unknown>;
+  sequence?: number;
+  timestamp_ms?: number;
+}
+
+// Extended for LLM-agnostic features (local OpenRouter keys + local models)
 export interface LLMConfig {
   llm_provider?: string | null;
   has_own_llm_key?: boolean;
@@ -97,9 +113,48 @@ export interface ChatCompletionRequest {
   messages: ChatMessage[];
   project_id?: string;
   scenes_excerpt?: string;
-  // Flags to select personal (BYO) or platform LLM (keys resolved server-side)
+  // Provider/model selection. Desktop resolves locally stored provider keys.
   llm_provider?: string;
   use_personal_llm?: boolean;
+}
+
+export type AgentRunStatus =
+  | "received"
+  | "understanding"
+  | "planning"
+  | "executing"
+  | "verifying"
+  | "recovering"
+  | "completed"
+  | "blocked"
+  | "failed"
+  | "cancelled";
+
+export interface AgentRunState {
+  run_id: string;
+  runtime_version: string;
+  project_id: string;
+  objective: string;
+  status: AgentRunStatus;
+  sequence: number;
+  plan: Array<{ id: string; text: string; status: string }>;
+  acceptance_criteria: string[];
+  terminal_reason?: string | null;
+  completion_manifest?: Record<string, unknown> | null;
+  budgets: Record<string, number>;
+  usage: Record<string, number>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentStreamEvent {
+  event_id: string;
+  run_id: string;
+  sequence: number;
+  schema_version: number;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface AudioSpeechRequest {
@@ -116,18 +171,56 @@ export interface Settings {
   serverUrl: string;
   apiToken?: string | null;
   bottomDockDefault?: BottomDockTab;
-  // LLM preferences - user chooses personal keys (BYO via web dashboard) or platform credits
+  // LLM preferences - user chooses connected provider keys or local models.
   usePersonalLlm?: boolean;
   llmProvider?: string;
+  openrouterApiKey?: string | null;
+  openrouterUserId?: string | null;
+  openrouterConnectedAt?: string | null;
+  openrouterFreeDisabledUntil?: string | null;
+  openaiApiKey?: string | null;
+  openaiConnectedAt?: string | null;
+  groqApiKey?: string | null;
+  groqConnectedAt?: string | null;
+  xaiApiKey?: string | null;
+  xaiConnectedAt?: string | null;
   useLocalLlm?: boolean;
   localLlmModel?: string;
   externalLlmModel?: string;
+  providerModels?: Record<string, ProviderModelSettings>;
   reasoningLevel?: string;
   useAutonomousAgent?: boolean;
+  agentRuntimeVersion?: string;
+}
+
+export interface ProviderModelSettings {
+  pinned?: string[];
+  catalog?: ProviderModel[];
+  fetchedAt?: string | null;
+}
+
+export interface ProviderModel {
+  id: string;
+  name: string;
+  provider: string;
+  contextLength?: number | null;
+  pricingLabel?: string | null;
+  badges?: string[];
 }
 
 export interface TokenResponse {
   accessToken: string;
+}
+
+export interface OpenRouterConnectionStatus {
+  connected: boolean;
+  userId?: string | null;
+  connectedAt?: string | null;
+}
+
+export interface OpenRouterConnectStart {
+  authUrl: string;
+  callbackUrl: string;
 }
 
 export interface SidecarEventPayload {
@@ -278,6 +371,6 @@ export interface AssetManifest {
 export interface Conversation {
   id: string;
   title: string;
-  createdAt: string;
+  created_at: string;
   messages: ChatMessage[];
 }

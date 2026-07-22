@@ -88,7 +88,7 @@ impl Drop for ActiveDownloadGuard {
 impl AssetManager {
     pub fn new(paths: AppPaths) -> Self {
         let mut state = Self::load_state(&paths).unwrap_or_default();
-        
+
         // Pre-populate assets from manifest and auto-detect existing downloads on startup
         let manifest = Self::get_manifest();
         let mut modified = false;
@@ -118,7 +118,12 @@ impl AssetManager {
             } else {
                 // Asset is not in the loaded state yet - add it
                 let (downloaded, verified, path, progress) = if exists_and_matches {
-                    (true, true, Some(final_path.to_string_lossy().to_string()), Some(100.0))
+                    (
+                        true,
+                        true,
+                        Some(final_path.to_string_lossy().to_string()),
+                        Some(100.0),
+                    )
                 } else {
                     (false, false, None, None)
                 };
@@ -160,9 +165,9 @@ impl AssetManager {
     /// Retrieve the authoritative asset manifest, resolving relative development paths
     /// or returning static fallbacks in production.
     pub fn get_manifest() -> Manifest {
-        let manifest_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../shared/assets/manifest.json");
-        
+        let manifest_path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../shared/assets/manifest.json");
+
         if manifest_path.exists() {
             if let Ok(raw) = fs::read_to_string(&manifest_path) {
                 if let Ok(manifest) = serde_json::from_str::<Manifest>(&raw) {
@@ -170,7 +175,7 @@ impl AssetManager {
                 }
             }
         }
-        
+
         // Static production-grade fallback manifest if local file resolution fails
         Manifest {
             version: "2026-07-12".to_string(),
@@ -286,7 +291,9 @@ impl AssetManager {
         if !is_active {
             let manifest = Self::get_manifest();
             if let Some(asset_spec) = manifest.assets.iter().find(|a| a.id == asset_id) {
-                let temp_file = self.paths.assets_root
+                let temp_file = self
+                    .paths
+                    .assets_root
                     .join(&asset_spec.install_path)
                     .parent()
                     .map(|p| p.join(format!("{}.download.tmp", asset_id)));
@@ -378,7 +385,7 @@ impl AssetManager {
         // Check if file already exists partially (for resuming)
         fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
         let temp_file = dest_dir.join(format!("{}.download.tmp", asset_id));
-        
+
         let mut downloaded: u64 = 0;
         if temp_file.is_file() {
             if let Ok(meta) = fs::metadata(&temp_file) {
@@ -667,12 +674,13 @@ fn verify_sha256(file_path: &Path, expected_sha: &str) -> Result<bool, String> {
 
     let mut file = File::open(file_path)
         .map_err(|e| format!("failed to open file for SHA256 validation: {e}"))?;
-    
+
     let mut hasher = Sha256::new();
     let mut buffer = [0; 65536]; // 64KB chunks for optimal IO latency
 
     loop {
-        let count = file.read(&mut buffer)
+        let count = file
+            .read(&mut buffer)
             .map_err(|e| format!("failed reading bytes for SHA256 validation: {e}"))?;
         if count == 0 {
             break;
@@ -691,8 +699,7 @@ mod tests {
     use super::*;
 
     fn mock_paths() -> AppPaths {
-        let temp_dir = std::env::temp_dir()
-            .join(format!("matemium-test-{}", uuid::Uuid::new_v4()));
+        let temp_dir = std::env::temp_dir().join(format!("matemium-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&temp_dir).unwrap();
 
         AppPaths {
@@ -701,6 +708,7 @@ mod tests {
             config_dir: temp_dir.join("config"),
             settings_path: temp_dir.join("settings.json"),
             assets_root: temp_dir.join("assets"),
+            agent_root: temp_dir.join("agent"),
         }
     }
 

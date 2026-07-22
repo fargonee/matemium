@@ -11,23 +11,31 @@ class ChatMessage(BaseModel):
 class ChatCompletionRequest(BaseModel):
     messages: list[ChatMessage]
     project_id: str | None = None
+    conversation_id: str | None = Field(
+        None,
+        description="Stable UI conversation identifier used for agent persistence.",
+    )
     scenes_excerpt: str | None = Field(
         None,
         description="Current scenes.py content or selection for context",
     )
-    # LLM selection (server resolves secrets from stored user or platform config)
+    # LLM selection retained for compatibility; desktop resolves local provider keys.
     llm_provider: str | None = Field(
-        None,
-        description="Which provider to use. If user has configured a personal key for this provider, it will be used (BYO). Otherwise platform pool.",
+        "openrouter",
+        description="User-owned provider to use. OpenRouter is the default.",
     )
     use_personal_llm: bool = Field(
-        False,
-        description="Explicitly request to use the user's stored personal LLM keys for the selected provider.",
+        True,
+        description="Deprecated compatibility flag. External AI runs from the user's device with local provider keys.",
     )
     model: str | None = Field(None, description="Optional model override for this call")
     use_autonomous_agent: bool = Field(
         False,
         description="Explicitly request to execute the autonomous multi-turn ReAct agent loop for this call.",
+    )
+    agent_runtime_version: str | None = Field(
+        None,
+        description="Versioned autonomous runtime selector. Omitted requests use the current compatible default.",
     )
 
 
@@ -44,6 +52,14 @@ class ChatCompletionResponse(BaseModel):
     code_edit: CodeEdit | None = None
     model: str
     stub: bool = False
+    agent_runtime_version: str | None = None
+    provider: str | None = None
+    billing_mode: str | None = Field(
+        None,
+        description="Compatibility field; current values are byo_external or local, never platform.",
+    )
+    request_id: str | None = None
+    agent_trace: list[dict[str, object]] = Field(default_factory=list)
 
 
 # ---------------- Audio / TTS ----------------
@@ -53,9 +69,9 @@ class AudioSpeechRequest(BaseModel):
     voice: str | None = "alloy"
     model: str | None = None
     speed: float | None = Field(None, ge=0.25, le=4.0)
-    # Selection (server resolves from stored config)
+    # Deprecated compatibility fields. Provider audio proxying is disabled server-side.
     tts_provider: str | None = None
-    use_personal_llm: bool = Field(False, description="Use user's stored TTS key for this provider if configured.")
+    use_personal_llm: bool = Field(False, description="Deprecated compatibility flag.")
 
 
 # Response is raw audio bytes. Route will return it with proper Content-Type (e.g. audio/mpeg).

@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 const links = [
   { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/usage", label: "Usage" },
-  { href: "/dashboard/billing", label: "Billing" },
   { href: "/dashboard/downloads", label: "Downloads" },
   { href: "/dashboard/account", label: "Account" },
 ];

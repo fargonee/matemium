@@ -94,7 +94,7 @@ Close, minimize, and maximize live **top-right** on Windows/Linux and **top-left
 | Python (sidecar) | `os.path.join`, `pathlib.Path` |
 | TypeScript (display only) | Paths from Rust invoke results — do not construct OS paths in the UI |
 
-Agent `edit_file` / workspace tools operate on **logical filenames** (`scenes.py`, `assets.py`); the Rust orchestrator resolves them against the workspace root with `PathBuf`.
+Agent workspace tools operate on approved logical paths such as `scenes.py`, `helpers.py`, and `brief/tape.md`; the Rust orchestrator resolves them against the workspace root with `PathBuf`.
 
 ## Summary
 

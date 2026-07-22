@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import gc
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -11,6 +12,18 @@ from typing import Any
 
 # Global cache for the in-process llama-cpp model instance to prevent double load
 _LLAMA_CPP_MODEL: Any = None
+_LLAMA_CPP_MODEL_PATH: str | None = None
+
+
+def unload_cached_model() -> None:
+    """Release an in-process GGUF before changing models or context sizing."""
+    global _LLAMA_CPP_MODEL, _LLAMA_CPP_MODEL_PATH
+    _LLAMA_CPP_MODEL = None
+    _LLAMA_CPP_MODEL_PATH = None
+    from .llm_worker import shutdown_worker
+
+    shutdown_worker()
+    gc.collect()
 
 
 class LocalInferenceRunner:
@@ -66,6 +79,37 @@ class LocalInferenceRunner:
         self.model_path = Path(model_path) if model_path else None
         self.ollama_url = "http://localhost:11434/api/chat"
 
+    @property
+    def model_name(self) -> str:
+        """Model identifier shared by local chat and native agent transports."""
+        if not self.model_path:
+            return "qwen2.5-coder:7b-instruct"
+        filename = self.model_path.name.lower()
+        if "3b" in filename:
+            return "qwen2.5-coder:3b-instruct"
+        if "llama" in filename or "8b" in filename:
+            return "llama3:8b-instruct"
+        return "qwen2.5-coder:7b-instruct"
+
+    @property
+    def context_window(self) -> int:
+        """Choose a context that fits the selected quantized model in memory.
+
+        The larger 7B/8B models do not need a 32K KV cache for ordinary local
+        chat turns. Keeping them at 18K prevents a multi-gigabyte allocation
+        spike on typical 16 GB PCs while leaving room for code context.
+        """
+        override = os.environ.get("MATEMIUM_LOCAL_LLM_CONTEXT_SIZE", "").strip()
+        if override:
+            try:
+                return max(18432, min(32768, int(override)))
+            except ValueError:
+                pass
+        filename = self.model_path.name.lower() if self.model_path else self.model_name.lower()
+        if "7b" in filename or "8b" in filename or "llama" in filename:
+            return 18432
+        return 32768
+
     def is_ollama_running(self) -> bool:
         """Check if Ollama service is reachable on localhost:11434."""
         try:
@@ -84,23 +128,15 @@ class LocalInferenceRunner:
     def _generate_via_ollama(self, system_prompt: str, user_prompt: str) -> str:
         """Send chat completion request to local Ollama API."""
         # Detect model from filename or use standard fallback qwen2.5-coder
-        model_name = "qwen2.5-coder:7b-instruct"
-        if self.model_path:
-            filename = self.model_path.name.lower()
-            if "3b" in filename:
-                model_name = "qwen2.5-coder:3b-instruct"
-            elif "llama" in filename or "8b" in filename:
-                model_name = "llama3:8b-instruct"
-
         payload = {
-            "model": model_name,
+            "model": self.model_name,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
             "options": {
                 "temperature": 0.1,  # Low temperature for highly deterministic math/coding
-                "num_ctx": 8192,     # Generous context window for code retrieval injection
+                "num_ctx": self.context_window,
             },
             "stream": False
         }
@@ -122,20 +158,12 @@ class LocalInferenceRunner:
 
     def _generate_via_ollama_messages(self, messages: list[dict[str, str]]) -> str:
         """Send chat completion request with custom conversation history to local Ollama API."""
-        model_name = "qwen2.5-coder:7b-instruct"
-        if self.model_path:
-            filename = self.model_path.name.lower()
-            if "3b" in filename:
-                model_name = "qwen2.5-coder:3b-instruct"
-            elif "llama" in filename or "8b" in filename:
-                model_name = "llama3:8b-instruct"
-
         payload = {
-            "model": model_name,
+            "model": self.model_name,
             "messages": messages,
             "options": {
                 "temperature": 0.1,
-                "num_ctx": 8192,
+                "num_ctx": self.context_window,
             },
             "stream": False
         }
@@ -155,62 +183,52 @@ class LocalInferenceRunner:
         except Exception as e:
             raise RuntimeError(f"Ollama generation request failed: {e}")
 
+    def _generate_via_ollama_schema(
+        self, system_prompt: str, user_prompt: str, schema: dict[str, Any]
+    ) -> str:
+        """Use Ollama's JSON-schema output constraint for the v2 protocol."""
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "format": schema,
+            "options": {"temperature": 0.1, "num_ctx": self.context_window},
+            "stream": False,
+        }
+        req = urllib.request.Request(
+            self.ollama_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=90.0) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                return str(result["message"]["content"])
+        except Exception as e:
+            raise RuntimeError(f"Ollama structured generation request failed: {e}")
+
     def _generate_via_llama_cpp(self, system_prompt: str, user_prompt: str, *, grammar: str | None = None) -> str:
         """Load and run GGUF in-process using llama-cpp-python."""
-        global _LLAMA_CPP_MODEL
-
         if not self.model_path or not self.model_path.is_file():
             raise FileNotFoundError(
                 f"Local GGUF model path not found or invalid: {self.model_path}. "
                 "Ensure the model is fully downloaded via Settings."
             )
 
-        # Lazy loading llama-cpp-python to keep startup fast and avoid compilation blocks
-        try:
-            from llama_cpp import Llama
-        except ImportError:
-            raise ImportError(
-                "The 'llama-cpp-python' library is not installed in the sidecar venv. "
-                "Ensure local dependencies are fully configured."
-            )
+        from .llm_worker import generate_in_worker
 
-        # Cache the in-process model to avoid painful disk load latency on every request
-        if _LLAMA_CPP_MODEL is None:
-            # Auto-detect offloading: use GPU (n_gpu_layers=-1) if CUDA/Metal is available
-            _LLAMA_CPP_MODEL = Llama(
-                model_path=str(self.model_path),
-                n_ctx=8192,
-                n_gpu_layers=-1,  # -1 means auto-offload all layers to GPU if possible
-                verbose=False
-            )
-
-        # Construct simple chat template payload for local instruct models
-        prompt = f"<|im_start|>system\n{system_prompt}<|im_end|>\n<|im_start|>user\n{user_prompt}<|im_end|>\n<|im_start|>assistant\n"
-        
-        # Compile GBNF grammar if requested and supported
-        llama_grammar = None
-        if grammar:
-            try:
-                from llama_cpp import LlamaGrammar
-                llama_grammar = LlamaGrammar.from_string(grammar)
-                print(f"[Local Runner] successfully compiled GBNF grammar constraint.")
-            except Exception as e:
-                print(f"[Local Runner Warning] Failed to compile GBNF grammar, falling back to unconstrained: {e}")
-
-        try:
-            kwargs = {
-                "max_tokens": 2048,
-                "temperature": 0.1,
-                "stop": ["<|im_end|>", "<|im_start|>", "system", "user", "assistant", "###"],
-                "echo": False
-            }
-            if llama_grammar is not None:
-                kwargs["grammar"] = llama_grammar
-
-            output = _LLAMA_CPP_MODEL(prompt, **kwargs)
-            return str(output["choices"][0]["text"])
-        except Exception as e:
-            raise RuntimeError(f"Direct GGUF llama-cpp generation failed: {e}")
+        return generate_in_worker(
+            model_path=self.model_path,
+            context_window=self.context_window,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            grammar=grammar,
+        )
 
     def generate(self, system_prompt: str, user_prompt: str, *, grammar: str | None = None) -> str:
         """Unified entrypoint: routes automatically to Ollama service (if running) or bundles llama-cpp."""
@@ -218,3 +236,19 @@ class LocalInferenceRunner:
             # If JSON grammar is requested, format the Ollama payload with format='json'
             return self._generate_via_ollama(system_prompt, user_prompt)
         return self._generate_via_llama_cpp(system_prompt, user_prompt, grammar=grammar)
+
+    def generate_structured_agent(self, request: Any, *, max_repairs: int = 1) -> Any:
+        """Run the Phase 2 local adapter with the same protocol as cloud models."""
+        from .model_gateway import LocalStructuredModelGateway
+
+        def transport(prompt: str, schema: dict[str, Any], grammar: str) -> str:
+            schema_prompt = (
+                "You are the structured model component of Matemium's agent runtime. "
+                "Your output is constrained to JSON and will be validated against this schema:\n"
+                f"{json.dumps(schema, ensure_ascii=False)}"
+            )
+            if self.is_ollama_running():
+                return self._generate_via_ollama_schema(schema_prompt, prompt, schema)
+            return self._generate_via_llama_cpp(schema_prompt, prompt, grammar=grammar)
+
+        return LocalStructuredModelGateway(transport, max_repairs=max_repairs).complete(request)

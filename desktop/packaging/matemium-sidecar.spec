@@ -40,6 +40,8 @@ hiddenimports = []
 hiddenimports += collect_submodules("manim")
 hiddenimports += collect_submodules("canvas")
 hiddenimports += collect_submodules("matemium")
+hiddenimports += collect_submodules("tiktoken_ext")
+hiddenimports += collect_submodules("binaryornot")
 hiddenimports += collect_submodules("manimpango")
 hiddenimports += [
     "manim.__main__",
@@ -61,9 +63,17 @@ binaries += collect_dynamic_libs("av")
 datas = []
 datas += collect_data_files("manim", include_py_files=False)
 datas += collect_data_files("matemium", includes=["templates/**"])
+datas += collect_data_files("binaryornot", include_py_files=True)
 
 # Package metadata (manim, pillow, etc.)
-for pkg in ("manim", "pillow", "numpy", "scipy", "networkx", "mapbox-earcut"):
+for pkg in (
+    "manim",
+    "pillow",
+    "numpy",
+    "scipy",
+    "networkx",
+    "mapbox-earcut",
+):
     try:
         datas += copy_metadata(pkg)
     except Exception:
@@ -90,8 +100,6 @@ a = Analysis(
         "server",           # never import server into sidecar
         "website",          # no such package
         "desktop",          # no such package
-        "uvicorn",
-        "fastapi",
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

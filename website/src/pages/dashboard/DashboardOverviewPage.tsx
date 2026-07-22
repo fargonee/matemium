@@ -10,7 +10,6 @@ import type { RootState } from "@/store";
 export function DashboardOverviewPage() {
   const user = useSelector((state: RootState) => state.auth.user);
   const { data: account, isLoading, error, refetch } = useGetMeQuery(undefined, { skip: !user });
-  const plan = account?.profile.plan ?? "free";
   const aiCalls = account?.usage?.ai_calls_count ?? 0;
 
   if (isLoading) {
@@ -28,10 +27,10 @@ export function DashboardOverviewPage() {
   return (
     <div className="grid gap-5 md:grid-cols-3">
       <Card>
-        <p className="text-sm text-text-subtle">Current plan</p>
-        <p className="mt-1 text-2xl font-bold capitalize">{plan}</p>
-        <Link to="/dashboard/billing" className="mt-4 inline-block text-sm font-medium">
-          Manage billing →
+        <p className="text-sm text-text-subtle">Access</p>
+        <p className="mt-1 text-2xl font-bold capitalize">Free</p>
+        <Link to="/dashboard/account" className="mt-4 inline-block text-sm font-medium">
+          Manage keys →
         </Link>
       </Card>
       <Card>
@@ -43,7 +42,7 @@ export function DashboardOverviewPage() {
       </Card>
       <Card>
         <p className="text-sm text-text-subtle">Desktop app</p>
-        <p className="mt-1 text-2xl font-bold">Licensed</p>
+        <p className="mt-1 text-2xl font-bold">Free</p>
         <Link to="/dashboard/downloads" className="mt-4 inline-block text-sm font-medium">
           Get installers →
         </Link>

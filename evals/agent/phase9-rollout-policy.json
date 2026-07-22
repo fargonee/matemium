@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "modes": ["legacy", "shadow", "canary", "target"],
+  "initial_mode": "legacy",
+  "shadow_mutations_allowed": false,
+  "rollback": {
+    "false_success_rate_max": 0.01,
+    "destructive_edits_max": 0,
+    "provider_failure_rate_max": 0.10,
+    "cancellation_p95_seconds_max": 3.0,
+    "accounting_reconciliation_rate_min": 0.99
+  },
+  "dashboard_metrics": [
+    "task_success_rate", "false_success_rate", "destructive_edit_rate",
+    "recovery_success_rate", "model_calls_mean", "tool_calls_mean",
+    "input_tokens_mean", "output_tokens_mean", "cost_mean",
+    "wall_seconds_p50", "wall_seconds_p95", "cancellation_p95_seconds",
+    "resume_success_rate", "accounting_reconciliation_rate"
+  ]
+}

@@ -23,6 +23,8 @@ __pycache__/
 venv/
 env/
 ENV/
+.aider-runtime/
+.uv-cache/
 
 # Python packaging
 build/
@@ -221,3 +223,4 @@ logs/
 Trashes
 ehthumbs.db
 Desktop.ini
+.aider*

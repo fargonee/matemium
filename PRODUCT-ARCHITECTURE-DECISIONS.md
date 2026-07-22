@@ -7,11 +7,14 @@
 
 This document is now the single source of truth for product-level architecture. The older docs have been updated with references to prevent inconsistency.
 
-This document records the shift from a lightweight research-oriented agent system to a production desktop application that must feel instant on first launch while delivering powerful local AI capabilities.
+This document records the shift from a lightweight research-oriented agent system to a production desktop application that must feel instant on first launch while delivering powerful AI-assisted authoring through user-owned external providers and optional local models.
 
 ## 1. Core Philosophy & Product Constraints
 
 - **Local-first, zero cloud rendering.** All video generation, Manim execution, and heavy computation happens on the user’s machine via the sidecar.
+- **Free product, no model resale.** Matemium is completely free to use. It does not sell subscriptions, pooled model API keys, in-app AI tokens, or Matemium-owned model quota.
+- **Source-available project.** Source is public for inspection, personal use, education, and contribution to the official project. Private modifications are permitted. Redistribution, publication of derivative builds, commercial use, and operation of competing forks require written permission.
+- **BYO AI access.** External AI providers are preferred by default. OpenRouter is the default independent provider, and users connect their own accounts/API keys.
 - **Tiny first-run experience.** Target ~50 MB installer. Users should not be blocked by large upfront downloads in the installer itself.
 - **Strict capability gating.** Users cannot perform any creation, editing, AI-assisted authoring, or rendering work until *all* working dependencies (TinyTeX + embeddings + lazy engines) are present and ready.
 - **Value during wait time.** The only allowed activities before full readiness are:
@@ -48,6 +51,35 @@ This document records the shift from a lightweight research-oriented agent syste
   - File system and render-related capabilities
 - **Hosted MCP:** Runs on Matemium servers. Provides non-grounded augmentation (shared patterns, community indexes, higher-level orchestration, possibly better models for certain phases).
 - **Future direction:** The internal agent loop may evolve to act as an MCP client. Local MCP is the source of truth for anything that touches the user’s workspace.
+
+## 4A. External AI Provider Policy
+
+**Decision:** External AI is preferred by default, with OpenRouter as Matemium's default provider. Matemium does not own, pool, resell, or subsidize model API access.
+
+### User-owned provider keys
+
+- Users can add as many provider API keys as they want.
+- Users choose a preferred provider/model for chat and agent workflows.
+- OpenRouter is the default OpenAI-compatible provider because one user account can route to many model families.
+- Direct provider keys (OpenAI-compatible endpoints, Anthropic-compatible adapters, local OpenAI-compatible servers, etc.) may also be supported, but must be treated as user-owned secrets.
+- Personal/BYO calls never deduct Matemium credits because Matemium credits no longer exist as a product concept.
+
+### OpenRouter OAuth
+
+The settings UI should provide a first-class **Connect OpenRouter Account** action instead of making users manually visit OpenRouter, create a key, copy it, and paste it into Matemium.
+
+Flow:
+
+1. Generate a PKCE verifier/challenge in the desktop app.
+2. Redirect the user to OpenRouter's `/auth` URL with `callback_url`, `code_challenge`, and `code_challenge_method=S256`.
+3. OpenRouter authenticates the user and redirects back to Matemium with a temporary `code`.
+4. Exchange the code with `POST https://openrouter.ai/api/v1/auth/keys`, sending the code plus the PKCE verifier/method.
+5. Store the returned `sk-or-v1-...` key as a user-scoped provider credential.
+
+Storage preference:
+
+- Desktop/local-only use: store the token in OS secure storage when available; otherwise use encrypted app-local storage.
+- Cloud profile sync: store only if needed, encrypt at rest, redact from logs/checkpoints/events, and allow deletion/replacement from settings.
 
 ## 5. Sidecar Architecture – Minimal Control Plane
 
@@ -199,10 +231,10 @@ The gate is enforced in the Tauri layer and reflected in all UI surfaces.
 
 ## 15. Local LLM Architecture (Offline Agent Engine)
 
-**Decision:** Support offline-capable, local-first agentic orchestration using quantized GGUF format models, downloadable on-demand as a lazy configuration package.
+**Decision:** Support offline-capable, local-first agentic orchestration using quantized GGUF format models, downloadable on-demand as a lazy configuration package. Local models are available for privacy/offline workflows, but external AI providers are preferred by default.
 
 ### A. Supported Models & Quantization Profiles
-To accommodate varying client hardware configurations (from standard laptops with CPU-only to powerful developer rigs), Matemium supports three distinct model options. All models utilize standard `Q4_K_M` (4-bit Medium) quantizations as the recommended default to maximize token generation speed, with an optional upgrade to `Q8_0` (8-bit) for high-precision scenarios:
+To accommodate varying client hardware configurations (from standard laptops with CPU-only to powerful developer rigs), Matemium supports clearly labeled model options. The UI must describe expected download size, RAM/VRAM needs, speed, quality tradeoff, and recommended hardware before download. All models utilize standard `Q4_K_M` (4-bit Medium) quantizations as the recommended local default to maximize token generation speed, with an optional upgrade to `Q8_0` (8-bit) for high-precision scenarios:
 
 1. **Lite Tier: Qwen-2.5-Coder-3B-Instruct**
    - **Download Size:** **~1.9 GB** (Q4_K_M) / **~3.2 GB** (Q8_0)
@@ -219,7 +251,7 @@ To accommodate varying client hardware configurations (from standard laptops wit
 
 ### B. Download Lifecycle & Lazy Configuration UX
 - **Installer footprint:** The installer remains a sleek **~50 MB**. GGUF models are strictly downloaded in the background post-installation.
-- **Gated Toggle:** In the Settings screen, users can activate `[ ] Enable Local LLM Engine (Offline Mode)`.
+- **Gated Toggle:** In the Settings screen, users can activate `[ ] Enable Local LLM Engine (Offline Mode)`. This is an explicit alternative to the default OpenRouter/BYO external provider path.
 - **Background Downloader:** Once toggled, the Tauri Rust asset manager (`downloads.rs`) initiates a resumable background download from the Matemium asset manifest, saving the model file to standard user-writable paths:
   - Linux: `~/.local/share/Matemium/models/...`
   - macOS: `~/Library/Application Support/Matemium/models/...`
@@ -235,9 +267,11 @@ To accommodate varying client hardware configurations (from standard laptops wit
 
 | Area                    | Before (Prototype)              | After (Product)                              |
 |-------------------------|---------------------------------|----------------------------------------------|
+| Monetization            | Possible paid access/model resale | Free app; no Matemium subscriptions or AI credits |
+| External AI             | Platform/provider ambiguity      | OpenRouter-first BYO keys; users pay providers directly |
 | Vector DB               | None                            | Fully local in sidecar (LanceDB + Jina)     |
 | Embeddings              | N/A                             | jina-embeddings-v2-base-code ONNX int8      |
-| Model delivery          | Bundled or none                 | First-run download of Embeddings + GGUF LLMs (Tauri lazy-downloaded) |
+| Model delivery          | Bundled or none                 | External AI by default; optional first-run download of embeddings + GGUF LLMs |
 | Sidecar                 | Eager full engine               | Minimal control plane + lazy registry       |
 | Public content          | None                            | YouTube + thin metadata                     |
 | Publishing              | N/A                             | Official channel, metadata only             |

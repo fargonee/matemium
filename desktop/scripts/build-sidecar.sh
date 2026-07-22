@@ -17,6 +17,7 @@ elif [[ -x "$VENV/Scripts/python.exe" ]]; then
 else
   echo "Missing engine venv at $VENV (looked for bin/python and Scripts/python.exe)"
   echo "Create with: python -m venv .venv && .venv/bin/pip install -e '.[dev,intelligence]' pyinstaller"
+  echo "Then create the separate Aider runtime with: ./desktop/scripts/setup-aider-runtime.sh"
   exit 1
 fi
 

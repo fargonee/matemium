@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "cancel-during-model-call", "category": "cancellation", "assertions": ["cancelled_terminal_state", "no_post_cancel_mutation", "latency_recorded"]},
+    {"id": "resume-after-process-restart", "category": "resume", "assertions": ["checkpoint_loaded", "workspace_hash_validated", "usage_preserved"]},
+    {"id": "offline-local-model", "category": "offline", "assertions": ["no_network_dependency", "local_accounting", "honest_terminal_state"]},
+    {"id": "provider-timeout-mid-run", "category": "provider_failure", "assertions": ["bounded_retry", "checkpoint_preserved", "no_false_success"]},
+    {"id": "provider-malformed-structured-output", "category": "provider_failure", "assertions": ["bounded_repair", "typed_failure", "no_false_success"]},
+    {"id": "concurrent-user-edit", "category": "concurrency", "assertions": ["stale_hash_rejected", "user_edit_preserved", "fresh_inspection"]}
+  ]
+}

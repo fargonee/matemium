@@ -86,9 +86,7 @@ impl SidecarManager {
         };
 
         if let Some(child) = child {
-            child
-                .kill()
-                .map_err(|e| format!("kill sidecar: {e}"))?;
+            child.kill().map_err(|e| format!("kill sidecar: {e}"))?;
         }
         Ok(())
     }
@@ -140,25 +138,46 @@ impl SidecarManager {
         let matemium_root = self.paths.data_root.to_string_lossy().to_string();
         let (mut rx, child) = if let Some(python) = dev_python_sidecar() {
             log::info!("sidecar: using repo .venv python (dev)");
-            let source_root = python.parent().and_then(|p| p.parent()).map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+            let source_root = python
+                .parent()
+                .and_then(|p| p.parent())
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let aider_runtime = std::path::Path::new(&source_root)
+                .join(".aider-runtime")
+                .to_string_lossy()
+                .to_string();
+            let uv_bin = resolve_uv_bin(&self.paths.data_root);
             self.app
                 .shell()
                 .command(python)
                 .args(["-u", "-m", "matemium.sidecar"])
                 .current_dir(&self.paths.data_root)
                 .env("MATEMIUM_ROOT", matemium_root)
+                .env("MATEMIUM_AIDER_RUNTIME_DIR", aider_runtime)
+                .env("MATEMIUM_UV_BIN", uv_bin)
                 .env("PYTHONPATH", source_root)
                 .env("PYTHONUNBUFFERED", "1")
                 .spawn()
                 .map_err(|e| format!("spawn python sidecar: {e}"))?
         } else {
             log::info!("sidecar: using bundled PyInstaller binary");
+            let aider_runtime = self
+                .paths
+                .data_root
+                .join("bin")
+                .join("aider-runtime")
+                .to_string_lossy()
+                .to_string();
+            let uv_bin = resolve_uv_bin(&self.paths.data_root);
             self.app
                 .shell()
                 .sidecar(SIDECAR_NAME)
                 .map_err(|e| format!("resolve sidecar binary: {e}"))?
                 .current_dir(&self.paths.data_root)
                 .env("MATEMIUM_ROOT", matemium_root)
+                .env("MATEMIUM_AIDER_RUNTIME_DIR", aider_runtime)
+                .env("MATEMIUM_UV_BIN", uv_bin)
                 .env("PYTHONUNBUFFERED", "1")
                 .spawn()
                 .map_err(|e| format!("spawn sidecar: {e}"))?
@@ -180,12 +199,13 @@ impl SidecarManager {
                     }
                     CommandEvent::Terminated(payload) => {
                         log::info!("sidecar terminated: {payload:?}");
+                        let termination = format!("sidecar process terminated: {payload:?}");
                         if let Ok(mut guard) = inner.lock() {
                             guard.child = None;
                             let pending: Vec<_> = guard.pending.drain().collect();
                             drop(guard);
                             for (_, sender) in pending {
-                                let _ = sender.send(Err("sidecar process terminated".to_string()));
+                                let _ = sender.send(Err(termination.clone()));
                             }
                         }
                         break;
@@ -218,6 +238,21 @@ impl SidecarManager {
     }
 }
 
+fn resolve_uv_bin(data_root: &std::path::Path) -> String {
+    let managed_uv = data_root
+        .join("bin")
+        .join(if cfg!(windows) { "uv.exe" } else { "uv" });
+    if managed_uv.is_file() {
+        return managed_uv.to_string_lossy().to_string();
+    }
+    if let Ok(configured) = std::env::var("MATEMIUM_UV_BIN") {
+        if !configured.trim().is_empty() {
+            return configured;
+        }
+    }
+    "uv".to_string()
+}
+
 fn dev_python_sidecar() -> Option<PathBuf> {
     if !cfg!(debug_assertions) {
         return None;
@@ -225,7 +260,9 @@ fn dev_python_sidecar() -> Option<PathBuf> {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     // Support normal layout and worktrees (math / math-preview)
     for levels in 1..=6u32 {
-        let p = manifest.join("../".repeat(levels as usize)).join(".venv/bin/python");
+        let p = manifest
+            .join("../".repeat(levels as usize))
+            .join(".venv/bin/python");
         if p.is_file() {
             return Some(p);
         }

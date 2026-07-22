@@ -12,11 +12,12 @@ interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   diagnostics: LintDiagnostic[];
+  language?: "python" | "markdown" | "json";
   readOnly?: boolean;
 }
 
 export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
-  function CodeEditor({ value, onChange, diagnostics, readOnly = false }, ref) {
+  function CodeEditor({ value, onChange, diagnostics, language = "python", readOnly = false }, ref) {
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
 
@@ -59,7 +60,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
       <div className="editor-wrap">
         <Editor
           height="100%"
-          defaultLanguage="python"
+          language={language}
           theme="vs-dark"
           value={value}
           onChange={(next) => onChange(next ?? "")}

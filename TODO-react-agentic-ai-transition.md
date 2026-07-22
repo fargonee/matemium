@@ -1,86 +1,138 @@
-# TODO Plan: Transitioning Matemium to an Autonomous ReAct Agent
+# Roadmap: Production Autonomous Agent Runtime
 
-This document outlines the step-by-step, actionable tasks to transition the Matemium AI assistant from the legacy rigid pipeline to the autonomous ReAct (Reasoning + Acting) loop.
+**Status:** Proposed migration plan
 
----
+**Source of truth:** [`agentic_ai_goal.md`](agentic_ai_goal.md)
 
-## Phase 1: Tool Infrastructure (`matemium/agent/tools/`)
+**Legacy baseline:** The XML/regex `ReActAgentRunner` and its tools are a prototype, not a completed production phase.
 
-- [x] **1.1 Base Tool Definition**
-  - [x] Create a standard base class/interface `BaseTool` in a new file `matemium/agent/tools/base.py`.
-  - [x] Implement support for automatic JSON Schema generation from Pydantic models for each tool's argument definition.
+Checkboxes describe verified repository state. Do not mark an item complete merely because a mocked happy-path test exists.
 
-- [x] **1.2 Core File-System Tools**
-  - [x] Implement `read_file_slice(file_path, start_line, end_line)` with robust boundary checking to prevent bloating the context.
-  - [x] Implement `grep_search(pattern, dir_path)` using Python's `re` module to locate functions, classes, and variable uses.
-  - [x] Implement `list_directory(dir_path)` to allow the agent to inspect project directories.
+## Phase 0 — Baseline and acceptance criteria
 
-- [x] **1.3 Modification & Compilation Tools**
-  - [x] Implement `apply_diff_patch(file_path, search, replace)` using our existing Aider-style search/replace patch engine.
-  - [x] Implement `run_compiler(project_id)` to execute the local Matemium compilation pipeline and return stdout/stderr.
+- [x] Inventory every autonomous entry point across server, desktop, sidecar, local runner, and MCP.
+- [x] Document the legacy runner's known failure modes and compatibility requirements.
+- [x] Define benchmark tasks and measurable release thresholds, including false-success rate.
+- [x] Add runtime versioning so legacy and new runs are distinguishable in APIs and telemetry.
+- [x] Decide durable checkpoint storage and retention policy.
 
-- [x] **1.4 Safety & Unit Testing**
-  - [x] Add guardrails to prevent path traversal (e.g., block tool calls attempting to read/write outside the active workspace directory).
-  - [x] Write robust unit tests under `tests/test_react_tools.py` verifying each tool's behavior under success and error conditions.
+**Exit gate:** Met by [`docs/agent/phase0-baseline.md`](docs/agent/phase0-baseline.md), the versioned files under `evals/agent/`, and ADR-001. Benchmark execution is deliberately deferred until the harness and pinned fixtures are implemented.
 
----
+## Phase 1 — Typed domain model and state machine
 
-## Phase 2: ReAct Engine Loop (`matemium/agent/react_runner.py`)
+- [x] Define `AgentRunState`, plan steps, acceptance criteria, changes, evidence, budgets, usage, and terminal outcomes.
+- [x] Define legal lifecycle transitions and reject invalid transitions.
+- [x] Implement checkpoint creation after each material event.
+- [x] Implement resume with workspace-hash validation.
+- [x] Add cancellation and terminal-reason contracts.
+- [x] Test crash/restart, cancellation, invalid transitions, and concurrent user edits.
 
-- [x] **2.1 Implement the Loop Class**
-  - [x] Create `ReActAgentRunner` to manage the conversation state and execute the tool-calling loop.
-  - [x] Design the conversation list structure: `[System, User, Thought/Tool Call, Tool Output, Thought, ...]`.
+**Exit gate:** Met by the desktop-owned state/store in `desktop/src-tauri/src/agent_runs.rs`; see [`docs/agent/phase1-state-machine.md`](docs/agent/phase1-state-machine.md).
 
-- [x] **2.2 Parser & Schema Extraction**
-  - [x] Write a robust regex/JSON parser to extract the chosen `<thought>` and `<tool_call>` (with arguments) from the raw LLM string.
-  - [x] Adapt the parser to support both standard OpenAI-compatible tool schemas (for cloud APIs) and GBNF grammars (for GGUF local LLMs).
+## Phase 2 — Structured model gateway
 
-- [x] **2.3 Loop Boundary Controls**
-  - [x] Enforce a strict `max_turns = 10` limit to prevent expensive runaway infinite loops.
-  - [x] Set up credit balance and token usage meters to track consumption during the loop execution.
+- [x] Define one internal model-response type for tool calls, plan revisions, progress, and finish proposals.
+- [x] Implement provider-native JSON tool calling for supported cloud providers.
+- [x] Implement a grammar/schema-constrained local-model adapter.
+- [x] Support multiple non-conflicting tool calls and serialize writes.
+- [x] Reject malformed responses through typed errors and bounded repair.
+- [x] Preserve or summarize the full relevant conversation, not only the last user message.
+- [x] Remove `<thought>`/`<tool_call>` XML as the production protocol.
 
-- [x] **2.4 Integration Tests**
-  - [x] Add mock-based integration tests under `tests/test_react_runner.py` simulating an entire thought -> search -> edit -> compile -> complete loop.
+**Exit gate:** Met by the recorded OpenAI-compatible family fixtures and local schema/grammar contract tests; see [`docs/agent/phase2-model-gateway.md`](docs/agent/phase2-model-gateway.md).
 
----
+## Phase 3 — Tool platform and mutation journal
 
-## Phase 3: Prompt Engineering & System Alignment
+- [x] Standardize the typed tool-result envelope and stable error codes.
+- [x] Adapt list/search/read tools with deterministic limits and truncation metadata.
+- [x] Add precondition hashes to edits and record before/after hashes and changed ranges.
+- [x] Enforce workspace and product file-boundary policy locally.
+- [x] Separate syntax, lint, project check, compile, render, and visual-inspection tools.
+- [x] Add snapshot/edit-journal rollback support.
+- [x] Ensure exceptions cannot become unclassified success-like strings.
+- [x] Add adversarial path, stale edit, ambiguous patch, and oversized-output tests.
 
-- [x] **3.1 Create Master ReAct Prompt**
-  - [x] Create `shared/prompts/react-agent-system.txt` outlining the rules of reasoning:
-    - Must search and read files before editing.
-    - Must run the compiler tool after every edit.
-    - Must never guess function signatures or variable names.
-    - Must keep search/replace blocks as small and surgical as possible.
+**Exit gate:** Met by the desktop-owned tool platform and mutation journal; see [`docs/agent/phase3-tool-platform.md`](docs/agent/phase3-tool-platform.md).
 
-- [x] **3.2 Self-Healing Examples**
-  - [x] Include clear few-shot examples in the prompt demonstrating how to process compile errors (stderr) and issue subsequent fixes.
+## Phase 4 — Planner, executor, and policy engine
 
----
+- [x] Generate explicit acceptance criteria and a short mutable plan.
+- [x] Enforce inspect-before-edit in code rather than only in prompts.
+- [x] Track active plan step and meaningful state changes.
+- [x] Classify errors and select bounded recovery policies.
+- [x] Detect repeated actions, unchanged observations, patch cycles, and rejected finish loops.
+- [x] Enforce independent model-call, tool-call, token, cost, time, compile, and render budgets.
+- [x] Implement `blocked` behavior for genuinely missing user input or capabilities.
 
-## Phase 4: Full Stack Streaming & Desktop UI
+**Exit gate:** Met by the LLM-independent fault-injection suite; see [`docs/agent/phase4-policy-engine.md`](docs/agent/phase4-policy-engine.md).
 
-- [x] **4.1 Streamable FastAPI Backend**
-  - [x] Expose an event-driven endpoint (Websockets or Server-Sent Events) at `/v1/chat/stream` in `server/matemium_server/routes/chat.py`.
-  - [x] Push progress updates synchronously as the agent executes tool calls:
-    - `{"type": "thought", "content": "..."}`
-    - `{"type": "tool_call", "name": "grep_search", "args": {...}}`
-    - `{"type": "tool_output", "output": "..."}`
+## Phase 5 — Verification and completion controller
 
-- [x] **4.2 React Frontend State Updates**
-  - [x] Map the stream events directly to `App.tsx`'s active `ExecutionProgress` state.
-  - [x] Populate the progress ledger stepper with detailed operations dynamically.
+- [x] Treat model completion as a finish proposal, never as terminal success.
+- [x] Derive applicable completion gates from task type and acceptance criteria.
+- [x] Require final inspection of changed files.
+- [x] Require project checks and relevant tests.
+- [x] Require render evidence for behavior-changing scene edits.
+- [x] Require visual inspection for layout, animation, camera, geometry, and appearance tasks.
+- [x] Produce a verification manifest used by the final response.
+- [x] Prevent claims about checks that were not executed.
 
-- [x] **4.3 UI Rendering Enhancements**
-  - [x] Render the golden-bordered collapsible reasoning panel for `<thought>` blocks in `ChatPanel.tsx`.
-  - [x] Render a live, line-by-line colored diff box as soon as a `replace_in_file` action is proposed, requesting user confirmation before execution.
+**Exit gate:** Met by deterministic false-success tests covering compile-successful semantic and visual failures; see [`docs/agent/phase5-verification-controller.md`](docs/agent/phase5-verification-controller.md).
 
----
+## Phase 6 — Context engine and durable memory
 
-## Phase 5: Production Validation & Deployment
+- [x] Build prompts from structured run state and the active plan step.
+- [x] Compact resolved observations into source-linked factual summaries.
+- [x] Keep unresolved diagnostics and exact pending patch text losslessly available.
+- [x] Reload raw evidence on demand without placing the full transcript in every request.
+- [x] Measure context growth and fact retention on long tasks.
 
-- [x] **5.1 End-to-End Test Suite**
-  - [x] Perform live, end-to-end integration tests using local test sheets (e.g., `projects/demo/`).
-  - [x] Verify that credit tracking accurately logs platform costs for the entire multi-turn ReAct run.
-- [x] **5.2 User Opt-In Control**
-  - [x] Add an "Enable Autonomous Agent Mode" toggle in the desktop application's Settings panel, allowing users to switch between the classic pipeline and the new autonomous ReAct model.
+**Exit gate:** Met by deterministic 1,000-observation growth and retention tests; see [`docs/agent/phase6-context-memory.md`](docs/agent/phase6-context-memory.md).
+
+## Phase 7 — Accounting, streaming, and user control
+
+- [x] Record usage, latency, model, provider, request ID, and cost for every model call.
+- [x] Record provider usage per call/run without charging BYO usage or deducting Matemium credits.
+- [x] Define versioned SSE/IPC event schemas.
+- [x] Stream concise rationales, actions, results, evidence, and budgets—not private chain-of-thought.
+- [x] Add cancel, resume, approval, blocked-input, and run-history UI states.
+- [x] Bound and redact streamed tool output.
+
+**Exit gate:** Met by per-call reconciliation tests, versioned event tests, and the compiled typed terminal-state UI; see [`docs/agent/phase7-accounting-events-controls.md`](docs/agent/phase7-accounting-events-controls.md).
+
+## Phase 8 — Optional scoped delegation
+
+- [x] Define child-run capability, budget, and result contracts.
+- [x] Prevent parent/child write races.
+- [x] Return compressed, source-linked child evidence.
+- [x] Keep final verification and completion authority in the parent.
+- [ ] Benchmark delegation against the single-agent baseline before enabling it (Phase 9 execution; delegation remains disabled meanwhile).
+
+**Exit gate:** The scoped delegation implementation is complete, but operational enablement remains gated on a passing Phase 9 model benchmark. The comparison contract and default-off behavior are tested; see [`docs/agent/phase8-scoped-delegation.md`](docs/agent/phase8-scoped-delegation.md) and `evals/agent/phase8-delegation-gate.json`.
+
+## Phase 9 — End-to-end evaluation and rollout
+
+- [ ] Run cloud and local models on the approved benchmark suite.
+- [x] Measure task success, false success, destructive edits, recovery, calls, tokens, cost, and latency.
+- [x] Add cancellation, resume, offline, provider-failure, and user-concurrent-edit scenarios.
+- [ ] Run security and prompt-injection tests against workspace content and tool outputs (catalog and deterministic boundary tests exist; end-to-end profiles remain).
+- [ ] Shadow the new runtime before allowing mutations for production users.
+- [ ] Roll out behind a versioned feature flag with a legacy fallback (fail-closed controller is implemented; production integration remains).
+- [ ] Publish operational dashboards and rollback criteria (machine-readable metrics and criteria exist; deployed dashboard remains).
+
+**Exit gate:** Implementation is available in `matemium.agent.evaluation`, `matemium.agent.rollout`, and `evals/agent/`; operational evidence remains open. See [`docs/agent/phase9-evaluation-rollout.md`](docs/agent/phase9-evaluation-rollout.md). All thresholds must pass and rollback must be exercised before v2 mutations are enabled.
+
+## Legacy components: disposition
+
+| Component | Current role | Migration decision |
+|---|---|---|
+| `matemium/agent/react_runner.py` | XML/regex prototype loop | Replace with state-machine runtime; retain temporarily for compatibility tests |
+| `matemium/agent/tools/*` | Prototype filesystem/compiler tools | Adapt behind typed envelopes and mutation journal |
+| `shared/prompts/react-agent-system.txt` | Prompt-enforced ReAct behavior | Replace with role-specific prompts using structured protocol |
+| `/chat/completions` autonomous branch | Non-streaming legacy entry point | Route through versioned runtime and preserve conversation context |
+| `/chat/stream` | Legacy event stream | Migrate to versioned run events, cancellation, and resume |
+| `LifecycleCoordinator` | Fixed pipeline | Reuse project-domain operations where helpful; do not make it the autonomy state machine |
+
+## Definition of done
+
+The migration is complete only when the new runtime satisfies the exit gate for every required phase, the end-to-end benchmark meets its thresholds, accounting reconciles, cancellation/resume work, and the system cannot report `completed` without a verification manifest.

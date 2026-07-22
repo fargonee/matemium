@@ -145,7 +145,7 @@ class LifecycleCoordinator:
         session.record_transition(Phase.ENGINEER, ("blueprint",))
 
     def run_phase_engineer(self, session: ProjectSession) -> None:
-        """Phase 3 — decoupled scenes.py / assets.py configuration."""
+        """Phase 3 — decoupled scenes.py / helpers.py configuration."""
         artifacts = self.config.engineer_fn(session)
         session.artifacts = artifacts
         self._charge_phase(session, Phase.ENGINEER, "decoupled_code_generation")

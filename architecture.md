@@ -283,17 +283,17 @@ Elements default to `z = 0`. Authors may set explicit `z` on `CanvasElement` or 
 
 **Full spec:** [`desktop-architecture.md`](desktop-architecture.md)
 
-Matemium is pivoting from a developer CLI/library to a **commercial/freemium desktop application**. The engine in `canvas/` becomes a **local compilation farm** packaged as a PyInstaller sidecar inside a **Tauri v2** shell. This section records how that pivot relates to the engine — without changing engine internals.
+Matemium is pivoting from a developer CLI/library to a **free, source-available desktop application**. The engine in `canvas/` becomes a **local compilation farm** packaged as a PyInstaller sidecar inside a **Tauri v2** shell. This section records how that pivot relates to the engine — without changing engine internals.
 
 ### 8.1 Three boundaries
 
 | Boundary | Technology | Responsibility |
 |----------|------------|----------------|
-| **Cloud** | HTTPS API | Auth, billing, **chat LLM routing** — returns text + code edits only |
+| **Cloud** | HTTPS API | Optional auth, profile/provider sync, **BYO chat LLM helpers** — returns text + code edits only |
 | **Desktop shell** | Tauri (Rust) + TypeScript UI | Projects, code editor, AI chat, diff apply, sidecar lifecycle |
 | **Local engine** | Python sidecar (`canvas/` + Manim) | Lint/import `scenes.py`, render, emit progress events |
 
-**Hard rule:** No cloud rendering. No render farms. Cloud ops cost must stay near zero.
+**Hard rule:** No cloud rendering. No render farms. No Matemium-owned model quota or pooled provider keys.
 
 **Cross-platform ship:** TS/Rust are shared; the PyInstaller sidecar is **not** cross-compiled — one native binary per OS triple, built via CI matrix. See [`desktop/targets/README.md`](desktop/targets/README.md).
 
@@ -301,7 +301,7 @@ Matemium is pivoting from a developer CLI/library to a **commercial/freemium des
 
 | Context | Authoring surface | Artifact |
 |---------|-------------------|----------|
-| **Product (desktop)** | Code editor + AI chat → **autonomous agent** (v2) | `scenes.py` (v1); `scenes.py` + `assets.py` (v2 agent) |
+| **Product (desktop)** | Code editor + AI chat → **autonomous agent** (v2) | `scenes.py`; optional `helpers.py`; first-class `brief/` project memory |
 | **Development (repo)** | `projects/*/scenes.py` + optional `helpers.py` | Same Python → `CanvasBuilder` → `SheetDSL` |
 
 - **AI edits Python code** on the user's behalf — not Sheet DSL JSON, not builder-op JSON.
@@ -310,9 +310,11 @@ Matemium is pivoting from a developer CLI/library to a **commercial/freemium des
 
 Visual **section fences** (`# ---DIV: Title---` before top-level `def`/`class`) give a multi-pane editor UX while keeping one Python file. See [`desktop-architecture.md`](desktop-architecture.md) §5.
 
-**v1** stays single-file (`scenes.py` only). **v2 agent mode** enforces a strict two-file workspace (`scenes.py` + `assets.py`) with function-calling tools, Search/Replace patches, and an autonomous compile self-correction loop. See [`ai-agent-architecture.md`](ai-agent-architecture.md).
+**v1** can stay single-file (`scenes.py` only). **v2 agent/project mode** uses a bounded workspace: `scenes.py` as the render entrypoint, `helpers.py` for reusable Python support, and `brief/` for structured creative/production context such as passport, description, tape plan, roadmap, and narration. See [`ai-agent-architecture.md`](ai-agent-architecture.md).
 
-**Latest product decisions** (local vector DB/RAG in sidecar, lazy loading, first-run downloads of Jina embeddings + TinyTeX, YouTube-based thin publishing, strict user gating until fully ready, local + hosted MCP) are in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
+The `brief/` files are product memory for the user, UI, and AI. They do not replace `SheetDSL`, and the engine should not treat Markdown/JSON brief files as animation IR.
+
+**Latest product decisions** (free/source-available distribution, OpenRouter-first BYO AI providers, local vector DB/RAG in sidecar, lazy loading, first-run downloads of Jina embeddings + TinyTeX, YouTube-based thin publishing, strict user gating until fully ready, local + hosted MCP) are in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
 **PAD-10 complete:** Cross-platform packaging, CI updates, docs refresh. Full implementation details in [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md).
 

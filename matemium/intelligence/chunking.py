@@ -494,8 +494,10 @@ def token_based_chunking(
                 }
             })
         return chunks
-    except ImportError:
-        # Approximate words split fallback
+    except Exception:
+        # Tiktoken may be installed while its encoding table is not cached. In
+        # an offline desktop build, loading that table raises a network error;
+        # preserve the documented approximate fallback in that case too.
         words = text.split(" ")
         chunks = []
         step = chunk_size_tokens - overlap_tokens

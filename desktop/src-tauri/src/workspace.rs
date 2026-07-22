@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -13,6 +14,8 @@ pub struct AppPaths {
     pub settings_path: PathBuf,
     /// Root for first-run assets (TinyTeX, embeddings, etc.)
     pub assets_root: PathBuf,
+    /// Durable state and bounded artifacts for autonomous agent runs.
+    pub agent_root: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,11 +27,31 @@ pub struct Settings {
     pub api_token: Option<String>,
     #[serde(default = "default_bottom_dock_default")]
     pub bottom_dock_default: String,
-    // LLM mode: personal (BYO keys from web profile) vs platform credits
+    // LLM mode: external BYO provider keys or local models.
     #[serde(default)]
     pub use_personal_llm: Option<bool>,
     #[serde(default)]
     pub llm_provider: Option<String>,
+    #[serde(default)]
+    pub openrouter_api_key: Option<String>,
+    #[serde(default)]
+    pub openrouter_user_id: Option<String>,
+    #[serde(default)]
+    pub openrouter_connected_at: Option<String>,
+    #[serde(default)]
+    pub openrouter_free_disabled_until: Option<String>,
+    #[serde(default)]
+    pub openai_api_key: Option<String>,
+    #[serde(default)]
+    pub openai_connected_at: Option<String>,
+    #[serde(default)]
+    pub groq_api_key: Option<String>,
+    #[serde(default)]
+    pub groq_connected_at: Option<String>,
+    #[serde(default)]
+    pub xai_api_key: Option<String>,
+    #[serde(default)]
+    pub xai_connected_at: Option<String>,
     #[serde(default)]
     pub use_local_llm: Option<bool>,
     #[serde(default)]
@@ -36,17 +59,55 @@ pub struct Settings {
     #[serde(default)]
     pub external_llm_model: Option<String>,
     #[serde(default)]
+    pub provider_models: HashMap<String, ProviderModelSettings>,
+    #[serde(default)]
     pub reasoning_level: Option<String>,
+    #[serde(default = "default_autonomous_agent")]
+    pub use_autonomous_agent: Option<bool>,
+    #[serde(default)]
+    pub agent_runtime_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderModelSettings {
+    #[serde(default)]
+    pub pinned: Vec<String>,
+    #[serde(default)]
+    pub catalog: Vec<ProviderModel>,
+    #[serde(default)]
+    pub fetched_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderModel {
+    pub id: String,
+    pub name: String,
+    pub provider: String,
+    #[serde(default)]
+    pub context_length: Option<u64>,
+    #[serde(default)]
+    pub pricing_label: Option<String>,
+    #[serde(default)]
+    pub badges: Vec<String>,
 }
 
 fn default_server_url() -> String {
     let json_str = include_str!("../../app/src/config.json");
     let v: serde_json::Value = serde_json::from_str(json_str).expect("invalid config.json");
-    v["serverUrl"].as_str().expect("missing serverUrl in config.json").to_string()
+    v["serverUrl"]
+        .as_str()
+        .expect("missing serverUrl in config.json")
+        .to_string()
 }
 
 fn default_bottom_dock_default() -> String {
     "progress".to_string()
+}
+
+fn default_autonomous_agent() -> Option<bool> {
+    Some(true)
 }
 
 impl Default for Settings {
@@ -55,12 +116,25 @@ impl Default for Settings {
             server_url: default_server_url(),
             api_token: None,
             bottom_dock_default: default_bottom_dock_default(),
-            use_personal_llm: Some(false),
-            llm_provider: Some("openai".to_string()),
+            use_personal_llm: Some(true),
+            llm_provider: Some("openrouter".to_string()),
+            openrouter_api_key: None,
+            openrouter_user_id: None,
+            openrouter_connected_at: None,
+            openrouter_free_disabled_until: None,
+            openai_api_key: None,
+            openai_connected_at: None,
+            groq_api_key: None,
+            groq_connected_at: None,
+            xai_api_key: None,
+            xai_connected_at: None,
             use_local_llm: Some(false),
             local_llm_model: Some("llm-qwen-coder-3b-q4".to_string()),
-            external_llm_model: Some("gpt-4o-mini".to_string()),
+            external_llm_model: Some("openai/gpt-4o-mini".to_string()),
+            provider_models: HashMap::new(),
             reasoning_level: Some("low".to_string()),
+            use_autonomous_agent: Some(true),
+            agent_runtime_version: Some("aider-v1".to_string()),
         }
     }
 }
@@ -75,6 +149,7 @@ impl AppPaths {
             .join(APP_NAME);
 
         let assets_root = data_root.join("assets");
+        let agent_root = data_root.join("agent");
 
         Ok(Self {
             workspaces_root: data_root.join("workspaces"),
@@ -82,11 +157,18 @@ impl AppPaths {
             data_root,
             config_dir,
             assets_root,
+            agent_root,
         })
     }
 
     pub fn ensure(&self) -> Result<(), String> {
-        for dir in [&self.data_root, &self.workspaces_root, &self.config_dir, &self.assets_root] {
+        for dir in [
+            &self.data_root,
+            &self.workspaces_root,
+            &self.config_dir,
+            &self.assets_root,
+            &self.agent_root,
+        ] {
             fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
         }
         if !self.settings_path.exists() {
@@ -104,8 +186,8 @@ impl AppPaths {
         self.workspace_dir(project_id).join("scenes.py")
     }
 
-    pub fn assets_path(&self, project_id: &str) -> PathBuf {
-        self.workspace_dir(project_id).join("assets.py")
+    pub fn helpers_path(&self, project_id: &str) -> PathBuf {
+        self.workspace_dir(project_id).join("helpers.py")
     }
 
     pub fn project_json_path(&self, project_id: &str) -> PathBuf {
@@ -140,12 +222,20 @@ impl AppPaths {
         self.assets_root.join("assets.json")
     }
 
+    pub fn agent_runs_db_path(&self) -> PathBuf {
+        self.agent_root.join("agent-runs.sqlite3")
+    }
+
+    pub fn agent_run_artifacts_dir(&self, run_id: &str) -> PathBuf {
+        self.agent_root.join("runs").join(run_id)
+    }
+
     pub fn load_settings(&self) -> Result<Settings, String> {
         if !self.settings_path.exists() {
             return Ok(Settings::default());
         }
-        let raw = fs::read_to_string(&self.settings_path)
-            .map_err(|e| format!("read settings: {e}"))?;
+        let raw =
+            fs::read_to_string(&self.settings_path).map_err(|e| format!("read settings: {e}"))?;
         serde_json::from_str(&raw).map_err(|e| format!("parse settings: {e}"))
     }
 
@@ -163,8 +253,7 @@ pub fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
 }
 
 pub fn read_json_file(path: &Path) -> Result<serde_json::Value, String> {
-    let raw =
-        fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
+    let raw = fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
     serde_json::from_str(&raw).map_err(|e| format!("parse {}: {e}", path.display()))
 }
 

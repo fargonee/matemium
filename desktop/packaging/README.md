@@ -21,6 +21,27 @@ See [`../targets/README.md`](../targets/README.md) for the full CI/CD matrix and
 ./desktop/scripts/build-sidecar.sh
 ```
 
+The Aider-backed agent runtime is a separate uv-managed Python environment. It
+is intentionally not installed into Matemium's engine venv, so the engine can
+move independently of Aider's Python support window.
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -e '.[dev,intelligence]' pyinstaller
+./desktop/scripts/setup-aider-runtime.sh
+```
+
+The setup script provisions `aider-chat` with uv using Python 3.12 by default
+and writes it to `.aider-runtime` for dev builds. The sidecar can also
+self-provision the runtime into `MATEMIUM_AIDER_RUNTIME_DIR` when a bundled or
+system `uv` executable is available. Release installers must therefore ship `uv`
+beside the app or preinstall the runtime under the app data directory at
+`bin/aider-runtime`. End users must not be asked to run setup scripts.
+
+Local autonomous edits do not require a user-managed Ollama install. The
+sidecar starts Matemium's OpenAI-compatible local provider on loopback and
+serves the selected downloaded GGUF model to Aider as `openai/matemium-local`.
+
 Artifacts:
 
 | Path | Purpose |

@@ -2,39 +2,93 @@ import { useEffect, useState } from "react";
 
 import * as api from "../api/tauri";
 import config from "../config.json";
-import type { Settings } from "../api/types";
+import type { ProviderModel, Settings } from "../api/types";
+import {
+  DEFAULT_PINNED_MODELS,
+  formatModelMeta,
+  modelDisplayName,
+  pinnedModelIds,
+  providerModelState,
+} from "../modelCatalog";
 import { formatError } from "../utils/errors";
 
 interface SettingsScreenProps {
   settings: Settings;
   busy: boolean;
+  initialSection?: SettingsSection;
   onChange: (settings: Settings) => void;
   onClose: () => void;
   onSave: (settings: Settings) => Promise<void>;
 }
 
-type SettingsSection = "general" | "account" | "ai";
+type SettingsSection = "general" | "account" | "providers" | "models" | "ai";
 
 const NAV_ITEMS: Array<{ id: SettingsSection; label: string; desc?: string }> = [
   { id: "general", label: "General", desc: "App behavior & connections" },
   { id: "account", label: "Account", desc: "Authentication & tokens" },
-  { id: "ai", label: "AI & LLM", desc: "Model provider & keys" },
+  { id: "providers", label: "AI Providers", desc: "External model keys" },
+  { id: "models", label: "Model Picker", desc: "Pinned cloud models" },
+  { id: "ai", label: "Offline AI", desc: "Local models & agent runtime" },
+];
+
+const PROVIDERS = [
+  {
+    id: "openrouter",
+    name: "OpenRouter",
+    status: "Supported",
+    description: "Default external provider. OAuth and manual keys are supported.",
+  },
+  {
+    id: "openai",
+    name: "OpenAI Compatible",
+    status: "Manual key",
+    description: "Direct OpenAI-compatible requests from this computer.",
+  },
+  {
+    id: "groq",
+    name: "Groq",
+    status: "Manual key",
+    description: "Direct Groq requests from this computer.",
+  },
+  {
+    id: "xai",
+    name: "xAI",
+    status: "Manual key",
+    description: "Direct xAI requests from this computer.",
+  },
 ];
 
 export function SettingsScreen({
   settings,
   busy,
+  initialSection = "general",
   onChange,
   onClose,
   onSave,
 }: SettingsScreenProps) {
-  const [activeSection, setActiveSection] = useState<SettingsSection>("general");
+  const [activeSection, setActiveSection] = useState<SettingsSection>(initialSection);
   const [email, setEmail] = useState("dev@matemium.app");
   const [password, setPassword] = useState("test");
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [openRouterBusy, setOpenRouterBusy] = useState(false);
+  const [openRouterError, setOpenRouterError] = useState<string | null>(null);
+  const [openRouterPendingUrl, setOpenRouterPendingUrl] = useState<string | null>(null);
+  const [openRouterCallbackUrl, setOpenRouterCallbackUrl] = useState<string | null>(null);
+  const [manualProviderKeys, setManualProviderKeys] = useState<Record<string, string>>({});
+  const [selectedProvider, setSelectedProvider] = useState("openrouter");
+  const [selectedModelProvider, setSelectedModelProvider] = useState("openrouter");
+  const [copiedAuthUrl, setCopiedAuthUrl] = useState(false);
+  const [copiedProviderKey, setCopiedProviderKey] = useState<string | null>(null);
+  const [modelSearch, setModelSearch] = useState("");
+  const [modelBusyProvider, setModelBusyProvider] = useState<string | null>(null);
+  const [modelError, setModelError] = useState<string | null>(null);
 
   const [assetStatuses, setAssetStatuses] = useState<Record<string, { downloaded: boolean; verified: boolean; progress?: number; error?: string; paused?: boolean }>>({});
+
+  useEffect(() => {
+    setActiveSection(initialSection);
+  }, [initialSection]);
 
   const refreshStatuses = async () => {
     try {
@@ -234,6 +288,245 @@ export function SettingsScreen({
     }
   };
 
+  const handleConnectOpenRouter = async () => {
+    setOpenRouterError(null);
+    setOpenRouterBusy(true);
+    setOpenRouterPendingUrl(null);
+    setOpenRouterCallbackUrl(null);
+    setCopiedAuthUrl(false);
+    try {
+      const started = await api.openrouterPrepareConnect();
+      setOpenRouterPendingUrl(started.authUrl);
+      setOpenRouterCallbackUrl(started.callbackUrl);
+      await api.openrouterCompleteConnect();
+      onChange(await api.settingsGet());
+    } catch (error) {
+      const message = formatError(error);
+      if (!message.toLowerCase().includes("cancelled")) {
+        setOpenRouterError(message);
+      }
+    } finally {
+      setOpenRouterBusy(false);
+      setOpenRouterPendingUrl(null);
+      setOpenRouterCallbackUrl(null);
+    }
+  };
+
+  const handleCancelOpenRouter = async () => {
+    try {
+      await api.openrouterCancelConnect();
+    } catch (error) {
+      setOpenRouterError(formatError(error));
+    } finally {
+      setOpenRouterBusy(false);
+      setOpenRouterPendingUrl(null);
+      setOpenRouterCallbackUrl(null);
+    }
+  };
+
+  const handleDisconnectOpenRouter = async () => {
+    setOpenRouterError(null);
+    setOpenRouterBusy(true);
+    try {
+      await api.openrouterDisconnect();
+      onChange(await api.settingsGet());
+    } catch (error) {
+      setOpenRouterError(formatError(error));
+    } finally {
+      setOpenRouterBusy(false);
+    }
+  };
+
+  const providerApiKey = (providerId: string) => {
+    switch (providerId) {
+      case "openrouter":
+        return settings.openrouterApiKey ?? null;
+      case "openai":
+        return settings.openaiApiKey ?? null;
+      case "groq":
+        return settings.groqApiKey ?? null;
+      case "xai":
+        return settings.xaiApiKey ?? null;
+      default:
+        return null;
+    }
+  };
+
+  const providerConnectedAt = (providerId: string) => {
+    switch (providerId) {
+      case "openrouter":
+        return settings.openrouterConnectedAt ?? null;
+      case "openai":
+        return settings.openaiConnectedAt ?? null;
+      case "groq":
+        return settings.groqConnectedAt ?? null;
+      case "xai":
+        return settings.xaiConnectedAt ?? null;
+      default:
+        return null;
+    }
+  };
+
+  const settingsWithProviderKey = (providerId: string, key: string | null): Settings => {
+    const connectedAt = key ? new Date().toISOString() : null;
+    const next: Settings = {
+      ...settings,
+      llmProvider: key ? providerId : settings.llmProvider,
+      usePersonalLlm: true,
+    };
+    if (providerId === "openrouter") {
+      next.openrouterApiKey = key;
+      next.openrouterUserId = key ? settings.openrouterUserId ?? null : null;
+      next.openrouterConnectedAt = connectedAt;
+    } else if (providerId === "openai") {
+      next.openaiApiKey = key;
+      next.openaiConnectedAt = connectedAt;
+    } else if (providerId === "groq") {
+      next.groqApiKey = key;
+      next.groqConnectedAt = connectedAt;
+    } else if (providerId === "xai") {
+      next.xaiApiKey = key;
+      next.xaiConnectedAt = connectedAt;
+    }
+    return next;
+  };
+
+  const handleSaveManualProviderKey = async (providerId: string) => {
+    const key = (manualProviderKeys[providerId] ?? "").trim();
+    if (!key) {
+      setOpenRouterError(`Enter a ${PROVIDERS.find((item) => item.id === providerId)?.name ?? "provider"} API key first.`);
+      return;
+    }
+    setOpenRouterError(null);
+    setOpenRouterBusy(true);
+    try {
+      await api.settingsSet(settingsWithProviderKey(providerId, key));
+      onChange(await api.settingsGet());
+      setManualProviderKeys((prev) => ({ ...prev, [providerId]: "" }));
+    } catch (error) {
+      setOpenRouterError(formatError(error));
+    } finally {
+      setOpenRouterBusy(false);
+    }
+  };
+
+  const handleCopyAuthUrl = async () => {
+    if (!openRouterPendingUrl) return;
+    try {
+      await navigator.clipboard.writeText(openRouterPendingUrl);
+      setCopiedAuthUrl(true);
+      window.setTimeout(() => setCopiedAuthUrl(false), 1500);
+    } catch {
+      setOpenRouterError("Could not copy the URL. Select and copy it manually.");
+    }
+  };
+
+  const maskedKey = (key: string | null | undefined) => {
+    const trimmed = (key ?? "").trim();
+    if (!trimmed) return "Not saved";
+    const ending = trimmed.slice(-8);
+    return `•••• •••• •••• ${ending}`;
+  };
+
+  const handleCopyProviderKey = async (providerId: string) => {
+    const key = providerApiKey(providerId)?.trim();
+    if (!key) return;
+    try {
+      await navigator.clipboard.writeText(key);
+      setCopiedProviderKey(providerId);
+      window.setTimeout(() => setCopiedProviderKey(null), 1500);
+    } catch {
+      setOpenRouterError("Could not copy the key.");
+    }
+  };
+
+  const handleDisconnectProvider = async (providerId: string) => {
+    if (providerId === "openrouter") {
+      await handleDisconnectOpenRouter();
+      return;
+    }
+    setOpenRouterError(null);
+    setOpenRouterBusy(true);
+    try {
+      await api.settingsSet(settingsWithProviderKey(providerId, null));
+      onChange(await api.settingsGet());
+    } catch (error) {
+      setOpenRouterError(formatError(error));
+    } finally {
+      setOpenRouterBusy(false);
+    }
+  };
+
+  const handleUseProvider = async (providerId: string) => {
+    setOpenRouterError(null);
+    setOpenRouterBusy(true);
+    try {
+      await api.settingsSet({ ...settings, llmProvider: providerId, usePersonalLlm: true });
+      onChange(await api.settingsGet());
+    } catch (error) {
+      setOpenRouterError(formatError(error));
+    } finally {
+      setOpenRouterBusy(false);
+    }
+  };
+
+  const handleRefreshProviderModels = async (providerId: string) => {
+    setModelError(null);
+    setModelBusyProvider(providerId);
+    try {
+      await api.providerModelsList(providerId, true);
+      onChange(await api.settingsGet());
+    } catch (error) {
+      setModelError(formatError(error));
+    } finally {
+      setModelBusyProvider(null);
+    }
+  };
+
+  const updateProviderPinnedModels = async (providerId: string, pinned: string[]) => {
+    const currentProviderModels = settings.providerModels ?? {};
+    const currentState = currentProviderModels[providerId] ?? {};
+    const next: Settings = {
+      ...settings,
+      providerModels: {
+        ...currentProviderModels,
+        [providerId]: {
+          ...currentState,
+          pinned: Array.from(new Set(pinned)),
+        },
+      },
+    };
+    onChange(next);
+    await api.settingsSet(next);
+    onChange(await api.settingsGet());
+  };
+
+  const handlePinProviderModel = async (providerId: string, modelId: string) => {
+    await updateProviderPinnedModels(providerId, [...pinnedModelIds(settings, providerId), modelId]);
+  };
+
+  const handleUnpinProviderModel = async (providerId: string, modelId: string) => {
+    await updateProviderPinnedModels(
+      providerId,
+      pinnedModelIds(settings, providerId).filter((id) => id !== modelId),
+    );
+  };
+
+  const displayedProviderModels = (providerId: string, catalog: ProviderModel[]) => {
+    const defaults = DEFAULT_PINNED_MODELS[providerId] ?? [];
+    const merged = [...defaults, ...catalog].filter(
+      (model, index, list) => list.findIndex((candidate) => candidate.id === model.id) === index,
+    );
+    const query = modelSearch.trim().toLowerCase();
+    if (!query) return merged.slice(0, 80);
+    return merged
+      .filter((model) => {
+        const haystack = `${model.id} ${model.name} ${(model.badges ?? []).join(" ")}`.toLowerCase();
+        return haystack.includes(query);
+      })
+      .slice(0, 80);
+  };
+
   const handleSave = async () => {
     await onSave(settings);
   };
@@ -292,7 +585,7 @@ export function SettingsScreen({
             <div className="settings-section-header">
               <h3>Account</h3>
               <p className="settings-section-desc">
-                API access for the Matemium platform and sidecar.
+                API access for Matemium Cloud account features.
               </p>
             </div>
 
@@ -306,7 +599,7 @@ export function SettingsScreen({
                 placeholder="Paste your access token here"
               />
               <div className="settings-hint">
-                Required for chat, rendering credits, and cloud features.
+                Required for account features such as profile and gallery access. Provider keys stay in the Providers tab.
               </div>
             </div>
 
@@ -379,6 +672,357 @@ export function SettingsScreen({
           </div>
         );
 
+      case "providers": {
+        const provider = PROVIDERS.find((item) => item.id === selectedProvider) ?? PROVIDERS[0];
+        const isOpenRouter = provider.id === "openrouter";
+        const selectedProviderKey = providerApiKey(provider.id);
+        const providerConnected = !!selectedProviderKey;
+        const connectedAt = providerConnectedAt(provider.id);
+        const manualKey = manualProviderKeys[provider.id] ?? "";
+
+        return (
+          <div className="settings-section settings-section-wide">
+            <div className="settings-section-header">
+              <h3>Providers</h3>
+              <p className="settings-section-desc">
+                Manage external AI providers on this computer. Provider keys are stored locally and requests go directly from your device to the provider.
+              </p>
+            </div>
+
+            <div className="settings-provider-grid">
+              <div className="settings-provider-column">
+                <div className="settings-column-title">Available providers</div>
+                <div className="settings-provider-list">
+                  {PROVIDERS.map((item) => {
+                    const active = selectedProvider === item.id;
+                    const connected = !!providerApiKey(item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`settings-provider-item ${active ? "active" : ""}`}
+                        onClick={() => setSelectedProvider(item.id)}
+                      >
+                        <div className="settings-provider-item-main">
+                          <span>{item.name}</span>
+                          {connected && <span className="settings-provider-dot" />}
+                        </div>
+                        <div className="settings-provider-item-meta">{connected ? "Connected" : item.status}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="settings-provider-column">
+                <div className="settings-column-title">Provider</div>
+                <div className="settings-provider-summary">
+                  <div className="settings-provider-name">{provider.name}</div>
+                  <div className="settings-provider-description">{provider.description}</div>
+                  {isOpenRouter ? (
+                    <div className={`settings-provider-state ${providerConnected ? "connected" : ""}`}>
+                      {providerConnected ? "Connected locally" : "Not connected"}
+                    </div>
+                  ) : (
+                    <div className={`settings-provider-state ${providerConnected ? "connected" : ""}`}>
+                      {providerConnected ? "Connected locally" : "Not connected"}
+                    </div>
+                  )}
+                  {connectedAt && (
+                    <div className="settings-hint">
+                      Connected {new Date(connectedAt).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="settings-provider-column settings-provider-detail">
+                <div className="settings-column-title">Connection</div>
+                <>
+                    {providerConnected ? (
+                      <div className="settings-connected-provider">
+                        <div className="settings-provider-name">{provider.name} is connected</div>
+                        <div className="settings-hint">
+                          To replace this key or start OAuth again, disconnect first.
+                        </div>
+                        <div className={`settings-provider-state ${settings.llmProvider === provider.id ? "connected" : ""}`}>
+                          {settings.llmProvider === provider.id ? "Active for external AI" : "Connected but not active"}
+                        </div>
+                        <div className="settings-key-row">
+                          <div>
+                            <div className="settings-key-label">Saved key</div>
+                            <div className="settings-key-value">{maskedKey(selectedProviderKey)}</div>
+                          </div>
+                          <button type="button" className="btn" onClick={() => void handleCopyProviderKey(provider.id)}>
+                            {copiedProviderKey === provider.id ? "Copied" : "Copy"}
+                          </button>
+                        </div>
+                        {settings.llmProvider !== provider.id && (
+                          <button
+                            type="button"
+                            className="btn btn-primary settings-btn-block"
+                            disabled={openRouterBusy}
+                            onClick={() => void handleUseProvider(provider.id)}
+                          >
+                            Use {provider.name} for external AI
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn settings-btn-block"
+                          disabled={openRouterBusy}
+                          onClick={() => void handleDisconnectProvider(provider.id)}
+                        >
+                          Disconnect {provider.name}
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <label className="settings-label">Manual API key</label>
+                        <input
+                          className="settings-input"
+                          type="password"
+                          value={manualKey}
+                          onChange={(e) => setManualProviderKeys((prev) => ({ ...prev, [provider.id]: e.target.value }))}
+                          placeholder={isOpenRouter ? "sk-or-v1-..." : "Paste API key"}
+                          autoComplete="off"
+                        />
+                        <div className="settings-hint">
+                          Paste a {provider.name} key if you already have one. It is saved only in Matemium desktop settings on this computer.
+                        </div>
+
+                        <div className="settings-provider-actions">
+                          <button
+                            type="button"
+                            className="btn"
+                            disabled={openRouterBusy || !manualKey.trim()}
+                            onClick={() => void handleSaveManualProviderKey(provider.id)}
+                          >
+                            Save manual key
+                          </button>
+                        </div>
+
+                        {isOpenRouter && (
+                          <>
+                            <div className="settings-provider-divider" />
+
+                            <div className="settings-provider-name">Automatic connection</div>
+                            <div className="settings-hint">
+                              Matemium opens OpenRouter in your browser. The key is labeled Matemium and the callback stays on this computer.
+                            </div>
+                            {!openRouterBusy ? (
+                              <button
+                                type="button"
+                                className="btn btn-primary settings-btn-block"
+                                onClick={() => void handleConnectOpenRouter()}
+                              >
+                                Connect OpenRouter Account
+                              </button>
+                            ) : (
+                              <div className="settings-oauth-pending">
+                                <div className="settings-provider-name">Browser opened</div>
+                                <div className="settings-hint">
+                                  Complete authorization in the browser, or copy this URL and open it using your preferred browser. OpenRouter may show the temporary local callback address because the desktop app receives the code on this computer.
+                                </div>
+                                <div className="settings-copy-row">
+                                  <input
+                                    className="settings-input"
+                                    value={openRouterPendingUrl ?? ""}
+                                    readOnly
+                                    onFocus={(event) => event.currentTarget.select()}
+                                  />
+                                  <button type="button" className="btn" onClick={() => void handleCopyAuthUrl()}>
+                                    {copiedAuthUrl ? "Copied" : "Copy"}
+                                  </button>
+                                </div>
+                                {openRouterCallbackUrl && (
+                                  <div className="settings-hint">
+                                    Waiting for callback on {openRouterCallbackUrl}
+                                  </div>
+                                )}
+                                <button
+                                  type="button"
+                                  className="btn settings-btn-block"
+                                  onClick={() => void handleCancelOpenRouter()}
+                                >
+                                  Cancel connection
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </>
+                    )}
+                    {openRouterError && <p className="settings-error">{openRouterError}</p>}
+                  </>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      case "models": {
+        const provider = PROVIDERS.find((item) => item.id === selectedModelProvider) ?? PROVIDERS[0];
+        const providerConnected = !!providerApiKey(provider.id);
+        const modelState = providerModelState(settings, provider.id);
+        const pinnedIds = pinnedModelIds(settings, provider.id);
+        const catalog = modelState.catalog ?? [];
+        const fetchedAt = modelState.fetchedAt ? new Date(modelState.fetchedAt).toLocaleString() : null;
+        const visibleModels = displayedProviderModels(provider.id, catalog);
+        const refreshingModels = modelBusyProvider === provider.id;
+
+        return (
+          <div className="settings-section settings-section-wide">
+            <div className="settings-section-header">
+              <h3>Model Picker</h3>
+              <p className="settings-section-desc">
+                Choose which cloud models appear in the chat dropdown. Catalogs and pinned models are stored locally on this computer.
+              </p>
+            </div>
+
+            <div className="settings-model-management-grid">
+              <div className="settings-provider-column">
+                <div className="settings-column-title">Provider catalogs</div>
+                <div className="settings-provider-list">
+                  {PROVIDERS.map((item) => {
+                    const active = selectedModelProvider === item.id;
+                    const connected = !!providerApiKey(item.id);
+                    const count = pinnedModelIds(settings, item.id).length;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`settings-provider-item ${active ? "active" : ""}`}
+                        onClick={() => setSelectedModelProvider(item.id)}
+                      >
+                        <div className="settings-provider-item-main">
+                          <span>{item.name}</span>
+                          {connected && <span className="settings-provider-dot" />}
+                        </div>
+                        <div className="settings-provider-item-meta">
+                          {connected ? `${count} in picker` : "Connect provider first"}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="settings-provider-column settings-model-picker-detail">
+                <div className="settings-model-browser">
+                  <div className="settings-model-browser-header">
+                    <div>
+                      <div className="settings-provider-name">{provider.name}</div>
+                      <div className="settings-hint">
+                        Pinned models appear in the chat dropdown when this provider is active.
+                      </div>
+                    </div>
+                    {providerConnected ? (
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={refreshingModels}
+                        onClick={() => void handleRefreshProviderModels(provider.id)}
+                      >
+                        {refreshingModels ? "Refreshing..." : catalog.length ? "Refresh catalog" : "Browse catalog"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          setSelectedProvider(provider.id);
+                          setActiveSection("providers");
+                        }}
+                      >
+                        Connect provider
+                      </button>
+                    )}
+                  </div>
+
+                  <div className={`settings-provider-state ${providerConnected ? "connected" : ""}`}>
+                    {providerConnected ? "Catalog available with local provider key" : "Provider not connected"}
+                  </div>
+
+                  <div className="settings-column-title">Pinned in chat picker</div>
+                  <div className="settings-model-pinned">
+                    {pinnedIds.map((id) => {
+                      const model = visibleModels.find((item) => item.id === id)
+                        ?? catalog.find((item) => item.id === id)
+                        ?? (DEFAULT_PINNED_MODELS[provider.id] ?? []).find((item) => item.id === id)
+                        ?? { id, name: modelDisplayName(id), provider: provider.id };
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          className="settings-model-chip"
+                          onClick={() => void handleUnpinProviderModel(provider.id, id)}
+                          title="Remove from chat picker"
+                        >
+                          {model.name}
+                          <span>Remove</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="settings-model-toolbar">
+                    <input
+                      className="settings-input"
+                      value={modelSearch}
+                      onChange={(event) => setModelSearch(event.target.value)}
+                      placeholder="Search provider models"
+                      disabled={!providerConnected}
+                    />
+                    {fetchedAt && <div className="settings-hint">Refreshed {fetchedAt}</div>}
+                  </div>
+                  {modelError && <p className="settings-error">{modelError}</p>}
+
+                  <div className="settings-model-catalog settings-model-catalog-large">
+                    {providerConnected && visibleModels.map((model) => {
+                      const pinned = pinnedIds.includes(model.id);
+                      return (
+                        <div key={model.id} className="settings-model-catalog-row">
+                          <div className="settings-model-catalog-main">
+                            <div className="settings-model-name">{model.name}</div>
+                            <div className="settings-model-id">{model.id}</div>
+                            <div className="settings-model-meta">{formatModelMeta(model)}</div>
+                            {!!model.badges?.length && (
+                              <div className="settings-model-badges">
+                                {model.badges.slice(0, 4).map((badge) => (
+                                  <span key={badge} className="settings-model-badge">{badge}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => pinned
+                              ? void handleUnpinProviderModel(provider.id, model.id)
+                              : void handlePinProviderModel(provider.id, model.id)}
+                          >
+                            {pinned ? "Pinned" : "Add"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {providerConnected && !visibleModels.length && (
+                      <div className="settings-empty-models">
+                        Refresh the catalog, then search the models this provider returns.
+                      </div>
+                    )}
+                    {!providerConnected && (
+                      <div className="settings-empty-models">
+                        Connect {provider.name} in AI Providers before browsing its model catalog.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
       case "ai":
         return (
           <div className="settings-section" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -389,184 +1033,81 @@ export function SettingsScreen({
               </p>
             </div>
 
-            {/* Local LLM Offline Engine (Offline-First) */}
-            <div className="settings-card" style={{ border: settings.useLocalLlm ? "1px solid var(--accent-color, #06b6d4)" : "1px solid var(--border-color)" }}>
-              <label className="settings-checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={!!settings.useLocalLlm}
-                  onChange={(e) => {
-                    update({
-                      useLocalLlm: e.target.checked,
-                      usePersonalLlm: e.target.checked ? false : settings.usePersonalLlm,
-                    });
-                  }}
-                />
-                <div>
-                  <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-                    Enable Local LLM Engine <span style={{
-                      borderRadius: 4,
-                      padding: "2px 6px",
-                      fontSize: 10,
-                      background: "var(--accent-dim, rgba(6, 182, 212, 0.15))",
-                      color: "var(--accent-color, #06b6d4)",
-                      fontWeight: 700,
-                      textTransform: "uppercase"
-                    }}>Offline Mode</span>
-                  </div>
-                  <div className="settings-hint" style={{ marginTop: 2 }}>
-                    Run state-of-the-art open mathematical assistant models entirely on your machine.
-                  </div>
-                </div>
-              </label>
-
-              {settings.useLocalLlm && (
-                <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-dim)" }}>
-                    Select local model:
-                  </div>
-
-                  {/* Model 1: Qwen 3B */}
-                  <div className="settings-model-row" style={{
-                    border: "1px solid var(--border-color)",
-                    borderRadius: 6,
-                    padding: 12,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                    background: settings.localLlmModel === "llm-qwen-coder-3b-q4" ? "rgba(6, 182, 212, 0.05)" : "transparent"
-                  }}>
-                    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
-                      <input
-                        type="radio"
-                        name="local-llm-model"
-                        checked={settings.localLlmModel === "llm-qwen-coder-3b-q4"}
-                        onChange={() => update({ localLlmModel: "llm-qwen-coder-3b-q4" })}
-                        style={{ marginTop: 3 }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>Lite Tier: Qwen-2.5-Coder-3B-Instruct (1.9 GB)</div>
-                        <div className="settings-hint" style={{ fontSize: 11 }}>
-                          Optimized for low RAM (4GB+) and CPU-only devices. Ultra-fast generation.
-                        </div>
-                      </div>
-                    </label>
-                    {renderModelStatus("llm-qwen-coder-3b-q4")}
-                  </div>
-
-                  {/* Model 2: Qwen 7B */}
-                  <div className="settings-model-row" style={{
-                    border: "1px solid var(--border-color)",
-                    borderRadius: 6,
-                    padding: 12,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                    background: settings.localLlmModel === "llm-qwen-coder-7b-q4" ? "rgba(6, 182, 212, 0.05)" : "transparent"
-                  }}>
-                    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
-                      <input
-                        type="radio"
-                        name="local-llm-model"
-                        checked={settings.localLlmModel === "llm-qwen-coder-7b-q4"}
-                        onChange={() => update({ localLlmModel: "llm-qwen-coder-7b-q4" })}
-                        style={{ marginTop: 3 }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>Balanced Tier: Qwen-2.5-Coder-7B-Instruct (4.7 GB)</div>
-                        <div className="settings-hint" style={{ fontSize: 11 }}>
-                          Perfect math layouts and coding correctness. Recommended for dedicated GPUs and M1/M2/M3 Macs.
-                        </div>
-                      </div>
-                    </label>
-                    {renderModelStatus("llm-qwen-coder-7b-q4")}
-                  </div>
-
-                  {/* Model 3: Llama 8B */}
-                  <div className="settings-model-row" style={{
-                    border: "1px solid var(--border-color)",
-                    borderRadius: 6,
-                    padding: 12,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                    background: settings.localLlmModel === "llm-llama-8b-q4" ? "rgba(6, 182, 212, 0.05)" : "transparent"
-                  }}>
-                    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
-                      <input
-                        type="radio"
-                        name="local-llm-model"
-                        checked={settings.localLlmModel === "llm-llama-8b-q4"}
-                        onChange={() => update({ localLlmModel: "llm-llama-8b-q4" })}
-                        style={{ marginTop: 3 }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>Elite Tier: Llama-3-8B-Instruct (4.9 GB)</div>
-                        <div className="settings-hint" style={{ fontSize: 11 }}>
-                          Exceptional pedagogy and scripting style. Best for top-tier workstations.
-                        </div>
-                      </div>
-                    </label>
-                    {renderModelStatus("llm-llama-8b-q4")}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Cloud Hosted LLM options */}
-            <div className="settings-card" style={{
-              opacity: settings.useLocalLlm ? 0.5 : 1,
-              pointerEvents: settings.useLocalLlm ? "none" : "auto",
-              transition: "opacity 0.2s ease"
-            }}>
-              <label className="settings-checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={!!settings.usePersonalLlm}
-                  disabled={!!settings.useLocalLlm}
-                  onChange={(e) => update({ usePersonalLlm: e.target.checked })}
-                />
-                <div>
-                  <div style={{ fontWeight: 600 }}>Use my personal API keys (BYO)</div>
-                  <div className="settings-hint" style={{ marginTop: 2 }}>
-                    Bring your own keys for OpenAI, Groq, xAI, etc. Keys are managed in the web dashboard.
-                  </div>
-                </div>
-              </label>
-
-              <div className="settings-field settings-field-tight">
-                <label className="settings-label">LLM Provider</label>
-                <select
-                  className="settings-select"
-                  value={settings.llmProvider || "openai"}
-                  disabled={!!settings.useLocalLlm}
-                  onChange={(e) => update({ llmProvider: e.target.value })}
-                >
-                  <option value="openai">OpenAI / Compatible</option>
-                  <option value="groq">Groq (fast)</option>
-                  <option value="xai">xAI</option>
-                  <option value="openrouter">OpenRouter</option>
-                </select>
+            {/* Local model asset management */}
+            <div className="settings-card">
+              <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                Local model downloads <span style={{
+                  borderRadius: 4,
+                  padding: "2px 6px",
+                  fontSize: 10,
+                  background: "var(--accent-dim, rgba(6, 182, 212, 0.15))",
+                  color: "var(--accent-color, #06b6d4)",
+                  fontWeight: 700,
+                  textTransform: "uppercase"
+                }}>Offline Assets</span>
+              </div>
+              <div className="settings-hint" style={{ marginTop: 2 }}>
+                Download local models here. Choose Local or Cloud, and pick the active model, from the chat header.
               </div>
 
-              <div style={{ marginTop: 12 }}>
-                <button
-                  type="button"
-                  className="btn settings-btn-block"
-                  disabled={!!settings.useLocalLlm}
-                  onClick={() =>
-                    window.open(
-                      `${config.serverUrl}/dashboard`,
-                      "_blank"
-                    )
-                  }
-                >
-                  Manage keys &amp; credits in web dashboard →
-                </button>
+              <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Model 1: Qwen 3B */}
+                <div className="settings-model-row" style={{
+                  border: "1px solid var(--border-color)",
+                  borderRadius: 6,
+                  padding: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>Lite Tier: Qwen-2.5-Coder-3B-Instruct (1.9 GB)</div>
+                    <div className="settings-hint" style={{ fontSize: 11 }}>
+                      Optimized for low RAM (4GB+) and CPU-only devices. Ultra-fast generation.
+                    </div>
+                  </div>
+                  {renderModelStatus("llm-qwen-coder-3b-q4")}
+                </div>
+
+                {/* Model 2: Qwen 7B */}
+                <div className="settings-model-row" style={{
+                  border: "1px solid var(--border-color)",
+                  borderRadius: 6,
+                  padding: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>Balanced Tier: Qwen-2.5-Coder-7B-Instruct (4.7 GB)</div>
+                    <div className="settings-hint" style={{ fontSize: 11 }}>
+                      Perfect math layouts and coding correctness. Recommended for dedicated GPUs and M1/M2/M3 Macs.
+                    </div>
+                  </div>
+                  {renderModelStatus("llm-qwen-coder-7b-q4")}
+                </div>
+
+                {/* Model 3: Llama 8B */}
+                <div className="settings-model-row" style={{
+                  border: "1px solid var(--border-color)",
+                  borderRadius: 6,
+                  padding: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>Elite Tier: Llama-3-8B-Instruct (4.9 GB)</div>
+                    <div className="settings-hint" style={{ fontSize: 11 }}>
+                      Exceptional pedagogy and scripting style. Best for top-tier workstations.
+                    </div>
+                  </div>
+                  {renderModelStatus("llm-llama-8b-q4")}
+                </div>
               </div>
             </div>
 
-            {/* Autonomous ReAct Agent Mode Option */}
+            {/* Autonomous Aider runtime */}
             <div className="settings-card" style={{ border: settings.useAutonomousAgent ? "1px solid #eab308" : "1px solid var(--border-color)" }}>
               <label className="settings-checkbox-row">
                 <input
@@ -580,7 +1121,7 @@ export function SettingsScreen({
                 />
                 <div>
                   <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-                    Enable Autonomous ReAct Agent Mode <span style={{
+                    Enable autonomous agent mode <span style={{
                       borderRadius: 4,
                       padding: "2px 6px",
                       fontSize: 10,
@@ -588,19 +1129,17 @@ export function SettingsScreen({
                       color: "#eab308",
                       fontWeight: 700,
                       textTransform: "uppercase"
-                    }}>Experimental</span>
+                    }}>Aider</span>
                   </div>
                   <div className="settings-hint" style={{ marginTop: 2 }}>
-                    Allow the AI to autonomously reason, search files, read slices, apply patches, and compile/self-heal in a multi-turn ReAct loop.
+                    Uses Aider as the coding-agent runtime for local and external models. Agent actions may modify project files; review the activity ledger and resulting changes.
                   </div>
                 </div>
               </label>
             </div>
 
             <div className="settings-hint">
-              {settings.useLocalLlm
-                ? "Running with local model. Internet access is not required."
-                : "The desktop app just selects the mode. Actual keys and billing live on the web."}
+              AI mode is controlled from the chat header. Settings only manages provider keys and local model downloads.
             </div>
           </div>
         );

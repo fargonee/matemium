@@ -1,100 +1,23 @@
-import { Link, useSearchParams } from "react-router-dom";
-import { useEffect } from "react";
-import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 
-import { useGetMeQuery } from "@/api/matemiumApi";
-import { ManageBillingButton } from "@/components/manage-billing-button";
 import { Card } from "@/components/ui/card";
-import type { RootState } from "@/store";
 
 export function DashboardBillingPage() {
-  const user = useSelector((state: RootState) => state.auth.user);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const checkoutSuccess = searchParams.get("checkout") === "success";
-
-  const { data: account, refetch, isLoading, error } = useGetMeQuery(undefined, { skip: !user });
-  const plan = account?.profile.plan ?? "free";
-  const sub = account?.subscription;
-
-  useEffect(() => {
-    if (checkoutSuccess && user) {
-      // Refetch latest plan/subscription after Lemon Squeezy redirect
-      void refetch();
-      // Remove the query param for cleaner URL
-      setTimeout(() => {
-        setSearchParams({}, { replace: true });
-      }, 1500);
-    }
-  }, [checkoutSuccess, user, refetch, setSearchParams]);
-
-  if (isLoading) {
-    return <div className="text-sm text-text-muted">Loading billing…</div>;
-  }
-  if (error) {
-    return <div className="text-sm text-red-300">Failed to load billing status.</div>;
-  }
-
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-      {checkoutSuccess ? (
-        <div className="lg:col-span-2 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm">
-          Thank you! Your checkout completed. Your subscription status is updating…
-        </div>
-      ) : null}
-
+    <div className="max-w-2xl">
       <Card>
-        <h2 className="text-lg font-semibold">Subscription</h2>
-        <dl className="mt-4 space-y-3 text-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-text-subtle">Plan</dt>
-            <dd className="font-medium capitalize">{plan}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-text-subtle">Status</dt>
-            <dd className="font-medium capitalize">{sub?.status ?? "active"}</dd>
-          </div>
-          {sub?.current_period_end ? (
-            <div className="flex justify-between gap-4">
-              <dt className="text-text-subtle">Renews</dt>
-              <dd className="font-medium">
-                {new Date(sub.current_period_end).toLocaleDateString()}
-              </dd>
-            </div>
-          ) : null}
-        </dl>
-
-        <div className="mt-6 flex flex-wrap gap-3">
-          {plan === "free" ? (
-            <Link
-              to="/pricing"
-              className="inline-flex rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-hover"
-            >
-              Upgrade to Pro
-            </Link>
-          ) : (
-            <ManageBillingButton hasSubscription={account?.profile.plan === "pro"} />
-          )}
-        </div>
-      </Card>
-
-      <Card>
-        <h2 className="text-lg font-semibold">What&apos;s included</h2>
-        <ul className="mt-4 space-y-2 text-sm text-text-muted">
-          {plan === "pro" ? (
-            <>
-              <li>High & final render quality</li>
-              <li>Reel cutting & static export</li>
-              <li>Priority AI usage</li>
-              <li>Multiple workspaces</li>
-            </>
-          ) : (
-            <>
-              <li>Desktop editor & AI chat</li>
-              <li>Preview-quality renders</li>
-              <li>Single workspace</li>
-            </>
-          )}
-        </ul>
+        <h2 className="text-lg font-semibold">No billing required</h2>
+        <p className="mt-2 text-sm text-text-muted">
+          Matemium is free to use. There are no subscriptions, paid tiers, or
+          Matemium AI credits.
+        </p>
+        <p className="mt-3 text-sm text-text-muted">
+          External AI uses your connected provider account. OpenRouter is the
+          default provider, and local models remain available for offline use.
+        </p>
+        <Link to="/dashboard/account" className="mt-5 inline-block text-sm font-medium">
+          Manage provider keys →
+        </Link>
       </Card>
     </div>
   );

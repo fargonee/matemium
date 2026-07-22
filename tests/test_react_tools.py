@@ -116,6 +116,9 @@ def test_apply_diff_patch_tool(tmp_path: Path):
         project_dir=str(project_dir)
     )
     assert "Successfully applied patch" in res
+    assert "sha256:" in res
+    assert "remaining search occurrences: 0" in res
+    assert "replacement occurrences: 1" in res
     assert "Hello World" in scenes_file.read_text(encoding="utf-8")
     
     # Ambiguous search patch error

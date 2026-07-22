@@ -49,9 +49,10 @@ Configured in `tauri.conf.json`:
 | Command | Description |
 |---------|-------------|
 | `project_list` | List workspaces with `project.json` |
-| `project_create` | New UUID dir + template `scenes.py` (+ `assets.py` for agent) |
-| `project_open` | Paths + `scenes.py` + `assets.py` content |
-| `project_save` / `project_save_assets` | Write editor buffer(s) to disk |
+| `project_create` | New UUID workspace with `scenes.py`, `helpers.py`, `brief/`, `assets/`, and `renders/` |
+| `project_open` | Project metadata plus all approved editable project files |
+| `project_save` / `project_save_file` | Write validated editor buffers to disk |
+| `project_list_media` / `project_import_media` / `project_delete_media` | Manage project source assets |
 | `project_delete` | Remove workspace dir |
 | `sidecar_ping` | IPC `ping` |
 | `sidecar_lint` | IPC `lint_project` |

@@ -20,9 +20,9 @@
     },
     "authoring_mode": {
       "type": "string",
-      "enum": ["single_file", "two_file"],
-      "default": "single_file",
-      "description": "single_file: scenes.py only (v1 chat). two_file: scenes.py + assets.py (v2 agent)."
+      "enum": ["single_file", "project_workspace"],
+      "default": "project_workspace",
+      "description": "project_workspace: scenes.py + helpers.py + brief/ project memory."
     },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" }

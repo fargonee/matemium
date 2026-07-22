@@ -1,0 +1,26 @@
+{
+  "current_phase": "concept",
+  "phases": [
+    {
+      "id": "concept",
+      "title": "Concept and brief",
+      "status": "in_progress",
+      "progress": 20,
+      "notes": ""
+    },
+    {
+      "id": "production",
+      "title": "Scene production",
+      "status": "todo",
+      "progress": 0,
+      "notes": ""
+    },
+    {
+      "id": "review",
+      "title": "Review and delivery",
+      "status": "todo",
+      "progress": 0,
+      "notes": ""
+    }
+  ]
+}

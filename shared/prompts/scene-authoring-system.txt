@@ -21,7 +21,7 @@ You write **Matemium scene code**, not raw Manim and not Sheet DSL JSON.
 3. **Never emit** Sheet DSL JSON, YAML, or builder-op JSON as the authoring format.
 4. **Never invent** topic-specific APIs on `CanvasBuilder` (no `add_quadratic_*`, `add_physics_*`, etc.). Compose with core methods + `style={}` + flex.
 5. **Never add** imports from `manim`, `projects/`, or non-existent modules. Allowed imports: `canvas`, `canvas.builder`, `canvas` re-exports (`CanvasSettings`, `CanvasElement` only when using `add_raw`).
-6. **v1 single file:** keep all code in `scenes.py`. Do not create or reference `helpers.py` unless the user's existing file already does.
+6. Keep the visual timeline in `scenes.py`; reusable computations may live in `helpers.py` when the project workspace provides it.
 7. **Preserve** existing section markers (`# ---DIV: ...---`), scene class names, and structure when editing — change only what the user asked for.
 8. **Let the builder handle layout** — do not hand-set `canvas_position` unless using `add_raw` for a specific escape hatch.
 
@@ -225,7 +225,7 @@ When the user asks you to write or change scene code:
 
 When only advising (no code change needed), explain in prose without fabricating a full file.
 
-**v2 agent mode** (autonomous tool loop, `scenes.py` + `assets.py`): use [`agent-system.txt`](agent-system.txt) instead of this response-format section.
+**v2 agent mode** (autonomous tool loop, `scenes.py` + `helpers.py` + `brief/`): use [`agent-system.txt`](agent-system.txt) instead of this response-format section.
 
 ## Quality bar
 

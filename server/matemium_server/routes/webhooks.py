@@ -1,34 +1,16 @@
 from __future__ import annotations
 
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, HTTPException, Request
-
-from ..services.billing import BillingService
-from ..services.supabase import SupabaseService, get_supabase_service
+from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(tags=["webhooks"])
-
-
-def _billing_service(
-    supabase: SupabaseService = Depends(get_supabase_service),
-) -> BillingService:
-    return BillingService(supabase)
 
 
 @router.post("/webhooks/lemonsqueezy")
 async def lemon_squeezy_webhook(
     request: Request,
-    billing: Annotated[BillingService, Depends(_billing_service)],
 ) -> dict[str, bool]:
-    payload = await request.body()
-    signature = request.headers.get("x-signature") or request.headers.get("X-Signature")
-
-    try:
-        await billing.handle_webhook(payload, signature)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    return {"received": True}
+    _ = await request.body()
+    raise HTTPException(
+        status_code=410,
+        detail="Lemon Squeezy webhooks are disabled because Matemium is free.",
+    )

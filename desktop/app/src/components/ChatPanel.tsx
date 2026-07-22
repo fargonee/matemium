@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatMessage, CodeEdit, Conversation } from "../api/types";
+import type { AgentTraceEntry, ChatMessage, CodeEdit, Conversation, ProviderModel } from "../api/types";
+import { formatModelMeta, modelDisplayName } from "../modelCatalog";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
   pendingEdit: CodeEdit | null;
   input: string;
   busy: boolean;
-  progressStep?: "idle" | "preparing" | "retrieving" | "thinking" | "processing" | "refreshing";
   contextMatches?: Array<{ file: string; score?: number }>;
   validationErrors?: Array<{ line: number; message: string }>;
   onFixErrors?: () => void;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onCancel?: () => void;
+  canCancel?: boolean;
   onApplyEdit: () => void;
-  // LLM status from profile (for credits / mode visibility)
+  // LLM status from profile (provider/mode visibility)
   llmStatus?: string;
   onGenerateAudio?: () => void;
   disabled?: boolean;
@@ -27,6 +29,9 @@ interface ChatPanelProps {
   onLocalLlmModelChange?: (val: string) => void;
   externalLlmModel?: string;
   onExternalLlmModelChange?: (val: string) => void;
+  externalModelOptions?: ProviderModel[];
+  onManageExternalModels?: () => void;
+  openRouterFreeDisabledUntil?: string | null;
   reasoningLevel?: string;
   onReasoningLevelChange?: (val: string) => void;
   downloadedModels?: Record<string, boolean>;
@@ -36,6 +41,20 @@ interface ChatPanelProps {
   onSelectConversation?: (id: string) => void;
   onNewConversation?: () => void;
   onDeleteConversation?: (id: string) => void;
+  autonomousEnabled?: boolean;
+  onToggleAutonomous?: (enabled: boolean) => void;
+  autonomousUnavailableReason?: string;
+  configuredRuntime?: string;
+  responseMetadata?: {
+    runtime: string;
+    model: string;
+    provider: string;
+    billingMode: string;
+    requestId: string;
+    stub: boolean;
+    trace: AgentTraceEntry[];
+  };
+  liveAgentTrace?: AgentTraceEntry[];
 }
 
 export function ChatPanel({
@@ -43,12 +62,13 @@ export function ChatPanel({
   pendingEdit,
   input,
   busy,
-  progressStep,
   contextMatches,
   validationErrors,
   onFixErrors,
   onInputChange,
   onSend,
+  onCancel,
+  canCancel = false,
   onApplyEdit,
   llmStatus,
   onGenerateAudio,
@@ -60,8 +80,11 @@ export function ChatPanel({
   onToggleLocalLlm,
   localLlmModel = "llm-qwen-coder-3b-q4",
   onLocalLlmModelChange,
-  externalLlmModel = "gpt-4o-mini",
+  externalLlmModel = "openai/gpt-4o-mini",
   onExternalLlmModelChange,
+  externalModelOptions = [],
+  onManageExternalModels,
+  openRouterFreeDisabledUntil,
   reasoningLevel = "low",
   onReasoningLevelChange,
   downloadedModels = {},
@@ -70,12 +93,42 @@ export function ChatPanel({
   onSelectConversation,
   onNewConversation,
   onDeleteConversation,
+  autonomousEnabled = false,
+  onToggleAutonomous,
+  autonomousUnavailableReason,
+  configuredRuntime = "aider-v1",
+  responseMetadata,
+  liveAgentTrace = [],
 }: ChatPanelProps) {
-  const stepsOrder = ["preparing", "retrieving", "thinking", "processing", "refreshing"] as const;
-
+  const freeDisabledUntil = openRouterFreeDisabledUntil ? new Date(openRouterFreeDisabledUntil) : null;
+  const freeModelDisabled = !!freeDisabledUntil && freeDisabledUntil.getTime() > Date.now();
+  const freeModelRenewal = freeModelDisabled && freeDisabledUntil
+    ? freeDisabledUntil.toLocaleString()
+    : null;
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [completedTraceEvents, setCompletedTraceEvents] = useState<AgentTraceEntry[]>([]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const wasBusyRef = useRef(false);
+  const [timerNow, setTimerNow] = useState(() => Date.now());
+  const rawTraceEvents = liveAgentTrace.length ? liveAgentTrace : responseMetadata?.trace ?? [];
+  const traceEvents = rawTraceEvents.filter((event) => !isHeartbeatEvent(event));
+  const archivedTraceEvents = completedTraceEvents.length
+    ? completedTraceEvents
+    : (responseMetadata?.trace ?? []).filter((event) => !isHeartbeatEvent(event));
+  const visibleExternalModels = externalModelOptions.length
+    ? externalModelOptions
+    : [{ id: externalLlmModel, name: modelDisplayName(externalLlmModel), provider: "openrouter" }];
+  const selectedExternalModel = visibleExternalModels.some((model) => model.id === externalLlmModel)
+    ? externalLlmModel
+    : visibleExternalModels[0]?.id ?? externalLlmModel;
+
+  useEffect(() => {
+    if (!useLocalLlm && selectedExternalModel !== externalLlmModel) {
+      onExternalLlmModelChange?.(selectedExternalModel);
+    }
+  }, [externalLlmModel, onExternalLlmModelChange, selectedExternalModel, useLocalLlm]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -97,17 +150,49 @@ export function ChatPanel({
     }
   }, [input]);
 
-  function getStepStatus(
-    step: typeof stepsOrder[number],
-    current: typeof stepsOrder[number] | "idle" | undefined
-  ) {
-    if (!current || current === "idle") return "pending";
-    const stepIdx = stepsOrder.indexOf(step);
-    const currentIdx = stepsOrder.indexOf(current);
-    if (stepIdx < currentIdx) return "completed";
-    if (stepIdx === currentIdx) return "active";
-    return "pending";
-  }
+  useEffect(() => {
+    const history = historyRef.current;
+    if (!history) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      history.scrollTo({ top: history.scrollHeight, behavior: "smooth" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    messages.length,
+    traceEvents.length,
+    archivedTraceEvents.length,
+    busy,
+    pendingEdit,
+    contextMatches?.length,
+    validationErrors?.length,
+  ]);
+
+  useEffect(() => {
+    if (busy && !wasBusyRef.current) {
+      setCompletedTraceEvents([]);
+    }
+
+    if (traceEvents.length > 0) {
+      setCompletedTraceEvents(traceEvents);
+    }
+
+    wasBusyRef.current = busy;
+  }, [busy, traceEvents]);
+
+  useEffect(() => {
+    setCompletedTraceEvents([]);
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    if (!busy) {
+      setTimerNow(Date.now());
+      return;
+    }
+    const timer = window.setInterval(() => setTimerNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [busy]);
 
   interface ToolCallData {
     name: string;
@@ -115,12 +200,10 @@ export function ChatPanel({
   }
 
   function parseResponseBlocks(content: string): { 
-    thought: string | null; 
     toolCall: ToolCallData | null;
     toolOutput: string | null;
     cleanContent: string;
   } {
-    let thought: string | null = null;
     let toolCall: ToolCallData | null = null;
     let toolOutput: string | null = null;
     let cleanContent = content;
@@ -128,7 +211,6 @@ export function ChatPanel({
     const thoughtRegex = /<(?:thought|reasoning)>([\s\S]*?)<\/(?:thought|reasoning)>/gi;
     const thoughtMatch = thoughtRegex.exec(content);
     if (thoughtMatch) {
-      thought = thoughtMatch[1].trim();
       cleanContent = cleanContent.replace(thoughtRegex, "");
     }
 
@@ -149,19 +231,232 @@ export function ChatPanel({
       cleanContent = cleanContent.replace(toolOutputRegex, "");
     }
 
-    return { 
-      thought, 
+    return {
       toolCall, 
       toolOutput,
       cleanContent: cleanContent.trim() 
     };
   }
 
+  function safeDiagnostic(value: string): string {
+    const redacted = value
+      .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s]+/gi, "$1[REDACTED]")
+      .replace(/((?:api[_-]?key|token|secret|password)\s*[:=]\s*)[^\s,;}]+/gi, "$1[REDACTED]");
+    return redacted.length > 4096 ? `${redacted.slice(0, 4096)}\n… output truncated` : redacted;
+  }
+
+  function traceTone(event: AgentTraceEntry): "ok" | "warn" | "error" | "info" {
+    const type = event.type.toLowerCase();
+    const details = JSON.stringify(event.details ?? {}).toLowerCase();
+    if (type.includes("approval") || type.includes("blocked") || type.includes("budget")) return "warn";
+    if (type.includes("fail") || type.includes("error") || details.includes("failed")) return "error";
+    if (type.includes("complete") || type.includes("verify") || details.includes("passed")) return "ok";
+    return "info";
+  }
+
+  function isHeartbeatEvent(event: AgentTraceEntry): boolean {
+    return event.type === "agent_waiting";
+  }
+
+  function traceLabel(type: string): string {
+    return type.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  function eventTimestamp(event: AgentTraceEntry): number | null {
+    return typeof event.timestamp_ms === "number" ? event.timestamp_ms : null;
+  }
+
+  function formatTraceDuration(ms: number | null): string | null {
+    if (ms === null || !Number.isFinite(ms) || ms < 0) return null;
+    if (ms < 1000) return `${Math.max(1, Math.round(ms))}ms`;
+    const seconds = ms / 1000;
+    if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainder = Math.round(seconds % 60);
+    return `${minutes}m ${remainder.toString().padStart(2, "0")}s`;
+  }
+
+  function toolName(event: AgentTraceEntry): string {
+    const detailsTool = event.details?.tool;
+    return typeof detailsTool === "string" && detailsTool.trim() ? detailsTool : "workspace";
+  }
+
+  function traceDurationMs(events: AgentTraceEntry[], event: AgentTraceEntry, index: number): number | null {
+    const start = eventTimestamp(event);
+    if (start === null) return null;
+
+    if (event.type === "model_request_started") {
+      const next = events.slice(index + 1).find((candidate) =>
+        candidate.type === "model_request_completed" || candidate.type === "model_request_failed"
+      );
+      return (next ? eventTimestamp(next) ?? timerNow : timerNow) - start;
+    }
+
+    if (event.type === "action_started") {
+      const name = toolName(event);
+      const next = events.slice(index + 1).find((candidate) =>
+        (candidate.type === "action_completed" || candidate.type === "action_failed") && toolName(candidate) === name
+      );
+      return (next ? eventTimestamp(next) ?? timerNow : timerNow) - start;
+    }
+
+    const previousStarted = [...events.slice(0, index)].reverse().find((candidate) => {
+      if (event.type === "model_request_completed" || event.type === "model_request_failed") {
+        return candidate.type === "model_request_started";
+      }
+      if (event.type === "action_completed" || event.type === "action_failed") {
+        return candidate.type === "action_started" && toolName(candidate) === toolName(event);
+      }
+      return false;
+    });
+    const previousStart = previousStarted ? eventTimestamp(previousStarted) : null;
+    return previousStart === null ? null : start - previousStart;
+  }
+
+  function traceTimingSummary(events: AgentTraceEntry[]): {
+    total: string | null;
+    model: string | null;
+    tools: string | null;
+    count: number;
+  } {
+    const stamped = events.filter((event) => eventTimestamp(event) !== null);
+    if (stamped.length === 0) return { total: null, model: null, tools: null, count: events.length };
+
+    const first = eventTimestamp(stamped[0]) ?? timerNow;
+    const terminal = [...stamped].reverse().find((event) => event.type === "terminal");
+    const last = eventTimestamp(terminal ?? stamped[stamped.length - 1]) ?? timerNow;
+    let modelMs = 0;
+    let toolMs = 0;
+    events.forEach((event, index) => {
+      const duration = traceDurationMs(events, event, index);
+      if (duration === null) return;
+      if (event.type === "model_request_started") modelMs += duration;
+      if (event.type === "action_started") toolMs += duration;
+    });
+
+    return {
+      total: formatTraceDuration((busy ? timerNow : last) - first),
+      model: modelMs > 0 ? formatTraceDuration(modelMs) : null,
+      tools: toolMs > 0 ? formatTraceDuration(toolMs) : null,
+      count: events.length,
+    };
+  }
+
+  function compactPrompt(value: string): string {
+    const cleaned = value
+      .replace(/^### Active Reference Attachments:[\s\S]*### User Question:/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return cleaned.length > 140 ? `${cleaned.slice(0, 137)}...` : cleaned;
+  }
+
+  function latestUserPrompt(): string | null {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.role === "user" && message.content.trim()) {
+        return compactPrompt(message.content);
+      }
+    }
+    return null;
+  }
+
+  function hasAssistantResponseAfterLatestUser(): boolean {
+    let sawAssistant = false;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.role === "assistant") sawAssistant = true;
+      if (message.role === "user") return sawAssistant;
+    }
+    return false;
+  }
+
+  function fallbackCompletionTrace(): AgentTraceEntry[] {
+    if (busy || !hasAssistantResponseAfterLatestUser()) return [];
+
+    const fallback: AgentTraceEntry[] = [
+      {
+        type: "request_understood",
+        summary: latestUserPrompt()
+          ? `User request captured: ${latestUserPrompt()}`
+          : "User request captured.",
+        sequence: 1,
+      },
+    ];
+
+    if (contextMatches && contextMatches.length > 0) {
+      fallback.push({
+        type: "context_referenced",
+        summary: `Referenced ${contextMatches.length} workspace item${contextMatches.length === 1 ? "" : "s"}.`,
+        details: { files: contextMatches.map((match) => match.file) },
+        sequence: fallback.length + 1,
+      });
+    }
+
+    if (pendingEdit) {
+      fallback.push({
+        type: "code_edit_prepared",
+        summary: pendingEdit.description || "Prepared a code edit for review.",
+        sequence: fallback.length + 1,
+      });
+    }
+
+    if (responseMetadata) {
+      fallback.push({
+        type: "response_completed",
+        summary: `Completed with ${responseMetadata.model} using ${responseMetadata.billingMode} mode.`,
+        details: {
+          runtime: responseMetadata.runtime,
+          provider: responseMetadata.provider,
+          request_id: responseMetadata.requestId,
+          stub: responseMetadata.stub,
+        },
+        sequence: fallback.length + 1,
+      });
+    } else {
+      fallback.push({
+        type: "response_completed",
+        summary: "Assistant response completed.",
+        sequence: fallback.length + 1,
+      });
+    }
+
+    return fallback;
+  }
+
+  function workingNote(): string | null {
+    const prompt = latestUserPrompt();
+    if (!prompt) return null;
+
+    const latestTrace = traceEvents[traceEvents.length - 1];
+    if (busy && latestTrace) {
+      return `User asked: ${prompt}. I am now ${traceLabel(latestTrace.type).toLowerCase()}${latestTrace.summary ? `: ${latestTrace.summary}` : "."}`;
+    }
+
+    if (busy) {
+      return `User asked: ${prompt}. I need to understand the request, gather the relevant project context, make the change, and verify the result.`;
+    }
+
+    if (archivedTraceEvents.length > 0) {
+      const terminal = [...archivedTraceEvents].reverse().find((event) => event.type === "terminal");
+      const outcome = typeof terminal?.details?.outcome === "string" ? terminal.details.outcome : null;
+      if (outcome === "finished" || outcome === "completed") {
+        return `User asked: ${prompt}. Aider finished the run and kept the action trace available below.`;
+      }
+      return `User asked: ${prompt}. Aider stopped with status ${outcome ?? "unknown"}; review the action trace below.`;
+    }
+
+    return null;
+  }
+
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
   const activeTitle = activeConversation ? activeConversation.title : "AI Assistant";
+  const visibleWorkingNote = workingNote();
+  const completionTraceEvents = archivedTraceEvents.length ? archivedTraceEvents : fallbackCompletionTrace();
+  const liveTiming = traceTimingSummary(traceEvents);
+  const completionTiming = traceTimingSummary(completionTraceEvents);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--bg-base)" }}>
+    <div className="chat-panel-shell">
       {/* Dynamic Styled Header Toggle & Conversation Switcher */}
       <h2 className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", flexShrink: 0, position: "relative" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", textTransform: "none", letterSpacing: "normal" }} onClick={() => setPopoverOpen(!popoverOpen)}>
@@ -191,7 +486,6 @@ export function ChatPanel({
               letterSpacing: "normal",
             }}
           >
-            {/* New Conversation Button */}
             <button
               type="button"
               onClick={() => {
@@ -222,7 +516,6 @@ export function ChatPanel({
               ＋ New Conversation
             </button>
 
-            {/* List of Conversations */}
             <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
               {conversations.map((c) => (
                 <div
@@ -303,8 +596,15 @@ export function ChatPanel({
           </div>
         )}
 
+        <div style={{ display: "flex", gap: "4px", alignItems: "center", textTransform: "none" }}>
+          {onToggleAutonomous && (
+            <div style={{ display: "flex", gap: 2, padding: 2, border: "1px solid var(--border-subtle)", borderRadius: 6 }} aria-label="Assistant execution mode">
+              <button type="button" aria-pressed={autonomousEnabled} onClick={() => onToggleAutonomous(true)} style={{ padding: "2px 6px", fontSize: "0.62rem", border: 0, borderRadius: 4, cursor: "pointer", color: autonomousEnabled ? "white" : "var(--text-secondary)", background: autonomousEnabled ? "var(--accent)" : "transparent" }}>Agent</button>
+              <button type="button" aria-pressed={!autonomousEnabled} onClick={() => onToggleAutonomous(false)} style={{ padding: "2px 6px", fontSize: "0.62rem", border: 0, borderRadius: 4, cursor: "pointer", color: !autonomousEnabled ? "white" : "var(--text-secondary)", background: !autonomousEnabled ? "var(--accent)" : "transparent" }}>Ask</button>
+            </div>
+          )}
         {onToggleLocalLlm && (
-          <div style={{ display: "flex", gap: "2px", background: "var(--bg-elevated)", padding: "2px", borderRadius: "6px", border: "1px solid var(--border-subtle)", textTransform: "none" }}>
+          <div style={{ display: "flex", gap: "2px", background: "var(--bg-elevated)", padding: "2px", borderRadius: "6px", border: "1px solid var(--border-subtle)" }}>
             <button
               type="button"
               onClick={() => onToggleLocalLlm(true)}
@@ -343,10 +643,26 @@ export function ChatPanel({
             </button>
           </div>
         )}
+        </div>
       </h2>
 
+      <div role="status" style={{ padding: "7px 12px", borderBottom: "1px solid var(--border-subtle)", background: autonomousEnabled ? "rgba(234, 179, 8, 0.07)" : "rgba(59, 130, 246, 0.05)", fontSize: "0.67rem", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+        <strong style={{ color: "var(--text-primary)" }}>{autonomousEnabled ? "Autonomous agent" : "Single-turn assistant"}</strong>
+        {autonomousUnavailableReason && <> · {autonomousUnavailableReason}</>}
+        {autonomousEnabled && <> · runtime <code>{configuredRuntime}</code> · Aider workspace agent</>}
+        {responseMetadata && (
+          <details style={{ marginTop: 3 }}>
+            <summary style={{ cursor: "pointer" }}>Last response: {responseMetadata.model} · {responseMetadata.billingMode}{responseMetadata.stub ? " · stub" : ""}</summary>
+            <div>Runtime: <code>{responseMetadata.runtime}</code></div>
+            <div>Provider: {responseMetadata.provider}</div>
+            <div>Request: <code>{responseMetadata.requestId}</code></div>
+            <div>{responseMetadata.billingMode === "local" ? "Runs locally." : "Uses your connected provider account."}</div>
+          </details>
+        )}
+      </div>
+
       {/* Main Scrollable History */}
-      <div className="chat-history" style={{ flex: 1, overflowY: "auto", paddingBottom: "12px" }}>
+      <div className="chat-history" ref={historyRef}>
         {messages.length === 0 ? (
           <div style={{ color: "#7c8595", fontSize: "0.8rem" }}>
             Ask the assistant to refine or extend the scene...
@@ -354,22 +670,12 @@ export function ChatPanel({
         ) : (
           messages.map((message, index) => {
             if (message.role === "assistant") {
-              const { thought, toolCall, toolOutput, cleanContent } = parseResponseBlocks(message.content);
+              const { toolCall, toolOutput, cleanContent } = parseResponseBlocks(message.content);
               return (
                 <div
                   key={`${message.role}-${index}`}
                   className={`chat-bubble ${message.role}`}
                 >
-                  {thought && (
-                    <details className="cognitive-reasoning" open={false}>
-                      <summary className="reasoning-summary">
-                        <span>🧠 Cognitive Reasoning</span>
-                      </summary>
-                      <div className="reasoning-content">
-                        {thought}
-                      </div>
-                    </details>
-                  )}
                   {toolCall && (
                     <div style={{
                       margin: "8px 0",
@@ -384,7 +690,7 @@ export function ChatPanel({
                         <span>🛠️ Calling Tool:</span>
                         <code style={{ background: "rgba(6, 182, 212, 0.15)", padding: "2px 4px", borderRadius: "4px" }}>{toolCall.name}</code>
                       </div>
-                      <pre style={{ margin: 0, overflowX: "auto", color: "var(--text-muted)", whiteSpace: "pre-wrap" }}>{toolCall.args}</pre>
+                      <pre style={{ margin: 0, overflowX: "auto", color: "var(--text-muted)", whiteSpace: "pre-wrap" }}>{safeDiagnostic(toolCall.args)}</pre>
                     </div>
                   )}
                   {toolOutput && (
@@ -416,7 +722,7 @@ export function ChatPanel({
                         maxHeight: "200px",
                         overflowY: "auto",
                         whiteSpace: "pre-wrap"
-                      }}>{toolOutput}</pre>
+                      }}>{safeDiagnostic(toolOutput)}</pre>
                     </details>
                   )}
                   {cleanContent && <div className="assistant-clean-text">{cleanContent}</div>}
@@ -457,32 +763,93 @@ export function ChatPanel({
           })
         )}
 
-        {busy && progressStep && progressStep !== "idle" && (
-          <div className="operation-progress-ledger">
-            <p className="ledger-title">⚙️ AI Orchestration Progress</p>
-            <ul className="ledger-steps">
-              <li className={`ledger-step ${getStepStatus("preparing", progressStep)}`}>
-                <span className="step-icon"></span>
-                <span className="step-text">Assembling local workspace context</span>
-              </li>
-              <li className={`ledger-step ${getStepStatus("retrieving", progressStep)}`}>
-                <span className="step-icon"></span>
-                <span className="step-text">Executing sidecar vector retrieval (RAG)</span>
-              </li>
-              <li className={`ledger-step ${getStepStatus("thinking", progressStep)}`}>
-                <span className="step-icon"></span>
-                <span className="step-text">Formulating AI model response (Inference)</span>
-              </li>
-              <li className={`ledger-step ${getStepStatus("processing", progressStep)}`}>
-                <span className="step-icon"></span>
-                <span className="step-text">Synthesizing search-and-replace blocks</span>
-              </li>
-              <li className={`ledger-step ${getStepStatus("refreshing", progressStep)}`}>
-                <span className="step-icon"></span>
-                <span className="step-text">Synchronizing user platform credits</span>
-              </li>
-            </ul>
+        {busy && traceEvents.length === 0 && (
+          <div className="chat-bubble assistant assistant-thinking" role="status" aria-live="polite">
+            <span className="agent-progress-spinner" aria-hidden="true" />
+            <span>Thinking...</span>
           </div>
+        )}
+
+        {visibleWorkingNote && (
+          <div className={`agent-working-note ${busy ? "active" : ""}`} role="status" aria-live="polite">
+            {busy && <span className="agent-progress-spinner" aria-hidden="true" />}
+            <div>
+              <strong>Working note</strong>
+              <p>{visibleWorkingNote}</p>
+            </div>
+          </div>
+        )}
+
+        {traceEvents.length > 0 && busy && (
+          <div className="agent-inline-activity-list" aria-label="Live agent activity">
+            <div className="agent-timing-strip" aria-label="Agent timing summary">
+              {liveTiming.total && <span>Total <strong>{liveTiming.total}</strong></span>}
+              {liveTiming.model && <span>Thinking <strong>{liveTiming.model}</strong></span>}
+              {liveTiming.tools && <span>Tools <strong>{liveTiming.tools}</strong></span>}
+            </div>
+            {traceEvents.map((event, index) => {
+              const active = index === traceEvents.length - 1;
+              const elapsed = formatTraceDuration(traceDurationMs(traceEvents, event, index));
+              return (
+                <div key={`${event.sequence ?? index}-${event.type}`} className={`agent-inline-activity ${traceTone(event)} ${active ? "active" : ""}`}>
+                  <span className={active ? "agent-progress-spinner" : "agent-inline-dot"} aria-hidden="true" />
+                  <div className="agent-inline-copy">
+                    <code>{traceLabel(event.type)}</code>
+                    <span>{event.summary || "Event recorded"}</span>
+                    {elapsed && <span className="agent-duration-pill">{elapsed}</span>}
+                  </div>
+                  {event.details && Object.keys(event.details).length > 0 && (
+                    <details className="agent-activity-details">
+                      <summary>Details</summary>
+                      <pre>{safeDiagnostic(JSON.stringify(event.details, null, 2))}</pre>
+                    </details>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {completionTraceEvents.length > 0 && !busy && (
+          <details aria-label="Completed agent activity" className="agent-activity-complete-card">
+            <summary className="agent-activity-complete-summary">
+              <span className="agent-activity-complete-title">
+                <span className="agent-live-dot" />
+                <span>
+                  <strong>Show action trace</strong>
+                  <small>Task complete. Expand to inspect what happened.</small>
+                </span>
+              </span>
+              <span>{completionTiming.total ? `${completionTiming.total} · ` : ""}{completionTraceEvents.length} events</span>
+            </summary>
+            {(completionTiming.total || completionTiming.model || completionTiming.tools) && (
+              <div className="agent-timing-strip complete" aria-label="Completed agent timing summary">
+                {completionTiming.total && <span>Total <strong>{completionTiming.total}</strong></span>}
+                {completionTiming.model && <span>Thinking <strong>{completionTiming.model}</strong></span>}
+                {completionTiming.tools && <span>Tools <strong>{completionTiming.tools}</strong></span>}
+              </div>
+            )}
+            <ol className="agent-activity-list">
+              {completionTraceEvents.map((event, index) => {
+                const elapsed = formatTraceDuration(traceDurationMs(completionTraceEvents, event, index));
+                return (
+                  <li key={`${event.sequence ?? index}-${event.type}`} className={`agent-activity-item ${traceTone(event)}`}>
+                    <div className="agent-activity-copy">
+                      <code>{traceLabel(event.type)}</code>
+                      <span>{event.summary || "Event recorded"}</span>
+                      {elapsed && <span className="agent-duration-pill">{elapsed}</span>}
+                    </div>
+                    {event.details && Object.keys(event.details).length > 0 && (
+                      <details className="agent-activity-details">
+                        <summary>Details</summary>
+                        <pre>{safeDiagnostic(JSON.stringify(event.details, null, 2))}</pre>
+                      </details>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </details>
         )}
 
         {contextMatches && contextMatches.length > 0 && (
@@ -737,8 +1104,15 @@ export function ChatPanel({
                 </select>
               ) : (
                 <select
-                  value={externalLlmModel}
-                  onChange={(e) => onExternalLlmModelChange?.(e.target.value)}
+                  value={selectedExternalModel}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (next === "__manage_models__") {
+                      onManageExternalModels?.();
+                      return;
+                    }
+                    onExternalLlmModelChange?.(next);
+                  }}
                   style={{
                     background: "rgba(255, 255, 255, 0.04)",
                     border: "1px solid rgba(255, 255, 255, 0.06)",
@@ -751,12 +1125,19 @@ export function ChatPanel({
                     maxWidth: "140px",
                   }}
                 >
-                  <option value="gpt-4o-mini">GPT-4o mini</option>
-                  <option value="gpt-4o">GPT-4o</option>
-                  <option value="claude-3-5-sonnet">Claude 3.5</option>
-                  <option value="deepseek-r1" disabled style={{ color: "#5f697a" }}>
-                    DeepSeek-R1 (N/A)
-                  </option>
+                  {visibleExternalModels.map((model) => {
+                    const isFreeModel = model.id === "openrouter/free" || model.id.endsWith(":free");
+                    const disabledByQuota = isFreeModel && freeModelDisabled;
+                    const meta = formatModelMeta(model);
+                    return (
+                      <option key={model.id} value={model.id} disabled={disabledByQuota}>
+                        {disabledByQuota
+                          ? `${model.name} (renews ${freeModelRenewal})`
+                          : `${model.name}${meta ? ` · ${meta}` : ""}`}
+                      </option>
+                    );
+                  })}
+                  {onManageExternalModels && <option value="__manage_models__">Manage models...</option>}
                 </select>
               )}
 
@@ -816,37 +1197,68 @@ export function ChatPanel({
                 </button>
               )}
 
-              <button
-                type="button"
-                disabled={busy || disabled || !input.trim()}
-                onClick={onSend}
-                style={{
-                  background: input.trim() ? "var(--accent)" : "rgba(255, 255, 255, 0.04)",
-                  border: "none",
-                  color: input.trim() ? "white" : "var(--text-muted)",
-                  padding: "6px 14px",
-                  borderRadius: "8px",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  cursor: input.trim() ? "pointer" : "default",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "all 0.12s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (input.trim() && !disabled && !busy) {
-                    e.currentTarget.style.background = "var(--accent-hover)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (input.trim() && !disabled && !busy) {
-                    e.currentTarget.style.background = "var(--accent)";
-                  }
-                }}
-              >
-                Send
-              </button>
+              {busy && canCancel && onCancel ? (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  title="Stop the current chat task"
+                  style={{
+                    background: "var(--error-subtle)",
+                    border: "1px solid var(--error)",
+                    color: "var(--error)",
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.12s ease",
+                  }}
+                >
+                  Stop
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy || disabled || !input.trim()}
+                  onClick={onSend}
+                  style={{
+                    background: input.trim() ? "var(--accent)" : "rgba(255, 255, 255, 0.04)",
+                    border: "none",
+                    color: input.trim() ? "white" : "var(--text-muted)",
+                    padding: "6px 14px",
+                    borderRadius: "8px",
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    cursor: input.trim() ? "pointer" : "default",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.12s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (input.trim() && !disabled && !busy) {
+                      e.currentTarget.style.background = "var(--accent-hover)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (input.trim() && !disabled && !busy) {
+                      e.currentTarget.style.background = "var(--accent)";
+                    }
+                  }}
+                >
+                  {busy ? (
+                    <>
+                      <span className="send-button-spinner" aria-hidden="true" />
+                      <span>Sending</span>
+                    </>
+                  ) : (
+                    "Send"
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

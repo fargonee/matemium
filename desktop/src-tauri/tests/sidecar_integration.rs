@@ -1,7 +1,6 @@
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 
-
 #[test]
 fn ping_real_sidecar_binary() {
     let bin = match std::env::var("MATEMIUM_SIDECAR_BIN") {

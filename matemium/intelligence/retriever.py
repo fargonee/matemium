@@ -160,7 +160,7 @@ class VectorRetriever:
         return embeddings.tolist()
 
     def index_files(self, files: list[str], force: bool = False, events: Any = None) -> int:
-        """Index the given files (scenes.py, assets.py, etc.). Returns number of chunks."""
+        """Index the given project files (scenes.py, helpers.py, brief files, etc.)."""
         if not self.workspace or not self._use_vector:
             return 0
 

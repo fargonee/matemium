@@ -1,3 +1,11 @@
+pub mod agent_accounting;
+pub mod agent_context;
+pub mod agent_delegation;
+pub mod agent_events;
+pub mod agent_policy;
+pub mod agent_runs;
+pub mod agent_tools;
+pub mod agent_verifier;
 pub mod assets;
 pub mod cloud;
 pub mod commands;
@@ -9,6 +17,7 @@ mod sidecar;
 mod state;
 pub mod workspace;
 
+use std::sync::Mutex;
 use tauri::{Manager, RunEvent};
 use workspace::AppPaths;
 
@@ -27,12 +36,11 @@ pub fn run() {
                 )?;
             }
 
-            let paths = AppPaths::resolve().map_err(|e| -> Box<dyn std::error::Error> {
-                e.into()
-            })?;
-            paths.ensure().map_err(|e| -> Box<dyn std::error::Error> {
-                e.into()
-            })?;
+            let paths =
+                AppPaths::resolve().map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+            paths
+                .ensure()
+                .map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
 
             let sidecar = sidecar::SidecarManager::new(app.handle().clone(), paths.clone());
             let assets = crate::assets::AssetManager::new(paths.clone());
@@ -65,9 +73,27 @@ pub fn run() {
                 });
 
                 let _ = sidecar_clone.request("update_llm_config", params).await;
+                if settings.use_autonomous_agent.unwrap_or(false) {
+                    let result = sidecar_clone
+                        .request("prepare_agent_runtime", serde_json::json!({}))
+                        .await;
+                    if let Err(error) = result {
+                        log::warn!("agent runtime preparation failed: {error}");
+                    }
+                }
             });
 
-            app.manage(state::AppState { paths, sidecar, assets });
+            let agent_runs = crate::agent_runs::AgentRunStore::open(paths.agent_runs_db_path())
+                .map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+
+            app.manage(state::AppState {
+                paths,
+                sidecar,
+                assets,
+                agent_runs,
+                openrouter_oauth_session: Mutex::new(None),
+                openrouter_oauth_active_cancel: Mutex::new(None),
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -75,7 +101,10 @@ pub fn run() {
             commands::project_create,
             commands::project_open,
             commands::project_save,
-            commands::project_save_assets,
+            commands::project_save_file,
+            commands::project_list_media,
+            commands::project_import_media,
+            commands::project_delete_media,
             commands::project_delete,
             commands::sidecar_ping,
             commands::sidecar_configure_assets,
@@ -97,9 +126,21 @@ pub fn run() {
             commands::sidecar_render,
             commands::sidecar_get_preview_data,
             commands::sidecar_cancel,
+            commands::agent_run_list,
+            commands::agent_run_get,
+            commands::agent_run_events,
+            commands::agent_run_cancel,
+            commands::agent_run_resume,
+            commands::agent_run_approve,
+            commands::agent_run_provide_input,
             commands::auth_login,
             commands::auth_session,
+            commands::openrouter_prepare_connect,
+            commands::openrouter_complete_connect,
+            commands::openrouter_cancel_connect,
+            commands::openrouter_disconnect,
             commands::cloud_chat,
+            commands::provider_models_list,
             commands::cloud_get_profile,
             commands::cloud_generate_audio,
             commands::conversation_list,

@@ -6,7 +6,6 @@ import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { RootLayout } from "@/layouts/RootLayout";
 import { AdminLLMPage } from "@/pages/admin/AdminLLMPage";
 import { AdminOverviewPage } from "@/pages/admin/AdminOverviewPage";
-import { AdminSubscriptionsPage } from "@/pages/admin/AdminSubscriptionsPage";
 import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
 import { AuthCallbackPage } from "@/pages/AuthCallbackPage";
 import { DashboardAccountPage } from "@/pages/dashboard/DashboardAccountPage";
@@ -57,7 +56,6 @@ export function App() {
               <Route path="admin" element={<AdminLayout />}>
                 <Route index element={<AdminOverviewPage />} />
                 <Route path="users" element={<AdminUsersPage />} />
-                <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
                 <Route path="llm" element={<AdminLLMPage />} />
               </Route>
             </Route>

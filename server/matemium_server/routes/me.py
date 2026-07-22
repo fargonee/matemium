@@ -18,7 +18,7 @@ class MeResponse(BaseModel):
     role: str
     plan: str
     lemon_customer_id: str | None = None
-    # LLM agnostic + credits
+    # Deprecated compatibility field. Matemium no longer sells credits.
     llm_credits: int = 0
     llm_provider: str | None = None
     has_own_llm_key: bool = False
@@ -48,7 +48,6 @@ async def get_me(
     supabase: SupabaseService = Depends(get_supabase_service),
 ) -> AccountResponse:
     profile = await supabase.get_profile(user.id)
-    sub = await supabase.get_latest_subscription(user.id)
     ai_calls = await supabase.get_ai_calls_count(user.id)
     llm_cfg = await supabase.get_user_llm_config(user.id)
 
@@ -62,18 +61,10 @@ async def get_me(
             lemon_customer_id=user.lemon_customer_id,
             llm_credits=llm_cfg.get("llm_credits", 0),
             llm_provider=llm_cfg.get("llm_provider"),
-            has_own_llm_key=bool(llm_cfg.get("llm_api_key")),
+            has_own_llm_key=False,
             tts_provider=llm_cfg.get("tts_provider"),
-            has_own_tts_key=bool(llm_cfg.get("tts_api_key")),
+            has_own_tts_key=False,
         ),
-        subscription=(
-            SubscriptionResponse(
-                status=sub.get("status"),
-                plan=sub.get("plan"),
-                current_period_end=sub.get("current_period_end"),
-            )
-            if sub
-            else None
-        ),
+        subscription=None,
         usage=UsageResponse(ai_calls_count=ai_calls),
     )

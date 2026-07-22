@@ -50,7 +50,7 @@ This specification outlines the requirements, architectural design, user experie
     2.  **RAG Analysis**: `Querying PyInstaller sidecar for vector similarity...`
     3.  **LLM Generation**: `Streaming response from Claude/Gemini model...`
     4.  **Edit Extraction**: `Synthesizing structural code search-and-replace blocks...`
-    5.  **Profile Synchronization**: `Deducting platform credits & refreshing status...`
+    5.  **Provider Sync**: `Refreshing provider usage metadata...`
 *   **Visual Indicators**:
     *   🟢 **Green Check**: Step successfully completed.
     *   ⏳ **Pulsing Spinner/Amber**: Currently active step.
@@ -62,7 +62,7 @@ This specification outlines the requirements, architectural design, user experie
 
 ```
 +-------------------------------------------------------------+
-| AI Assistant                      (Platform: 450 credits)   |
+| AI Assistant                      (OpenRouter: connected)   |
 +-------------------------------------------------------------+
 |                                                             |
 |  [User] Can you refactor my scene to use a continuous       |

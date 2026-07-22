@@ -21,3 +21,18 @@ value  ::= string | number | "true" | "false" | "null"
 number ::= [0-9]+ ( "." [0-9]+ )?
 space  ::= "  " | ""
 """
+
+# Recursive JSON grammar used by the v2 local structured-response envelope.
+# Semantic validation against LocalResponseEnvelope still happens after decoding.
+AGENT_RESPONSE_JSON_GBNF = r"""
+root    ::= ws value ws
+value   ::= object | array | string | number | "true" | "false" | "null"
+object  ::= "{" ws (member (ws "," ws member)*)? ws "}"
+member  ::= string ws ":" ws value
+array   ::= "[" ws (value (ws "," ws value)*)? ws "]"
+string  ::= "\"" chars "\""
+chars   ::= ([^"\\] | "\\" ["\\/bfnrt] | "\\u" hex hex hex hex)*
+number  ::= "-"? ("0" | [1-9] [0-9]*) ("." [0-9]+)? ([eE] [+-]? [0-9]+)?
+hex     ::= [0-9a-fA-F]
+ws      ::= [ \t\n\r]*
+"""

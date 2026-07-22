@@ -4,13 +4,15 @@ Matemium is a **layout-to-animation compiler** for math education videos. It sit
 
 ---
 
-## Product direction (2026-06-26)
+## Product direction (updated 2026-07-21)
 
-We are building a **commercial/freemium desktop application** — not an open-source developer CLI as the primary product.
+We are building a **free, source-available desktop application**. Matemium is completely free to use and its source code is publicly available for inspection, personal use, education, and contribution to the official project.
+
+Private modifications are permitted. Redistribution, publication of derivative builds, commercial use, and operation of competing forks require written permission.
 
 | Layer | Technology | Role |
 |-------|------------|------|
-| **Cloud** | HTTPS API (FastAPI) | Auth, billing, chat LLM routing — text + code edits only. **No cloud rendering.** |
+| **Cloud** | HTTPS API (FastAPI) | Optional auth, user profile sync, BYO chat routing helpers — text + code edits only. **No cloud rendering, no shared AI credits.** |
 | **Desktop** | Tauri v2 + TypeScript | Code editor, AI chat, project workspaces, sidecar lifecycle |
 | **Local engine** | PyInstaller sidecar | Frozen `canvas/` + Manim; lint, import, render on the user's machine |
 
@@ -24,6 +26,8 @@ We are building a **commercial/freemium desktop application** — not an open-so
 | **v2 — Agent** | Tool loop (`view_file`, `edit_file`, `compile_manim`) + self-correction | `scenes.py` + `assets.py` only |
 
 Visual section fences (`# ---DIV: Title---`) make one file feel like multiple collapsible cards in the editor without splitting the project.
+
+**AI provider policy:** Matemium does not own or resell model API access. External AI is preferred by default, with OpenRouter as the default independent provider. Users connect their own OpenRouter/API-provider accounts and can add multiple personal keys, then choose the preferred provider/model for each workflow. Local models remain supported as an offline/user-controlled option, but they are not the default path.
 
 **Key docs:**
 
@@ -147,7 +151,7 @@ Composition uses **CSS-like `style={}`** dicts and flex rows/columns rather than
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  CLOUD — auth, billing, chat LLM (no rendering)             │
+│  CLOUD — optional auth, BYO AI helpers (no rendering)       │
 └────────────────────────────┬────────────────────────────────┘
                              │ HTTPS
 ┌────────────────────────────▼────────────────────────────────┐

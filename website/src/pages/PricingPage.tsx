@@ -6,12 +6,12 @@ export function PricingPage() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-10 max-w-2xl">
           <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent">
-            Pricing
+            Free
           </p>
-          <h1 className="text-3xl font-bold tracking-tight">Start free, upgrade when you need more</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Matemium is free to use</h1>
           <p className="mt-3 text-text-muted">
-            Matemium is licensed software. Sign in to manage your subscription and download
-            installers from your account dashboard.
+            There are no Matemium subscriptions, paid tiers, or in-app AI credits.
+            External AI uses your own provider account; OpenRouter is the default.
           </p>
         </div>
         <PricingCards />

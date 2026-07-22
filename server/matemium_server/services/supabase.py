@@ -48,24 +48,6 @@ class SupabaseService:
             {"select": "*", "order": "created_at.desc", "limit": str(limit)},
         )
 
-    async def list_subscriptions(self, limit: int = 100) -> list[dict[str, Any]]:
-        return await self._rest_get(
-            "subscriptions",
-            {"select": "*", "order": "created_at.desc", "limit": str(limit)},
-        )
-
-    async def get_latest_subscription(self, user_id: str) -> dict[str, Any] | None:
-        rows = await self._rest_get(
-            "subscriptions",
-            {
-                "user_id": f"eq.{user_id}",
-                "select": "status,plan,current_period_end",
-                "order": "created_at.desc",
-                "limit": "1",
-            },
-        )
-        return rows[0] if rows else None
-
     async def count_profiles(self, plan: str | None = None) -> int:
         params: dict[str, str] = {"select": "id"}
         if plan:
@@ -73,32 +55,24 @@ class SupabaseService:
         rows = await self._rest_get("profiles", params)
         return len(rows)
 
-    async def count_subscriptions(self, status: str) -> int:
-        rows = await self._rest_get("subscriptions", {"status": f"eq.{status}", "select": "id"})
-        return len(rows)
-
     async def update_profile(self, user_id: str, data: dict[str, Any]) -> None:
         await self._rest_patch("profiles", {"id": f"eq.{user_id}"}, data)
 
     async def get_detailed_user(self, user_id: str) -> dict[str, Any] | None:
-        """Return profile + latest subscription + usage for admin detail views."""
+        """Return profile + usage for admin detail views."""
         profile = await self.get_profile(user_id)
         if not profile:
             return None
-        sub = await self.get_latest_subscription(user_id)
         ai_calls = await self.get_ai_calls_count(user_id)
         profile["ai_calls_count"] = ai_calls
-        profile["subscription"] = sub
+        profile["subscription"] = None
         return profile
-
-    async def update_subscription(self, subscription_id: str, data: dict[str, Any]) -> None:
-        await self._rest_patch("subscriptions", {"id": f"eq.{subscription_id}"}, data)
 
     async def get_total_ai_calls(self) -> int:
         rows = await self._rest_get("profiles", {"select": "ai_calls_count"})
         return sum(int(r.get("ai_calls_count") or 0) for r in rows)
 
-    # === User LLM / TTS config + platform credits (BYO keys vs platform tokens) ===
+    # === User-owned LLM / TTS config ===
 
     async def get_user_llm_config(self, user_id: str) -> dict[str, Any]:
         rows = await self._rest_get(
@@ -110,11 +84,11 @@ class SupabaseService:
         )
         if not rows:
             return {
-                "llm_provider": "openai",
+                "llm_provider": "openrouter",
                 "llm_api_key": None,
                 "llm_model": None,
                 "llm_credits": 0,
-                "tts_provider": "openai",
+                "tts_provider": "openrouter",
                 "tts_api_key": None,
                 "tts_voice": "alloy",
             }
@@ -127,7 +101,7 @@ class SupabaseService:
         prov_field = "tts_provider" if for_tts else "llm_provider"
         if cfg.get(key_field):
             return {
-                "provider": cfg.get(prov_field) or provider or "openai",
+                "provider": cfg.get(prov_field) or provider or "openrouter",
                 "api_key": cfg.get(key_field),
                 "model": cfg.get("llm_model") if not for_tts else None,
             }
@@ -142,58 +116,24 @@ class SupabaseService:
             await self.update_profile(user_id, safe_data)
 
     async def adjust_llm_credits(self, user_id: str, delta: int) -> int:
-        """Atomically-ish adjust credits. Returns new balance (best effort)."""
+        """Deprecated compatibility helper. Matemium no longer sells credits."""
         current = await self.get_user_llm_config(user_id)
         new_balance = max(0, int(current.get("llm_credits") or 0) + delta)
         await self.update_profile(user_id, {"llm_credits": new_balance})
         return new_balance
 
     async def has_sufficient_credits(self, user_id: str, required: int = 1) -> bool:
-        cfg = await self.get_user_llm_config(user_id)
-        return int(cfg.get("llm_credits") or 0) >= required
-
-    # === Platform (our) LLM provider management ===
-
-    async def list_active_platform_providers(self) -> list[dict[str, Any]]:
-        return await self._rest_get(
-            "llm_providers",
-            {"is_active": "eq.true", "select": "*", "order": "priority.asc"},
-        )
-
-    async def get_platform_provider(self, name: str) -> dict[str, Any] | None:
-        rows = await self._rest_get(
-            "llm_providers",
-            {"name": f"eq.{name}", "select": "*", "limit": "1"},
-        )
-        return rows[0] if rows else None
-
-    async def pick_best_platform_provider(self, preferred_name: str | None = None) -> dict[str, Any] | None:
-        if preferred_name:
-            p = await self.get_platform_provider(preferred_name)
-            if p and p.get("is_active"):
-                return p
-        providers = await self.list_active_platform_providers()
-        return providers[0] if providers else None
+        """Deprecated compatibility helper. BYO provider keys are required instead."""
+        _ = (user_id, required)
+        return True
 
     async def log_llm_usage(self, data: dict[str, Any]) -> None:
         """Insert detailed usage + cost log."""
         await self._rest_post("llm_usages", data)
 
-    async def upsert_subscription(self, data: dict[str, Any]) -> None:
-        await self._rest_post("subscriptions", data, upsert=True, on_conflict="lemon_subscription_id")
-
     async def upsert_profile(self, data: dict[str, Any]) -> None:
         """Idempotent insert/update of a minimal profile row (used as backfill)."""
         await self._rest_post("profiles", data, upsert=True, on_conflict="id")
-
-    async def update_subscription_by_lemon_id(
-        self, lemon_subscription_id: str, data: dict[str, Any]
-    ) -> None:
-        await self._rest_patch(
-            "subscriptions",
-            {"lemon_subscription_id": f"eq.{lemon_subscription_id}"},
-            data,
-        )
 
     # --- Usage tracking (simple counters on profile for production dashboard) ---
     async def get_ai_calls_count(self, user_id: str) -> int:

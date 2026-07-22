@@ -10,14 +10,20 @@ import type {
   LintResult,
   ListScenesResult,
   MediaPreviewResult,
+  OpenRouterConnectStart,
+  OpenRouterConnectionStatus,
   OutputListResult,
   PreviewData,
   ProjectOpen,
+  ProjectMediaEntry,
+  ProviderModel,
   ProjectSummary,
   RenderResult,
   Settings,
   TokenResponse,
   VideoOrientation,
+  AgentRunState,
+  AgentStreamEvent,
 } from "./types";
 
 export function runningInTauri(): boolean {
@@ -42,10 +48,22 @@ export async function projectSave(projectId: string, content: string): Promise<v
   });
 }
 
-export async function projectSaveAssets(projectId: string, content: string): Promise<void> {
-  return invoke("project_save_assets", {
-    params: { projectId, content },
+export async function projectSaveFile(projectId: string, file: string, content: string): Promise<void> {
+  return invoke("project_save_file", {
+    params: { projectId, file, content },
   });
+}
+
+export async function projectListMedia(projectId: string, category: string): Promise<ProjectMediaEntry[]> {
+  return invoke<ProjectMediaEntry[]>("project_list_media", { params: { projectId, category } });
+}
+
+export async function projectImportMedia(projectId: string, category: string, source: string): Promise<ProjectMediaEntry> {
+  return invoke<ProjectMediaEntry>("project_import_media", { params: { projectId, category, source } });
+}
+
+export async function projectDeleteMedia(projectId: string, category: string, name: string): Promise<void> {
+  return invoke("project_delete_media", { params: { projectId, category, name } });
 }
 
 export async function projectDelete(projectId: string): Promise<void> {
@@ -95,6 +113,51 @@ export async function sidecarRender(
 
 export async function sidecarCancel(): Promise<void> {
   return invoke("sidecar_cancel");
+}
+
+export async function agentRunList(): Promise<AgentRunState[]> {
+  return invoke<AgentRunState[]>("agent_run_list");
+}
+
+export async function agentRunGet(runId: string): Promise<AgentRunState> {
+  return invoke<AgentRunState>("agent_run_get", { params: { runId } });
+}
+
+export async function agentRunEvents(
+  runId: string,
+  afterSequence = 0,
+  limit = 200,
+): Promise<AgentStreamEvent[]> {
+  return invoke<AgentStreamEvent[]>("agent_run_events", {
+    params: { runId, afterSequence, limit },
+  });
+}
+
+export async function agentRunCancel(runId: string, reason?: string): Promise<AgentRunState> {
+  return invoke<AgentRunState>("agent_run_cancel", {
+    params: { runId, reason: reason ?? null },
+  });
+}
+
+export async function agentRunResume(runId: string): Promise<AgentRunState> {
+  return invoke<AgentRunState>("agent_run_resume", { params: { runId } });
+}
+
+export async function agentRunApprove(
+  runId: string,
+  actionId: string,
+  approved: boolean,
+  note?: string,
+): Promise<AgentStreamEvent> {
+  return invoke<AgentStreamEvent>("agent_run_approve", {
+    params: { runId, actionId, approved, note: note ?? null },
+  });
+}
+
+export async function agentRunProvideInput(runId: string, content: string): Promise<AgentRunState> {
+  return invoke<AgentRunState>("agent_run_provide_input", {
+    params: { runId, content },
+  });
 }
 
 export async function getAssetStatus(assetId?: string): Promise<any[]> {
@@ -217,25 +280,34 @@ export async function listGallery(search?: string): Promise<any> {
 export async function cloudChat(
   messages: ChatMessage[],
   projectId?: string,
+  conversationId?: string | null,
   scenesExcerpt?: string,
-  llmConfig?: { llm_provider?: string; use_personal_llm?: boolean; model?: string; use_autonomous_agent?: boolean },
+  llmConfig?: { llm_provider?: string; use_personal_llm?: boolean; model?: string; use_autonomous_agent?: boolean; agent_runtime_version?: string },
 ): Promise<ChatCompletionResponse> {
   return invoke<ChatCompletionResponse>("cloud_chat", {
     params: {
       messages,
       projectId: projectId ?? null,
+      conversationId: conversationId ?? null,
       scenesExcerpt: scenesExcerpt ?? null,
       llmProvider: llmConfig?.llm_provider ?? null,
       usePersonalLlm: llmConfig?.use_personal_llm ?? null,
       model: llmConfig?.model ?? null,
       useAutonomousAgent: llmConfig?.use_autonomous_agent ?? null,
+      agentRuntimeVersion: llmConfig?.agent_runtime_version ?? null,
     },
   });
 }
 
 export async function cloudGetProfile(): Promise<any> {
-  // Fetches /v1/me for credits, LLM config status (has_own keys, etc.)
+  // Fetches /v1/me for account/profile status. Provider keys stay local.
   return invoke("cloud_get_profile");
+}
+
+export async function providerModelsList(provider: string, refresh = false): Promise<ProviderModel[]> {
+  return invoke<ProviderModel[]>("provider_models_list", {
+    params: { provider, refresh },
+  });
 }
 
 export async function cloudGenerateAudio(
@@ -267,6 +339,22 @@ export async function settingsGet(): Promise<Settings> {
 
 export async function settingsSet(settings: Settings): Promise<void> {
   return invoke("settings_set", { settings });
+}
+
+export async function openrouterPrepareConnect(): Promise<OpenRouterConnectStart> {
+  return invoke<OpenRouterConnectStart>("openrouter_prepare_connect");
+}
+
+export async function openrouterCompleteConnect(): Promise<OpenRouterConnectionStatus> {
+  return invoke<OpenRouterConnectionStatus>("openrouter_complete_connect");
+}
+
+export async function openrouterCancelConnect(): Promise<void> {
+  return invoke("openrouter_cancel_connect");
+}
+
+export async function openrouterDisconnect(): Promise<OpenRouterConnectionStatus> {
+  return invoke<OpenRouterConnectionStatus>("openrouter_disconnect");
 }
 
 export async function readMediaPreview(path: string): Promise<MediaPreviewResult> {

@@ -10,8 +10,7 @@ export function SiteFooter() {
             <span>Matemium</span>
           </div>
           <p className="max-w-xs text-sm text-text-subtle">
-            A document compiler for animated math — proprietary desktop software for
-            educators and creators.
+            A free, source-available document compiler for animated math.
           </p>
         </div>
 
@@ -23,7 +22,7 @@ export function SiteFooter() {
             Features
           </Link>
           <Link to="/pricing" className="text-text-muted hover:text-text">
-            Pricing
+            Free access
           </Link>
           <Link to="/dashboard/downloads" className="text-text-muted hover:text-text">
             Downloads
@@ -51,8 +50,8 @@ export function SiteFooter() {
           </h4>
           <Link to="/terms" className="text-text-muted hover:text-text">Terms of Service</Link>
           <Link to="/privacy" className="text-text-muted hover:text-text">Privacy Policy</Link>
-          <Link to="/refund" className="text-text-muted hover:text-text">Refund &amp; Cancellation</Link>
-          <Link to="/license" className="text-text-muted hover:text-text">Desktop License (EULA)</Link>
+          <Link to="/refund" className="text-text-muted hover:text-text">Refund Policy</Link>
+          <Link to="/license" className="text-text-muted hover:text-text">Software License</Link>
           <Link to="/acceptable-use" className="text-text-muted hover:text-text">Acceptable Use</Link>
           <span className="mt-1 text-text-subtle">© 2026 Matemium. All rights reserved.</span>
         </div>

@@ -1,22 +1,26 @@
 # Matemium — Project Spec & Status
 
-## Product direction (2026-06-26)
+## Product direction (updated 2026-07-21)
 
-**We are building a commercial/freemium desktop application**, not an open-source developer tool as the primary product.
+**We are building a free, source-available desktop application.** Matemium is completely free to use. The source code is publicly available for inspection, personal use, education, and contribution to the official project.
+
+Private modifications are permitted. Redistribution, publication of derivative builds, commercial use, and operation of competing forks require written permission.
 
 **PAD-10 (Packaging/CI/cross-platform + docs) status:** Complete. All prior phases wired; see [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md).
 
 | Layer | Role |
 |-------|------|
-| **Cloud** | Thin router — auth, billing, **chat LLM**; returns text + code edits only |
-| **Desktop (Tauri v2)** | Code editor + AI chat + preview; project workspaces with `scenes.py` |
+| **Cloud** | Thin optional service — auth, user profile sync, **BYO chat LLM helpers**; returns text + code edits only |
+| **Desktop (Tauri v2)** | Code editor + AI chat + preview; project workspaces with `scenes.py`, optional `helpers.py`, and first-class `brief/` |
 | **Sidecar (PyInstaller)** | Frozen `canvas/` + Manim; lint, import, render project code locally |
 
-**Authoring:** one `scenes.py` per project (v1 chat), `CanvasBuilder` + `CanvasScene`, visual `# ---DIV: ...---` section fences. **v2 agent mode:** strict `scenes.py` + `assets.py` with tool loop (view/edit/compile) and self-correction. **Not** AI → Sheet DSL JSON.
+**Authoring:** one `scenes.py` render entrypoint per project, `CanvasBuilder` + `CanvasScene`, visual `# ---DIV: ...---` section fences. **v2 agent/project mode:** bounded `scenes.py` + `helpers.py` + `brief/` workspace with tool loop (view/edit/compile), project-brief editing, and self-correction. **Not** AI → Sheet DSL JSON.
+
+**Desktop workspace UI:** the left sidebar should show the current project structure as a curated production map: Script, Helpers, Brief, Assets, and Renders. It is not merely a project switcher and not a raw OS file explorer; each item opens the appropriate code, form, Markdown, asset, or render-history surface.
 
 Full product architecture: [`desktop-architecture.md`](desktop-architecture.md). Agent upgrade: [`ai-agent-architecture.md`](ai-agent-architecture.md). Engine rules: [`architecture.md`](architecture.md) (incl. §8).
 
-**Latest decisions** on vector/RAG, lazy sidecar, first-run downloads, UX gating, and YouTube publishing: [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
+**Latest decisions** on vector/RAG, user-owned AI providers, OpenRouter OAuth, lazy sidecar, first-run downloads, local model options, UX gating, and YouTube publishing: [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
 The CLI (`matemium`) and `projects/` layout remain for **engine development and parity testing**.
 
@@ -273,7 +277,7 @@ See [`desktop-architecture.md`](desktop-architecture.md) §6 for full detail. (L
 | P2 — PyInstaller | **done** | `dist/matemium-sidecar`, Tauri `binaries/` copy, `verify-sidecar-binary.sh` |
 | P3 — Tauri scaffold | **done** | `src-tauri/`, sidecar spawn, `invoke` bridge |
 | P4 — Rust shell | **done** | sidecar IPC, project CRUD, `cloud_chat` |
-| P5 — UI shell | **done** | Vite + React + Monaco (editor, chat, preview, sections, assets support) |
+| P5 — UI shell | **done** | Vite + React + Monaco (editor, chat, preview, sections; project-structure sidebar/brief UI is the next layout target) |
 | P6 — Cloud client + auth | **done** | `auth_login`, Supabase/Google, `cloud_chat` → [`server/`](../server/) |
 | P7 — Linux ship | **done** | `build-linux.sh` → `.deb` / `.AppImage`; CI in [`.github/workflows/build-linux.yml`](.github/workflows/build-linux.yml) |
 | P8 — CI matrix (Win/Mac) | pending | Windows + macOS GitHub Actions workflows (Linux done) |
@@ -282,7 +286,7 @@ See [`desktop-architecture.md`](desktop-architecture.md) §6 for full detail. (L
 
 ## Agent mode phases (v2)
 
-See [`ai-agent-architecture.md`](ai-agent-architecture.md) §12. (UI supports two-file scenes+assets + chat; full autonomous loop + patch engine in progress.)
+See [`ai-agent-architecture.md`](ai-agent-architecture.md) §12. Current UI support is transitional; the target workspace is `scenes.py` + `helpers.py` + `brief/` with a project-structure sidebar and purpose-built editors.
 
 Product constraints on when the agent and render become available (strict gating until dependencies ready) are in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
@@ -292,7 +296,7 @@ Product constraints on when the agent and render become available (strict gating
 | A2 — Context bundler | partial | Sections, editor state in chat context; full bundle for agent |
 | A3 — Tool loop orchestrator | partial | `compile_manim` via sidecar + render pipeline; full view/edit/compile agent loop |
 | A4 — Async render bridge | **done** | Non-blocking render + streamed `render_progress` events |
-| A5 — Two-file workspace | **done** | `assets.py` template + editor support for scenes/assets files |
+| A5 — Bounded project workspace | target update | Migrate helper code from `assets.py` to `helpers.py`; add `brief/`, source asset folders, and sidebar navigation for Script/Helpers/Brief/Assets/Renders |
 | A6 — TinyTeX bootstrap | partial (PAD-2) | Python injection + paths implemented; Rust asset unpacker in PAD-3 |
 | A7 — Agent system prompt | **done** | [`shared/prompts/agent-system.txt`](shared/prompts/agent-system.txt) |
 

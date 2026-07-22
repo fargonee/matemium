@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..deps import AuthUser, require_user
-from ..services.supabase import SupabaseService, get_supabase_service
 
 router = APIRouter(tags=["settings"])
 
@@ -24,13 +23,10 @@ class LLMSettingsUpdate(BaseModel):
 async def update_llm_settings(
     body: LLMSettingsUpdate,
     user: Annotated[AuthUser, Depends(require_user)],
-    supabase: SupabaseService = Depends(get_supabase_service),
 ) -> dict:
-    """Allow authenticated user to configure their own LLM / TTS credentials (BYO).
-
-    Keys are stored (encrypt in production).
-    """
-    data = body.model_dump(exclude_unset=True)
-    if data:
-        await supabase.set_user_llm_config(user.id, data)
-    return {"ok": True, "updated": list(data.keys())}
+    """Deprecated. Provider API keys are stored on the user's computer."""
+    _ = (body, user)
+    raise HTTPException(
+        status_code=410,
+        detail="Provider keys are stored locally in the Matemium desktop app, not on Matemium servers.",
+    )

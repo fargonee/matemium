@@ -1,23 +1,20 @@
 """
-LLM Management, Cost Tracking, Autonomous Pricing.
+LLM usage telemetry.
 
 Responsibilities:
-- Track real money we spend on providers (our cost).
-- Apply profit margin to automatically price tokens for users.
-- Log every platform call with accurate token + dollar cost.
-- Provide helpers for picking providers, calculating deductions.
-- Future: health of our provider balances, auto-replenish hooks.
+- Estimate provider usage cost for observability.
+- Log BYO/local model calls when needed.
+- Never deduct Matemium credits or apply resale margins.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from ..config import settings
 from .supabase import SupabaseService, get_supabase_service
 
-# Base pricing (USD per 1M tokens). These are our purchase costs.
-# Can be overridden / extended in llm_model_pricing table.
+# Base pricing (USD per 1M tokens) for usage observability only.
+# Users pay their chosen provider directly through their own account.
 DEFAULT_PRICING: dict[tuple[str, str], dict[str, float]] = {
     ("openai", "gpt-4o-mini"): {"input": 0.15, "output": 0.60},
     ("openai", "gpt-4o"): {"input": 2.50, "output": 10.00},
@@ -29,21 +26,12 @@ DEFAULT_PRICING: dict[tuple[str, str], dict[str, float]] = {
 
 
 async def get_profit_margin() -> float:
-    """Global profit margin (e.g. 0.40 = 40%). Can be changed in system_settings."""
-    supabase = get_supabase_service()
-    rows = await supabase._rest_get("system_settings", {"key": "eq.llm_profit_margin", "select": "value"})
-    if rows:
-        try:
-            val = rows[0]["value"]
-            if isinstance(val, (int, float, str)):
-                return float(val)
-        except Exception:
-            pass
-    return getattr(settings, "llm_default_margin", 0.40)
+    """Deprecated compatibility helper. Matemium does not apply provider margins."""
+    return 0.0
 
 
 def get_model_cost_per_million(provider: str, model: str) -> dict[str, float]:
-    """Our cost per million tokens (input/output)."""
+    """Estimated provider cost per million tokens (input/output)."""
     key = (provider.lower(), model)
     if key in DEFAULT_PRICING:
         return DEFAULT_PRICING[key]
@@ -58,9 +46,8 @@ async def calculate_cost_and_price(
     completion_tokens: int | None,
 ) -> dict[str, Any]:
     """
-    Returns our_cost_usd, user_price_usd (with margin), suggested_credits.
+    Returns estimated provider cost for telemetry. No Matemium price or credits.
     """
-    margin = await get_profit_margin()
     pricing = get_model_cost_per_million(provider, model)
 
     p_tok = prompt_tokens or 0
@@ -70,23 +57,17 @@ async def calculate_cost_and_price(
     output_cost = (c_tok / 1_000_000) * pricing["output"]
     our_cost = round(input_cost + output_cost, 6)
 
-    user_price = round(our_cost * (1 + margin), 6)
-
-    # Simple credit model: 1 credit ≈ $0.001 (or make configurable)
-    # For now we map price to "credits". You can tune this.
-    credits = max(1, int(user_price * 1000))   # e.g. $0.001 = 1 credit
-
     return {
         "our_cost_usd": our_cost,
-        "user_price_usd": user_price,
-        "margin": margin,
-        "charged_credits": credits,
+        "user_price_usd": our_cost,
+        "margin": 0.0,
+        "charged_credits": 0,
         "prompt_tokens": p_tok,
         "completion_tokens": c_tok,
     }
 
 
-async def record_platform_usage(
+async def record_provider_usage(
     user_id: str,
     provider_name: str,
     model: str,
@@ -97,7 +78,7 @@ async def record_platform_usage(
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    Log the call + calculate cost + deduct appropriate credits from user.
+    Log the call and estimate provider cost without deducting credits.
     Returns the calculation result.
     """
     supabase: SupabaseService = get_supabase_service()
@@ -113,19 +94,15 @@ async def record_platform_usage(
         "completion_tokens": calc["completion_tokens"],
         "total_tokens": (calc["prompt_tokens"] or 0) + (calc["completion_tokens"] or 0),
         "cost_usd": calc["our_cost_usd"],
-        "charged_credits": calc["charged_credits"],
-        "margin_applied": calc["margin"],
+        "charged_credits": 0,
+        "margin_applied": 0,
         "request_id": request_id,
         "metadata": extra or {},
     }
 
     await supabase.log_llm_usage(log_data)
 
-    # Deduct the credits the user owes us
-    if calc["charged_credits"] > 0:
-        await supabase.adjust_llm_credits(user_id, -calc["charged_credits"])
-
-    return calc
+    return {**calc, "charged_credits": 0, "margin": 0}
 
 
 async def get_spend_summary() -> dict[str, Any]:
@@ -153,28 +130,13 @@ async def get_spend_summary() -> dict[str, Any]:
 
 async def get_autonomous_status() -> dict[str, Any]:
     """
-    Very basic autonomous health.
-    In future: compare spend against budgets in llm_providers, suggest top-ups.
+    Basic autonomous health for the BYO/local model architecture.
     """
-    supabase = get_supabase_service()
-    providers = await supabase.list_active_platform_providers()
     summary = await get_spend_summary()
-
-    recommendations = []
-    for p in providers:
-        budget = float(p.get("monthly_budget_usd") or 0)
-        # Very rough: we don't have per-provider monthly yet, so global hint
-        if budget > 0 and summary["total_cost_usd"] > budget * 0.8:
-            recommendations.append({
-                "provider": p["name"],
-                "message": "Approaching or over budget. Consider replenishing.",
-                "current_spend": summary["total_cost_usd"],
-                "budget": budget,
-            })
 
     return {
         "margin": await get_profit_margin(),
-        "total_platform_spend_usd": summary["total_cost_usd"],
-        "active_providers": len(providers),
-        "recommendations": recommendations,
+        "total_provider_cost_usd": summary["total_cost_usd"],
+        "active_providers": 0,
+        "recommendations": [],
     }

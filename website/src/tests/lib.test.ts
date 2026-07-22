@@ -77,7 +77,7 @@ describe("displayName", () => {
 
 describe("planById", () => {
   it("returns the matching plan", () => {
-    expect(planById("pro")?.name).toBe("Pro");
+    expect(planById("free")?.name).toBe("Matemium");
   });
 
   it("returns undefined for unknown ids", () => {

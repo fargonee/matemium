@@ -5,7 +5,7 @@
 
 **Phase 10 status:** Packaging/CI/cross-platform + docs refresh implemented. See [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](../PRODUCT-ARCHITECTURE-IMPLEMENTATION.md) §11 and phased roadmap.
 
-This document records the **strategic pivot** to a **commercial/freemium desktop application** where users author animations as **Python project code** assisted by an **AI chat** — not as cloud-generated JSON specs. 
+This document records the **strategic pivot** to a **free, source-available desktop application** where users author animations as **Python project code** assisted by **user-owned AI provider access** — not as cloud-generated JSON specs or platform-resold model credits.
 
 Engine internals remain in [`architecture.md`](architecture.md); feature status in [`project-spec.md`](project-spec.md). Product-level architecture decisions (sidecar lazy loading, intelligence engine, publishing, user gating) live in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
@@ -15,7 +15,7 @@ Engine internals remain in [`architecture.md`](architecture.md); feature status 
 
 | Before | After |
 |--------|-------|
-| Open-source developer CLI + Python library | Commercial/freemium **desktop application** |
+| Developer CLI + Python library | Free, source-available **desktop application** |
 | Hypothesis: AI emits Sheet DSL JSON from prompts | **AI edits `scenes.py`** on the user's behalf (mini-Cursor) |
 | `matemium render` as primary UX | **Code editor + AI chat + render** in a Tauri shell |
 | Repo is the product | Repo is the **local compilation engine** packaged inside the desktop app |
@@ -41,15 +41,17 @@ These are non-negotiable product rules. All new desktop, cloud, and engine work 
 ### 2.2 AI edits code, not JSON
 
 - Third-party LLMs integrated via **chat APIs** return **natural language + code edits** (diffs / replace blocks), **not** Sheet DSL JSON or builder-op JSON.
-- The cloud is a **thin chat router** (auth, billing, entitlements). It does not compile, preview, or render animations.
+- External providers are preferred by default. OpenRouter is the default provider because it gives users one independent account for many model families.
+- Matemium does not provide pooled model API keys, prepaid in-app AI tokens, or Matemium-owned model quotas. Users bring their own API keys and can add/select multiple providers.
+- The cloud is a **thin optional router/helper** (auth/profile sync, provider selection metadata, optional BYO request forwarding). It does not compile, preview, render animations, or own model spend.
 - **Robustness parity:** AI and the human edit the **same file** and run through the **same** import → lint → render pipeline.
 
-### 2.3 Authoring modes: single file (v1) → two file (agent)
+### 2.3 Authoring modes: script + project brief
 
-- **v1 chat default:** one `scenes.py` per project. Maximizes reliability for API-only integrations (one buffer, no cross-file import routing).
-- **Visual multi-section UI** on top of the single file (see §5) — prettier editing without multi-file complexity.
-- **v2 agent mode:** strict **two-file boundary** — `scenes.py` (visual timeline) + `assets.py` (computations and data). See [`ai-agent-architecture.md`](ai-agent-architecture.md) §7.
-- Agent mode unlocks the **tool loop** (view/edit/compile), Search/Replace patches, and autonomous self-correction — not optional multi-file sprawl.
+- **v1 chat default:** one `scenes.py` per project. Maximizes reliability for API-only integrations (one render entrypoint, no cross-file import routing).
+- **Visual multi-section UI** on top of `scenes.py` (see §5) — prettier editing without hiding that the renderable artifact is Python code.
+- **Agent/project mode:** `scenes.py` remains the render entrypoint, `helpers.py` holds reusable Python computations, and `brief/` holds structured creative intent, narration, roadmap, and media references. See [`ai-agent-architecture.md`](ai-agent-architecture.md) §7.
+- Agent mode unlocks the **tool loop** (view/edit/compile), Search/Replace patches, project-brief editing, and autonomous self-correction — not unconstrained repo sprawl.
 
 **Note:** Later product decisions on sidecar bootstrapping, lazy loading of Manim/embeddings, first-run model downloads, and strict UX gating are documented in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
@@ -57,11 +59,18 @@ These are non-negotiable product rules. All new desktop, cloud, and engine work 
 
 - All Manim compilation and video encoding runs on the user's CPU/GPU.
 - No cloud rendering, no render farms, no uploaded scene assets for compute.
-- Cloud ops cost scales with **auth + chat API calls**, not render minutes or storage.
+- Cloud ops cost scales with optional auth/profile features, not render minutes, storage, or model resale.
+
+### 2.7 Free Use And Source Availability
+
+- Matemium is completely free to use.
+- The source code is publicly available for inspection, personal use, education, and contribution to the official project.
+- Private modifications are permitted.
+- Redistribution, publication of derivative builds, commercial use, and operation of competing forks require written permission.
 
 ### 2.5 Engine stays generic
 
-- Topic-specific patterns live in **project code** (or later `helpers.py`), never in `canvas/`.
+- Topic-specific patterns live in **project code** (`helpers.py` when reused), never in `canvas/`.
 - No `canvas/extensions/` package tier (see [`architecture.md`](architecture.md) §6).
 
 ### 2.6 SheetDSL is internal IR only
@@ -80,7 +89,7 @@ A desktop app where a user creates a **project**, edits **`scenes.py`** in a syn
 
 ### 3.2 Primary goals
 
-1. **Project workspaces** — create, open, save projects; each project has one canonical `scenes.py` (v1).
+1. **Project workspaces** — create, open, save projects; each project has one canonical `scenes.py`, optional `helpers.py`, and a first-class `brief/` workspace.
 2. **Code editor** — Python syntax highlighting, diagnostics (ruff / `py_compile`), section-aware navigation.
 3. **AI chat canvas** — v1: user prompts; AI proposes edits to `scenes.py`; user reviews/applies diffs. **v2 agent:** autonomous tool loop (view/edit/compile + self-correction) — see [`ai-agent-architecture.md`](ai-agent-architecture.md).
 4. **Zero cloud rendering** — sidecar runs all Manim/LaTeX/FFmpeg work locally.
@@ -90,7 +99,7 @@ A desktop app where a user creates a **project**, edits **`scenes.py`** in a syn
 
 **Future direction (Phase 0+):** The preview will become a true 3D manim-web renderer. The sheet/tape will be treated as one special object (`TapeObject`) inside an infinite 3D world. When the camera targets a tape, the preview re-uses/enhances the high-fidelity sheet logic on that plane while still supporting full 3D camera motion and other objects. See `canvas/3D-model.md` and the 3D unification plan.
 6. **Cross-platform shipping** — Windows (MSI/EXE), macOS (DMG), Linux (AppImage/DEB). One shared TS/Rust codebase; **per-platform PyInstaller sidecars** via CI matrix (sidecars cannot be cross-compiled).
-7. **Freemium monetization** — cloud handles auth, entitlements, billing; meter chat (and optionally renders).
+7. **Free distribution** — no subscriptions, no paid tiers, no Matemium AI credits; users pay external providers directly when they choose cloud AI.
 
 ### 3.3 Non-goals (explicit)
 
@@ -108,13 +117,39 @@ Each user project maps to a directory on disk (app data dir, not the dev repo):
 
 ```
 ~/Matemium/workspaces/<project-id>/
-├── scenes.py          # visual timeline (required)
-├── assets.py          # engine room — agent mode only (v2)
-├── project.json       # title, scene class, authoring_mode
-└── (renders via sidecar → app-managed output dirs)
+├── project.json       # app metadata: id, title, scene class, orientation, timestamps
+├── scenes.py          # render entrypoint and visual timeline (required)
+├── helpers.py         # reusable Python helpers imported by scenes.py
+├── brief/
+│   ├── passport.json  # structured creative/production identity
+│   ├── description.md # human-readable project brief
+│   ├── tape.md        # director's tape plan: beats, comments, camera/reveal notes
+│   ├── roadmap.json   # phases, completion, current focus, blockers
+│   └── narration.md   # voiceover, captions, timing and pronunciation notes
+├── assets/
+│   ├── images/
+│   ├── video/
+│   └── audio/
+└── renders/           # app-managed output dirs
 ```
 
-`authoring_mode`: `"single_file"` (v1 chat) or `"two_file"` (v2 agent). Templates: [`shared/templates/scenes.py`](shared/templates/scenes.py), [`shared/templates/assets.py`](shared/templates/assets.py).
+`authoring_mode`: `"single_file"` for the simplest path, `"project_brief"` when `helpers.py`, `brief/`, and media management are enabled. Templates live under [`shared/templates/`](shared/templates/). Historical `assets.py` workspaces should migrate to `helpers.py`; `assets` is reserved for real project/media assets and app-managed downloadable runtime assets.
+
+### 4.1 Project brief file roles
+
+| File | Owner | Purpose | UI treatment |
+|------|-------|---------|--------------|
+| `project.json` | App | Identity, scene class, orientation, timestamps | Settings form; not a general editor |
+| `scenes.py` | Human + AI | Executable visual timeline | Primary code editor with section outline |
+| `helpers.py` | Human + AI | Computations, LaTeX helpers, geometry/data builders | Secondary code editor |
+| `brief/passport.json` | Human + AI | Topic, audience, difficulty, style, duration, language, constraints, learning goals | Form editor with JSON fallback |
+| `brief/description.md` | Human + AI | Freeform project brief and intent | Markdown editor |
+| `brief/tape.md` | Human + AI | Full tape plan with comments about what happens and how it appears in video | Markdown editor with beat navigation |
+| `brief/roadmap.json` | AI-owned, human-readable | Phases, completion, current working point, blockers | Read-only production route; users steer changes through AI |
+| `brief/narration.md` | Human + AI | Voiceover, captions, timing notes, pronunciation | Markdown/script editor |
+| `assets/*` | Human + AI | User-provided images, video, audio | Asset browser with preview |
+
+The `brief/` files are not rendered directly. They are persistent project memory for the user, the UI, and the AI agent. `scenes.py` is still the only required render entrypoint.
 
 **Dev repo equivalent:**
 
@@ -122,9 +157,50 @@ Each user project maps to a directory on disk (app data dir, not the dev repo):
 projects/<slug>/scenes.py   →   matemium render <slug>
 ```
 
-The sidecar sets `MATEMIUM_ROOT` (or equivalent) to the workspace root so `import` and render match CLI behavior.
+The sidecar sets `MATEMIUM_ROOT` (or equivalent) to the workspace root so `import helpers` and render match CLI behavior.
 
-### 4.1 Recommended `scenes.py` structure
+### 4.2 Required UI navigation model
+
+The UI must make this structure feel like one coherent project, not a file tree dumped on the user:
+
+- **Project sidebar:** the persistent left panel shows the current project structure as a navigable tree/outline, not just a project switcher. It must expose `scenes.py`, `helpers.py`, `brief/`, `assets/`, and `renders/` with clear icons, selection state, dirty state, validation badges, and collapsed/expanded folders.
+- **Top-level sidebar groups:** Script, Helpers, Brief, Assets, Renders. Projects/workspace switching can live above this tree or in a compact header, but once a project is open the sidebar's main job is navigating that project's files and production state.
+- **Script view:** `scenes.py` as the default first screen, with section outline, diagnostics, render controls, and AI patch review.
+- **Helpers view:** `helpers.py` for advanced reusable code; visible but secondary.
+- **Brief view:** tabs/indexes for Passport, Description, Tape, Roadmap, and Narration. Passport gets a friendly form, Markdown files get an editor with preview, and Roadmap is an AI-owned read-only production route with no raw JSON escape hatch.
+- **Assets view:** source images, video, and audio grouped by type with thumbnails/previews and clear import/reference actions for `scenes.py`. Keep these under `assets/`; `<workspace>/media/` is reserved for generated Manim cache data.
+- **Renders view:** app-managed render outputs, latest preview, export/cut artifacts, and render history.
+- **AI context:** the agent can read and update the brief deliberately, but code changes still flow through `scenes.py`/`helpers.py` and compile verification.
+- **Progress affordance:** `brief/roadmap.json` drives a visible current phase/current task indicator so the user always knows what the project is working on.
+
+Navigation must be dense, predictable, and fast. Avoid marketing-style pages inside the workspace; the first screen is the usable script/project workspace.
+
+The project sidebar should not behave like a raw OS file explorer. It is a curated production map:
+
+```
+Current Project
+├── Script
+│   └── scenes.py
+├── Helpers
+│   └── helpers.py
+├── Brief
+│   ├── Passport
+│   ├── Description
+│   ├── Tape
+│   ├── Roadmap
+│   └── Narration
+├── Assets
+│   ├── Images
+│   ├── Video
+│   └── Audio
+└── Renders
+    ├── Latest
+    └── History
+```
+
+Selecting a sidebar item opens the correct purpose-built surface, not always a plain text editor. For example, Passport opens a form, Roadmap opens a checklist/phase view, Tape and Narration open Markdown/script editors, and Assets opens a browser with previews.
+
+### 4.3 Recommended `scenes.py` structure
 
 Split the lesson into **top-level `part_*` functions** plus a thin `CanvasScene` class:
 
@@ -188,7 +264,7 @@ The model patches **one file**, optionally scoped by section name in the user pr
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              CLOUD (thin)                                   │
-│  Auth · Billing · Entitlements · Chat LLM routing · text / code edits only  │
+│  Optional auth · profile sync · BYO provider helpers · text / code edits    │
 └───────────────────────────────────┬─────────────────────────────────────────┘
                                     │ HTTPS
                                     │ Request:  prompt + session + file context
@@ -217,21 +293,22 @@ The model patches **one file**, optionally scoped by section name in the user pr
 | In scope | Out of scope |
 |----------|--------------|
 | User authentication | Video encoding |
-| Subscription / credit entitlements | Manim execution |
-| Rate limiting per plan | DSL validation / layout |
-| Forwarding chat to third-party LLMs | Storing rendered media long-term |
+| User-owned provider key selection metadata | Manim execution |
+| Abuse/rate protection for Matemium endpoints | DSL validation / layout |
+| Optional forwarding to third-party LLMs using the user's key | Storing rendered media long-term |
+| OpenRouter OAuth callback/key exchange support | Selling model access or pooled API access |
 | Returning **text + structured code edits** | Hosting LaTeX/FFmpeg |
 
 **Chat pipeline (v1):**
 
 1. Desktop sends user message + auth token + `scenes.py` snapshot (+ optional selection, section map, last errors).
-2. Cloud selects model; system prompt includes Matemium `CanvasBuilder` API constraints ([`canvas/USAGE.md`](canvas/USAGE.md), [`shared/prompts/scene-authoring-system.txt`](shared/prompts/scene-authoring-system.txt)).
+2. Desktop/server selects the user's preferred provider and model. OpenRouter is the default external provider. System prompt includes Matemium `CanvasBuilder` API constraints ([`canvas/USAGE.md`](canvas/USAGE.md), [`shared/prompts/scene-authoring-system.txt`](shared/prompts/scene-authoring-system.txt)).
 3. LLM returns assistant message + **edit blocks** (Search/Replace or unified diff).
 4. Desktop shows diff; user applies to editor buffer; save writes `scenes.py`.
 
 **Agent pipeline (v2):** context bundle → tool calls → local patch engine + sidecar compile → self-correction loop. System prompt: [`shared/prompts/agent-system.txt`](shared/prompts/agent-system.txt). Full spec: [`ai-agent-architecture.md`](ai-agent-architecture.md).
 
-The cloud never sees the user's GPU output. It may see project **source code** the user sends for assistance (same trust model as Cursor/Copilot).
+The cloud never sees the user's GPU output. It may see project **source code** the user sends for assistance (same trust model as Cursor/Copilot). Provider API keys should be stored locally whenever possible; if cloud storage is used for cross-device sync, keys must be encrypted and treated as user secrets.
 
 ### 6.2 Desktop client
 
@@ -298,7 +375,7 @@ Exact wire schema: [`matemium/ipc/PROTOCOL.md`](matemium/ipc/PROTOCOL.md).
 | Tier | Integration | Project shape |
 |------|-------------|---------------|
 | **v1 — Chat API** | Completions + optional Search/Replace diffs | **Single `scenes.py`** |
-| **v2 — Agent** | Tool loop (`view_file`, `edit_file`, `compile_manim`) + self-correction | **`scenes.py` + `assets.py` only** |
+| **v2 — Agent** | Tool loop (`view_file`, `edit_file`, `compile_manim`) + self-correction | **`scenes.py` + `helpers.py` + `brief/`** |
 
 Full agent spec: [`ai-agent-architecture.md`](ai-agent-architecture.md).
 

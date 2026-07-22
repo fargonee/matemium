@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "suite_id": "matemium-agent-baseline-v1",
+  "cases": [
+    {
+      "id": "create-ambiguous-scene",
+      "category": "generation",
+      "objective": "Create a clear animation explaining why completing the square works.",
+      "fixture": "empty-two-file-project",
+      "required_evidence": ["project_check", "preview_render", "visual_inspection"],
+      "failure_tags": ["false_success", "visual_incorrectness"]
+    },
+    {
+      "id": "localized-heading-edit",
+      "category": "safe_edit",
+      "objective": "Rename the introduction heading without changing later sections.",
+      "fixture": "multi-section-scene",
+      "required_evidence": ["changed_ranges", "project_check"],
+      "failure_tags": ["unrelated_change", "full_file_rewrite"]
+    },
+    {
+      "id": "repair-syntax-error",
+      "category": "recovery",
+      "objective": "Repair the existing scene so it compiles.",
+      "fixture": "syntax-error-scene",
+      "required_evidence": ["diagnostic", "project_check"],
+      "failure_tags": ["false_success", "recovery_failure"]
+    },
+    {
+      "id": "repair-missing-import",
+      "category": "recovery",
+      "objective": "Repair the existing scene so it compiles.",
+      "fixture": "missing-import-scene",
+      "required_evidence": ["diagnostic", "project_check"],
+      "failure_tags": ["false_success", "recovery_failure"]
+    },
+    {
+      "id": "repair-latex-error",
+      "category": "recovery",
+      "objective": "Fix the malformed equation while preserving its mathematical meaning.",
+      "fixture": "latex-error-scene",
+      "required_evidence": ["latex_diagnostic", "preview_render"],
+      "failure_tags": ["semantic_regression", "recovery_failure"]
+    },
+    {
+      "id": "recover-stale-patch",
+      "category": "concurrency",
+      "objective": "Apply the requested label edit after the user changes the same file.",
+      "fixture": "stale-patch-project",
+      "required_evidence": ["stale_hash_rejection", "fresh_read", "project_check"],
+      "failure_tags": ["overwrite_user_edit", "repeated_patch"]
+    },
+    {
+      "id": "detect-visual-overlap",
+      "category": "visual_verification",
+      "objective": "Make the labels readable and non-overlapping.",
+      "fixture": "compile-success-overlap",
+      "required_evidence": ["preview_render", "visual_inspection"],
+      "failure_tags": ["false_success", "visual_incorrectness"]
+    },
+    {
+      "id": "cancel-long-render",
+      "category": "run_control",
+      "objective": "Render the full animation, then cancel when requested by the harness.",
+      "fixture": "long-render-scene",
+      "required_evidence": ["cancel_acknowledged", "checkpoint"],
+      "failure_tags": ["ignored_cancellation", "post_cancel_mutation"]
+    },
+    {
+      "id": "resume-after-restart",
+      "category": "durability",
+      "objective": "Resume the interrupted edit and finish verification.",
+      "fixture": "checkpointed-run",
+      "required_evidence": ["checkpoint_loaded", "workspace_hash_check", "verification_manifest"],
+      "failure_tags": ["lost_state", "stale_overwrite"]
+    },
+    {
+      "id": "stop-ineffective-loop",
+      "category": "stall_detection",
+      "objective": "Fix a task whose required dependency is unavailable.",
+      "fixture": "unavailable-dependency",
+      "required_evidence": ["repeated_signature_detected", "honest_terminal_state"],
+      "failure_tags": ["runaway_loop", "false_success"]
+    },
+    {
+      "id": "long-context-compaction",
+      "category": "memory",
+      "objective": "Complete a multi-section refactor while retaining the unresolved constraint introduced first.",
+      "fixture": "long-context-project",
+      "required_evidence": ["constraint_retained", "context_budget", "project_check"],
+      "failure_tags": ["forgotten_constraint", "context_overflow"]
+    },
+    {
+      "id": "per-call-accounting",
+      "category": "accounting",
+      "objective": "Complete a repair requiring at least three model calls.",
+      "fixture": "multi-turn-repair",
+      "required_evidence": ["provider_call_records", "usage_reconciliation"],
+      "failure_tags": ["missing_usage", "incorrect_charge"]
+    }
+  ]
+}

@@ -15,7 +15,7 @@ export function LoginPage() {
         </p>
         <h1 className="text-2xl font-bold tracking-tight">Sign in to Matemium</h1>
         <p className="mt-2 text-sm text-text-muted">
-          Use your Google account to access your dashboard, subscription, and licensed
+          Use your Google account to access your dashboard, provider key settings, and
           desktop downloads.
         </p>
 
@@ -26,10 +26,9 @@ export function LoginPage() {
         <p className="mt-6 text-center text-xs text-text-subtle">
           By signing in you agree to our{" "}
           <Link to="/terms" className="text-accent hover:underline">Terms of Service</Link>,{" "}
-          <Link to="/privacy" className="text-accent hover:underline">Privacy Policy</Link>, and{" "}
-          <Link to="/refund" className="text-accent hover:underline">Refund Policy</Link>.{" "}
+          <Link to="/privacy" className="text-accent hover:underline">Privacy Policy</Link>.{" "}
           <Link to="/pricing" className="text-accent hover:underline">
-            View plans
+            View free access
           </Link>
         </p>
       </Card>

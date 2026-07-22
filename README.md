@@ -8,12 +8,12 @@ Output targets **9:16 portrait reels** (TikTok / Shorts) by default, with landsc
 
 ## Product direction
 
-Monorepo for a **commercial/freemium desktop app** — three deployable layers:
+Monorepo for a **free, source-available desktop app** — three deployable layers:
 
 | Layer | Path | Role |
 |-------|------|------|
 | **Engine** | `canvas/`, `matemium/`, `projects/` | Local Manim compiler + sidecar IPC |
-| **Server** | [`server/`](server/) | Cloud auth + chat LLM router (no rendering) |
+| **Server** | [`server/`](server/) | Optional cloud auth + BYO chat routing helpers (no rendering, no Matemium-owned model quota) |
 | **Desktop** | [`desktop/`](desktop/) | Tauri app — Windows, macOS, Linux from one tree |
 
 Overview: [`INTRODUCTION.md`](INTRODUCTION.md). Map: [`STRUCTURE.md`](STRUCTURE.md). Product spec: [`desktop-architecture.md`](desktop-architecture.md). AI agent: [`ai-agent-architecture.md`](ai-agent-architecture.md).
@@ -223,15 +223,15 @@ cutter.cut(input_video=..., output_dir=..., manifest=manifest)
 - [x] Tauri v2 + TypeScript UI (Monaco editor, AI chat, section outline, render preview, project workspaces)
 - [x] Sidecar project commands — `lint_project`, `check_project`, `list_scenes`, `render_project`, `export_sheet`, etc. + progress events
 - [x] PyInstaller Linux binary + full Linux ship (`.deb` / `.AppImage`) via `./desktop/scripts/build-linux.sh`
-- [x] Cloud auth + chat client (Supabase / Google sign-in + billing)
+- [x] Cloud auth + chat client (Supabase / Google sign-in; AI uses user-owned provider keys)
 - [ ] Full CI matrix for Windows + macOS desktop builds (Linux complete)
 
 **Server** ([`server/`](server/)):
-- [x] FastAPI — `/health`, auth (Supabase token + Google sign-in session), `/v1/chat/completions`, billing (Lemon Squeezy checkout/portal + signed webhooks), admin routes
-- [x] Production auth + Lemon Squeezy billing + webhooks (see [LEMON_SQUEEZY_SETUP.md](LEMON_SQUEEZY_SETUP.md))
-- [x] LLM proxy (OpenAI-compatible; stub mode for dev)
+- [x] FastAPI — `/health`, auth (Supabase token + Google sign-in session), `/v1/chat/completions`, admin routes
+- [x] BYO LLM proxy helpers for user-owned OpenAI-compatible providers; OpenRouter is the default provider
+- [x] Stub mode for dev
 
-**Billing** is fully wired: Lemon Squeezy checkout + customer portal + signed webhooks sync plans to Supabase. Frontend pricing + dashboard included. See the dedicated guide to go live.
+**Cost model:** Matemium is completely free to use. The project does not sell subscriptions, in-app AI tokens, or model access. Users connect their own external provider keys, preferably through OpenRouter OAuth, or use their own local models.
 
 **CI / Deploy**: Engine tests on path changes; zero-downtime deploys for `server/` (Northflank) and `website/` (Cloudflare) with health verification + rollback. See `.github/workflows/`.
 

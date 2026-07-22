@@ -19,10 +19,32 @@ projects/
   demo/           # built-in test scenes (don't delete)
   my_topic/
     scenes.py     # your CanvasScene classes
+    helpers.py    # optional reusable topic helpers
 outputs/
   demo/media/     # demo renders (gitignored)
   my_topic/media/ # your renders (gitignored)
 ```
+
+Desktop workspaces use the same `scenes.py` entrypoint and optional `helpers.py`, plus a first-class project brief:
+
+```
+project/
+  project.json
+  scenes.py
+  helpers.py
+  brief/
+    passport.json
+    description.md
+    tape.md
+    roadmap.json
+    narration.md
+  assets/
+    images/
+    video/
+    audio/
+```
+
+`brief/` is project memory for the UI and AI agent: creative direction, tape plan, roadmap, and narration. It is not engine IR; `scenes.py` still compiles through `CanvasBuilder` into `SheetDSL`.
 
 ## New project
 

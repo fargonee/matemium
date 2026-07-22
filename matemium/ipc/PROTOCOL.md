@@ -6,7 +6,7 @@
 
 The Tauri Rust shell spawns `matemium-sidecar` as a child process. All engine work flows through this protocol — the TypeScript UI never talks to Python directly.
 
-**Product authoring path:** desktop saves `scenes.py` (and `assets.py` in agent mode) to a project workspace; sidecar **imports and renders project code** via `lint_project`, `check_project`, `list_scenes`, `render_project`. **Legacy path:** inline `dsl` payloads remain for tests and engine debugging.
+**Product authoring path:** desktop saves `scenes.py`, `helpers.py`, and `brief/` to a project workspace; sidecar **imports and renders project code** via `lint_project`, `check_project`, `list_scenes`, `render_project`. **Legacy path:** inline `dsl` payloads remain for tests and engine debugging.
 
 **Agent mode:** the LLM tool `compile_manim` maps to `check_project` + `render_project` on the sidecar. The desktop orchestrator runs the tool loop; see [`ai-agent-architecture.md`](../../ai-agent-architecture.md).
 
@@ -56,7 +56,7 @@ Events may arrive **between** the request write and the matching response line. 
 
 Optional: `path` — alternate scenes file relative to workspace (default `scenes.py`).
 
-`workspace` is the project root containing `scenes.py` (and `assets.py` when present). Sidecar sets `MATEMIUM_ROOT` to this path while importing. In PyInstaller builds, `MATEMIUM_ROOT` is the **user project workspace**, not the frozen executable directory — see path detection in [`ai-agent-architecture.md`](../../ai-agent-architecture.md) §8.C.
+`workspace` is the project root containing `scenes.py`, optional `helpers.py`, and `brief/`. Sidecar sets `MATEMIUM_ROOT` to this path while importing. In PyInstaller builds, `MATEMIUM_ROOT` is the **user project workspace**, not the frozen executable directory — see path detection in [`ai-agent-architecture.md`](../../ai-agent-architecture.md) §8.C.
 
 **Events:** `lint_started`, `lint_complete`, `check_complete`, plus render events on `render_project`.
 

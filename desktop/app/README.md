@@ -5,7 +5,8 @@ Vite + React + Monaco editor for the Tauri shell.
 ## Features (MVP shipping)
 
 - Project list — create, open, delete
-- Monaco Python editor (scenes.py + assets.py) with lint markers
+- Project sidebar — navigable curated project structure for Script, Helpers, Brief, Assets, and Renders
+- Monaco Python editor (`scenes.py` + `helpers.py`) with lint markers
 - Section outline from `# ---DIV:` comments
 - Toolbar — Save, Lint, Check, Render (quality selection)
 - Scene picker from `sidecar_list_scenes`
@@ -14,6 +15,33 @@ Vite + React + Monaco editor for the Tauri shell.
 - AI chat panel with Apply edit / diff support
 - Settings — server URL, API token, auth (stub or real Supabase/Google)
 - Render modal, bottom dock tabs (progress, terminal, outputs)
+
+## Workspace sidebar target
+
+When a project is open, the left sidebar should primarily navigate the project contents, not just list projects. It should present the curated production map:
+
+```
+Current Project
+├── Script
+│   └── scenes.py
+├── Helpers
+│   └── helpers.py
+├── Brief
+│   ├── Passport
+│   ├── Description
+│   ├── Tape
+│   ├── Roadmap
+│   └── Narration
+├── Assets
+│   ├── Images
+│   ├── Video
+│   └── Audio
+└── Renders
+    ├── Latest
+    └── History
+```
+
+Each item opens its natural surface: code editor for Script/Helpers, structured Passport editor, AI-owned read-only Roadmap, Markdown/script editors for Tape/Narration/Description, asset browser for Assets, and output history for Renders. The sidebar shows selection, dirty state, validation badges, and collapsed/expanded folders.
 
 ## Dev
 

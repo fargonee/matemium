@@ -36,6 +36,89 @@ from ..workspace_project import (
 HandlerFn = Callable[[dict[str, Any], EventEmitter], dict[str, Any]]
 
 
+_EDIT_REQUEST_TERMS = (
+    "add",
+    "change",
+    "delete",
+    "edit",
+    "fix",
+    "implement",
+    "modify",
+    "move",
+    "patch",
+    "remove",
+    "rename",
+    "replace",
+    "revert",
+    "update",
+)
+
+
+_EVIDENCE_REQUEST_TERMS = (
+    "animation",
+    "code",
+    "does",
+    "explain",
+    "generate",
+    "scene",
+    "show",
+    "summarize",
+    "what",
+)
+
+
+_WORKSPACE_TASK_TERMS = (
+    "animation",
+    "helpers.py",
+    "brief",
+    "build",
+    "canvas",
+    "check",
+    "class",
+    "code",
+    "compile",
+    "dsl",
+    "file",
+    "graph",
+    "lint",
+    "project",
+    "render",
+    "scene",
+    "scenes.py",
+    "workspace",
+)
+
+
+def _looks_like_workspace_edit_request(text: str) -> bool:
+    lowered = f" {text.lower()} "
+    return any(f" {term} " in lowered for term in _EDIT_REQUEST_TERMS)
+
+
+def _looks_like_workspace_evidence_request(text: str) -> bool:
+    lowered = f" {text.lower()} "
+    return any(f" {term} " in lowered for term in _EVIDENCE_REQUEST_TERMS)
+
+
+def _looks_like_workspace_task_request(text: str) -> bool:
+    lowered = f" {text.lower()} "
+    return (
+        _looks_like_workspace_edit_request(text)
+        or _looks_like_workspace_evidence_request(text)
+        or any(f" {term} " in lowered for term in _WORKSPACE_TASK_TERMS)
+        or "scenes.py" in lowered
+        or "helpers.py" in lowered
+    )
+
+
+def _local_chat_needs_workspace_context(prompt: str, scenes_excerpt: str) -> bool:
+    """Avoid feeding large workspace context into plain conversational turns."""
+    if not scenes_excerpt:
+        return False
+    if "--- REFERENCE FILE:" in scenes_excerpt:
+        return True
+    return _looks_like_workspace_task_request(prompt)
+
+
 def _render_progress(events: EventEmitter) -> Callable[..., None]:
     def emit(**kwargs: Any) -> None:
         events.render_progress(**kwargs)
@@ -138,7 +221,18 @@ def handle_retrieve(params: dict[str, Any], events: EventEmitter) -> dict[str, A
     top_k = int(params.get("top_k", 8))
     
     # Base files to index
-    files = list(params.get("files") or ["scenes.py", "assets.py"])
+    files = list(
+        params.get("files")
+        or [
+            "scenes.py",
+            "helpers.py",
+            "brief/passport.json",
+            "brief/description.md",
+            "brief/tape.md",
+            "brief/roadmap.json",
+            "brief/narration.md",
+        ]
+    )
     
     # Auto-scan references/ directory if it exists and append those files for indexing
     if workspace:
@@ -188,7 +282,7 @@ def handle_retrieve(params: dict[str, Any], events: EventEmitter) -> dict[str, A
             except Exception:
                 pass
                 
-    # 3. Perform semantic retrieve on the rest of the codebase (scenes.py, assets.py)
+    # 3. Perform semantic retrieval on the approved code and brief files.
     if codebase_files:
         if hasattr(retriever, "index_files"):
             try:
@@ -844,22 +938,192 @@ def handle_update_llm_config(params: dict[str, Any], _events: EventEmitter) -> d
     import os
     use_local = params.get("use_local_llm", False)
     model_path = params.get("model_path", "")
+    previous_model_path = os.environ.get("MATEMIUM_LOCAL_LLM_MODEL_PATH", "")
 
     os.environ["MATEMIUM_USE_LOCAL_LLM"] = "true" if use_local else "false"
     if model_path:
+        if previous_model_path and str(model_path) != previous_model_path:
+            from ..agent.local_runner import unload_cached_model
+
+            unload_cached_model()
         os.environ["MATEMIUM_LOCAL_LLM_MODEL_PATH"] = str(model_path)
 
     return {"ok": True, "configured": list(params.keys())}
 
 
+def _generate_local_messages(runner: Any, messages: list[dict[str, str]]) -> str:
+    """Run one local inference call for either chat or an agent turn."""
+    if runner.is_ollama_running():
+        return runner._generate_via_ollama_messages(messages)
+
+    if not runner.model_path or not runner.model_path.is_file():
+        raise FileNotFoundError(
+            f"Local GGUF model path not found or invalid: {runner.model_path}. "
+            "Ensure the model is fully downloaded via Settings."
+        )
+    from ..agent.llm_worker import generate_in_worker
+
+    return generate_in_worker(
+        model_path=runner.model_path,
+        context_window=runner.context_window,
+        messages=messages,
+    )
+
+
+def _split_reference_context(scenes_excerpt: str) -> tuple[str, str]:
+    if "--- REFERENCE FILE:" not in scenes_excerpt:
+        return "", scenes_excerpt
+    parts = scenes_excerpt.split("// --- workspace context below ---", 1)
+    if len(parts) == 2:
+        return parts[0].strip(), parts[1].strip()
+    return scenes_excerpt.strip(), ""
+
+
+def _handle_aider_chat(
+    params: dict[str, Any],
+    *,
+    user_prompt: str,
+    scenes_excerpt: str,
+) -> dict[str, Any]:
+    import uuid
+
+    from ..agent.aider_runner import AiderAgentRunner, AiderUnavailableError
+    from ..agent.local_runner import LocalInferenceRunner
+
+    workspace = _require_workspace(params)
+    use_local_model = bool(params.get("use_local_llm"))
+    provider = str(params.get("llm_provider") or "")
+    model = str(params.get("model") or "")
+    openrouter_api_key = str(params.get("openrouter_api_key") or "")
+    openai_api_key = str(params.get("openai_api_key") or "")
+    groq_api_key = str(params.get("groq_api_key") or "")
+    xai_api_key = str(params.get("xai_api_key") or "")
+    if use_local_model and not model:
+        model = LocalInferenceRunner().model_name
+
+    references, current_scene_context = _split_reference_context(scenes_excerpt)
+    extra_context = []
+    if references:
+        extra_context.append(f"Reference documents:\n{references}")
+    if current_scene_context:
+        extra_context.append(
+            "Current editor buffer supplied by the UI. Treat files on disk as the "
+            f"editable source of truth:\n```python\n{current_scene_context}\n```"
+        )
+
+    agent_trace: list[dict[str, Any]] = []
+    try:
+        env = {}
+        provider_name = provider.strip().lower()
+        if not use_local_model:
+            if provider_name == "openrouter" and openrouter_api_key:
+                env["OPENROUTER_API_KEY"] = openrouter_api_key
+            elif provider_name == "openai" and openai_api_key:
+                env["OPENAI_API_KEY"] = openai_api_key
+            elif provider_name == "groq" and groq_api_key:
+                env["GROQ_API_KEY"] = groq_api_key
+            elif provider_name == "xai" and xai_api_key:
+                env["XAI_API_KEY"] = xai_api_key
+        result = AiderAgentRunner(env=env).run(
+            workspace=workspace,
+            prompt=user_prompt,
+            model=model or None,
+            provider=provider or None,
+            use_local_model=use_local_model,
+            extra_context=extra_context,
+        )
+        response_text = result.output or "Aider completed the workspace edit."
+        resolved_model = result.model
+        agent_trace.extend(result.trace)
+    except AiderUnavailableError as exc:
+        if use_local_model:
+            response_text = (
+                "Local autonomous editing is not ready yet. Switch to an external "
+                "model for this edit, or wait for the local agent provider to become ready."
+            )
+        else:
+            response_text = (
+                "Autonomous editing is not ready yet. Matemium is preparing the "
+                "managed Aider runtime; try again after the agent runtime is ready."
+            )
+        agent_trace.append({
+            "type": "error",
+            "summary": "Aider runtime unavailable",
+            "details": {"error": str(exc)},
+        })
+        resolved_model = model or ("local" if use_local_model else "external")
+    except Exception as exc:
+        response_text = "Aider could not complete the agent task. Review the agent trace for details."
+        agent_trace.append({
+            "type": "error",
+            "summary": "Aider task failed",
+            "details": {"error": str(exc)},
+        })
+        resolved_model = model or ("local" if use_local_model else "external")
+
+    return {
+        "id": str(uuid.uuid4()),
+        "message": {
+            "role": "assistant",
+            "content": response_text,
+        },
+        "code_edit": None,
+        "model": resolved_model,
+        "stub": False,
+        "agent_runtime_version": "aider-v1",
+        "provider": "aider-local" if use_local_model else (provider or "aider"),
+        "billing_mode": "local" if use_local_model else "byo_external",
+        "request_id": str(uuid.uuid4()),
+        "agent_trace": agent_trace,
+    }
+
+
+def handle_prepare_agent_runtime(
+    _params: dict[str, Any], _events: EventEmitter
+) -> dict[str, Any]:
+    import uuid
+
+    from ..agent.aider_runner import AiderAgentRunner
+
+    try:
+        executable = AiderAgentRunner(timeout_seconds=900.0).prepare_runtime()
+        return {
+            "ok": True,
+            "runtime": "aider-v1",
+            "executable": executable,
+            "request_id": str(uuid.uuid4()),
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "runtime": "aider-v1",
+            "error": str(exc),
+            "request_id": str(uuid.uuid4()),
+        }
+
+
 def handle_local_chat(params: dict[str, Any], _events: EventEmitter) -> dict[str, Any]:
     """Offline local LLM chat completion using LocalInferenceRunner."""
     import uuid
-    import re
     from ..agent.local_runner import LocalInferenceRunner
     
     messages = params.get("messages", [])
     scenes_excerpt = params.get("scenes_excerpt", "")
+    user_prompt = next(
+        (str(msg.get("content", "")) for msg in reversed(messages) if msg.get("role") == "user"),
+        "",
+    )
+
+    if (
+        params.get("use_autonomous_agent")
+        and params.get("workspace")
+        and _looks_like_workspace_task_request(user_prompt)
+    ):
+        return _handle_aider_chat(
+            params,
+            user_prompt=user_prompt,
+            scenes_excerpt=scenes_excerpt,
+        )
 
     full_messages = []
     
@@ -879,10 +1143,22 @@ def handle_local_chat(params: dict[str, Any], _events: EventEmitter) -> dict[str
             "guidance and propose concrete Python edits when asked."
         )
 
-    full_messages.append({"role": "system", "content": system_prompt})
+    include_workspace_context = _local_chat_needs_workspace_context(
+        user_prompt, scenes_excerpt
+    )
+    if include_workspace_context:
+        full_messages.append({"role": "system", "content": system_prompt})
+    else:
+        full_messages.append({
+            "role": "system",
+            "content": (
+                "You are Ferganus, a concise Matemium assistant. For casual chat, "
+                "answer directly. Ask for project context only when it is needed."
+            ),
+        })
 
     # 2. Append scenes excerpt as system context if provided
-    if scenes_excerpt:
+    if scenes_excerpt and include_workspace_context:
         if "--- REFERENCE FILE:" in scenes_excerpt:
             parts = scenes_excerpt.split("// --- workspace context below ---")
             if len(parts) == 2:
@@ -919,68 +1195,24 @@ def handle_local_chat(params: dict[str, Any], _events: EventEmitter) -> dict[str
     # 4. Initialize LocalInferenceRunner
     runner = LocalInferenceRunner()
     
-    # 5. Execute generation
-    response_text = ""
-    if runner.is_ollama_running():
-        # Generate via Ollama
-        response_text = runner._generate_via_ollama_messages(full_messages)
-    else:
-        # Generate via llama-cpp-python using ChatML formatting
-        prompt = ""
-        for msg in full_messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
-        prompt += "<|im_start|>assistant\n"
-        
-        # Load GGUF model in-process
-        try:
-            from llama_cpp import Llama
-        except ImportError:
-            raise ImportError(
-                "The 'llama-cpp-python' library is not installed in the sidecar environment. "
-                "To use in-process GGUF models, please install it in your environment by running:\n"
-                "pip install llama-cpp-python"
-            )
-        
-        if not runner.model_path or not runner.model_path.is_file():
-            raise FileNotFoundError(
-                f"Local GGUF model path not found or invalid: {runner.model_path}. "
-                "Ensure the model is fully downloaded via Settings."
-            )
-            
-        import matemium.agent.local_runner as lr
-        if lr._LLAMA_CPP_MODEL is None:
-            lr._LLAMA_CPP_MODEL = Llama(
-                model_path=str(runner.model_path),
-                n_ctx=8192,
-                n_gpu_layers=-1,
-                verbose=False
-            )
-            
-        output = lr._LLAMA_CPP_MODEL(
-            prompt,
-            max_tokens=2048,
-            temperature=0.1,
-            stop=["<|im_end|>", "<|im_start|>", "system", "user", "assistant", "###"],
-            echo=False
-        )
-        response_text = str(output["choices"][0]["text"])
+    response_text = _generate_local_messages(runner, full_messages)
 
-    # 6. Parse Search/Replace blocks or code edits from response_text
+    # 6. Normalize high-confidence small edits before parsing model-authored blocks.
     code_edit = None
-    search_match = re.search(r"<<<<<<<\s*SEARCH\n(.*?)\n=======\n(.*?)\n>>>>>>>\s*REPLACE", response_text, re.DOTALL)
-    if search_match:
-        search_block = search_match.group(1)
-        replace_block = search_match.group(2)
+    from ..agent.edit_normalization import has_edit_proposal, normalize_model_edit
+    normalized = normalize_model_edit(response_text, scenes_excerpt)
+    if normalized:
         code_edit = {
-            "description": "Local GGUF Model refinement",
-            "search": search_block,
-            "replace": replace_block,
-            "full_file": None
+            "description": normalized.description,
+            "search": normalized.search,
+            "replace": normalized.replace,
+            "full_file": normalized.full_file,
         }
+        response_text = "Prepared a validated, bounded edit from the model proposal. Review the diff below and choose Apply to editor; no file has been changed yet."
+    elif has_edit_proposal(response_text):
+        response_text = "The local model proposed a code change, but it was not safely applicable to the current file: its precondition was missing or ambiguous, or the change exceeded the bounded-edit policy. Nothing was changed. Ask for a smaller edit."
 
-    model_name = runner.model_path.name if runner.model_path else "local-gguf"
+    model_name = runner.model_path.name if runner.model_path else runner.model_name
     return {
         "id": str(uuid.uuid4()),
         "message": {
@@ -989,7 +1221,12 @@ def handle_local_chat(params: dict[str, Any], _events: EventEmitter) -> dict[str
         },
         "code_edit": code_edit,
         "model": model_name,
-        "stub": False
+        "stub": False,
+        "agent_runtime_version": None,
+        "provider": "local",
+        "billing_mode": "local",
+        "request_id": str(uuid.uuid4()),
+        "agent_trace": [],
     }
 
 
@@ -998,6 +1235,7 @@ COMMANDS: dict[str, HandlerFn] = {
     "get_status": handle_get_status,
     "configure_assets": handle_configure_assets,
     "update_llm_config": handle_update_llm_config,
+    "prepare_agent_runtime": handle_prepare_agent_runtime,
     "local_chat": handle_local_chat,
     "retrieve": handle_retrieve,
     "upload_reference": handle_upload_reference,

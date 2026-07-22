@@ -112,7 +112,10 @@ pub fn validate_render_output_dir(raw: &str) -> Result<PathBuf, String> {
         .map_err(|e| format!("resolve output directory: {e}"))?;
 
     if !path.is_dir() {
-        return Err(format!("output path is not a directory: {}", path.display()));
+        return Err(format!(
+            "output path is not a directory: {}",
+            path.display()
+        ));
     }
 
     let probe = path.join(".matemium-write-test");
@@ -131,12 +134,10 @@ pub enum OutputPathScope {
 }
 
 fn is_allowed_output_relative(relative: &Path, scope: OutputPathScope) -> bool {
-    let top = relative
-        .components()
-        .find_map(|c| match c {
-            Component::Normal(s) => Some(s.to_string_lossy().to_string()),
-            _ => None,
-        });
+    let top = relative.components().find_map(|c| match c {
+        Component::Normal(s) => Some(s.to_string_lossy().to_string()),
+        _ => None,
+    });
     match scope {
         OutputPathScope::RendersOnly => top.as_deref() == Some("renders"),
         OutputPathScope::Deletable => {
@@ -156,9 +157,12 @@ pub fn validate_output_path(
         .workspace_dir(project_id)
         .canonicalize()
         .map_err(|e| format!("resolve workspace dir: {e}"))?;
-    let relative = path
-        .strip_prefix(&workspace)
-        .map_err(|_| format!("output path is outside project workspace: {}", path.display()))?;
+    let relative = path.strip_prefix(&workspace).map_err(|_| {
+        format!(
+            "output path is outside project workspace: {}",
+            path.display()
+        )
+    })?;
 
     if is_allowed_output_relative(relative, scope) {
         return Ok(path);
@@ -323,11 +327,7 @@ pub fn list_outputs(paths: &AppPaths, project_id: &str) -> Result<OutputListResu
     })
 }
 
-pub fn delete_output(
-    paths: &AppPaths,
-    project_id: &str,
-    raw_path: &str,
-) -> Result<(), String> {
+pub fn delete_output(paths: &AppPaths, project_id: &str, raw_path: &str) -> Result<(), String> {
     let path = validate_output_path(paths, project_id, raw_path, OutputPathScope::Deletable)?;
     if !path.exists() {
         return Err(format!("output not found: {}", path.display()));
@@ -457,9 +457,7 @@ pub fn clear_render_cache(
                 {
                     let item = item.map_err(|e| format!("read dir entry: {e}"))?;
                     let path = item.path();
-                    if path.is_file()
-                        && path.extension().and_then(|e| e.to_str()) == Some("mp4")
-                    {
+                    if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("mp4") {
                         total += remove_dir_if_exists(&path)?;
                     }
                 }
@@ -476,8 +474,7 @@ pub fn clear_render_cache(
         CacheKind::All => {
             let mut total = dir_size(&renders)?;
             if renders.exists() {
-                fs::remove_dir_all(&renders)
-                    .map_err(|e| format!("clear renders dir: {e}"))?;
+                fs::remove_dir_all(&renders).map_err(|e| format!("clear renders dir: {e}"))?;
             }
             fs::create_dir_all(&renders).map_err(|e| format!("recreate renders dir: {e}"))?;
 
@@ -519,8 +516,7 @@ mod tests {
         let preview = renders.join("MyScene.mp4");
         fs::write(&preview, b"mp4").expect("preview");
 
-        let partial = renders
-            .join("media/videos/1920p30/partial_movie_files/MyScene/seg.mp4");
+        let partial = renders.join("media/videos/1920p30/partial_movie_files/MyScene/seg.mp4");
         fs::create_dir_all(partial.parent().expect("parent")).expect("partial dir");
         fs::write(&partial, b"partial").expect("partial");
 
@@ -535,7 +531,10 @@ mod tests {
             .map(|e| (e.relative_path.clone(), e.kind.clone()))
             .collect();
 
-        assert_eq!(kinds.get("MyScene.mp4").map(String::as_str), Some("preview"));
+        assert_eq!(
+            kinds.get("MyScene.mp4").map(String::as_str),
+            Some("preview")
+        );
         assert_eq!(
             kinds
                 .get("media/videos/1920p30/partial_movie_files/MyScene/seg.mp4")
@@ -555,8 +554,7 @@ mod tests {
         fs::create_dir_all(final_video.parent().expect("parent")).expect("video dir");
         fs::write(&final_video, b"final").expect("final");
 
-        let partial = renders
-            .join("media/videos/960p15/partial_movie_files/Demo/seg.mp4");
+        let partial = renders.join("media/videos/960p15/partial_movie_files/Demo/seg.mp4");
         fs::create_dir_all(partial.parent().expect("parent")).expect("partial dir");
         fs::write(&partial, b"partial").expect("partial");
 
@@ -582,12 +580,8 @@ mod tests {
         fs::create_dir_all(media_video.parent().expect("parent")).expect("video dir");
         fs::write(&media_video, b"final").expect("video");
 
-        delete_output(
-            &paths,
-            project_id,
-            &media_video.display().to_string(),
-        )
-        .expect("delete media cache file");
+        delete_output(&paths, project_id, &media_video.display().to_string())
+            .expect("delete media cache file");
         assert!(!media_video.exists());
     }
 

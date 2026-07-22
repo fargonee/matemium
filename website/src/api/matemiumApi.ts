@@ -36,30 +36,11 @@ const injectedRtkApi = api.injectEndpoints({
     getMe: build.query<GetMeApiResponse, GetMeApiArg>({
       query: () => ({ url: `/v1/me` }),
     }),
-    createCheckout: build.mutation<
-      CreateCheckoutApiResponse,
-      CreateCheckoutApiArg
-    >({
-      query: (queryArg) => ({
-        url: `/v1/billing/checkout`,
-        method: "POST",
-        body: queryArg.checkoutRequest,
-      }),
-    }),
-    createPortal: build.mutation<CreatePortalApiResponse, CreatePortalApiArg>({
-      query: () => ({ url: `/v1/billing/portal`, method: "POST" }),
-    }),
     getAdminStats: build.query<GetAdminStatsApiResponse, GetAdminStatsApiArg>({
       query: () => ({ url: `/v1/admin/stats` }),
     }),
     getAdminUsers: build.query<GetAdminUsersApiResponse, GetAdminUsersApiArg>({
       query: () => ({ url: `/v1/admin/users` }),
-    }),
-    getAdminSubscriptions: build.query<
-      GetAdminSubscriptionsApiResponse,
-      GetAdminSubscriptionsApiArg
-    >({
-      query: () => ({ url: `/v1/admin/subscriptions` }),
     }),
     getAdminUser: build.query<GetAdminUserApiResponse, GetAdminUserApiArg>({
       query: (queryArg) => ({ url: `/v1/admin/users/${queryArg.userId}` }),
@@ -69,16 +50,6 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/v1/admin/users/${queryArg.userId}`,
         method: "PATCH",
         body: queryArg.updateUserRequest,
-      }),
-    }),
-    updateAdminSubscription: build.mutation<
-      UpdateAdminSubscriptionApiResponse,
-      UpdateAdminSubscriptionApiArg
-    >({
-      query: (queryArg) => ({
-        url: `/v1/admin/subscriptions/${queryArg.subscriptionId}`,
-        method: "PATCH",
-        body: queryArg.updateSubscriptionRequest,
       }),
     }),
     getAdminLLM: build.query<GetAdminLLMApiResponse, GetAdminLLMApiArg>({
@@ -119,12 +90,6 @@ const injectedRtkApi = api.injectEndpoints({
         body: queryArg.lLMSettingsUpdate,
       }),
     }),
-    lemonSqueezyWebhookV1WebhooksLemonsqueezyPost: build.mutation<
-      LemonSqueezyWebhookV1WebhooksLemonsqueezyPostApiResponse,
-      LemonSqueezyWebhookV1WebhooksLemonsqueezyPostApiArg
-    >({
-      query: () => ({ url: `/v1/webhooks/lemonsqueezy`, method: "POST" }),
-    }),
     chatCompletionsV1ChatCompletionsPost: build.mutation<
       ChatCompletionsV1ChatCompletionsPostApiResponse,
       ChatCompletionsV1ChatCompletionsPostApiArg
@@ -159,23 +124,12 @@ export type VerifyTokenV1AuthVerifyGetApiArg = void;
 export type GetMeApiResponse =
   /** status 200 Successful Response */ AccountResponse;
 export type GetMeApiArg = void;
-export type CreateCheckoutApiResponse =
-  /** status 200 Successful Response */ UrlResponse;
-export type CreateCheckoutApiArg = {
-  checkoutRequest: CheckoutRequest;
-};
-export type CreatePortalApiResponse =
-  /** status 200 Successful Response */ UrlResponse;
-export type CreatePortalApiArg = void;
 export type GetAdminStatsApiResponse =
   /** status 200 Successful Response */ AdminStats;
 export type GetAdminStatsApiArg = void;
 export type GetAdminUsersApiResponse =
   /** status 200 Successful Response */ ProfileRow[];
 export type GetAdminUsersApiArg = void;
-export type GetAdminSubscriptionsApiResponse =
-  /** status 200 Successful Response */ SubscriptionRow[];
-export type GetAdminSubscriptionsApiArg = void;
 export type GetAdminUserApiResponse =
   /** status 200 Successful Response */ AdminUserDetail;
 export type GetAdminUserApiArg = {
@@ -186,12 +140,6 @@ export type UpdateAdminUserApiResponse =
 export type UpdateAdminUserApiArg = {
   userId: string;
   updateUserRequest: UpdateUserRequest;
-};
-export type UpdateAdminSubscriptionApiResponse =
-  /** status 200 Successful Response */ SubscriptionRow;
-export type UpdateAdminSubscriptionApiArg = {
-  subscriptionId: string;
-  updateSubscriptionRequest: UpdateSubscriptionRequest;
 };
 export type GetAdminLLMApiResponse =
   /** status 200 Successful Response */ LLMInfo;
@@ -242,11 +190,6 @@ export type LLMSettingsUpdate = {
   tts_api_key?: string | null;
   tts_voice?: string | null;
 };
-export type LemonSqueezyWebhookV1WebhooksLemonsqueezyPostApiResponse =
-  /** status 200 Successful Response */ {
-    [key: string]: boolean;
-  };
-export type LemonSqueezyWebhookV1WebhooksLemonsqueezyPostApiArg = void;
 export type ChatCompletionsV1ChatCompletionsPostApiResponse =
   /** status 200 Successful Response */ ChatCompletionResponse;
 export type ChatCompletionsV1ChatCompletionsPostApiArg = {
@@ -302,12 +245,6 @@ export type AccountResponse = {
   subscription?: SubscriptionResponse | null;
   usage?: UsageResponse | null;
 };
-export type UrlResponse = {
-  url: string;
-};
-export type CheckoutRequest = {
-  plan_id?: string;
-};
 export type AdminStats = {
   total_users: number;
   pro_users: number;
@@ -322,18 +259,12 @@ export type AdminUserDetail = {
   lemon_customer_id?: string | null;
   ai_calls_count?: number;
   created_at?: string | null;
-  subscription?: SubscriptionRow | null;
+  subscription?: unknown | null;
 };
 export type UpdateUserRequest = {
   plan?: string | null;
   role?: string | null;
   ai_calls_count?: number | null;
-};
-export type UpdateSubscriptionRequest = {
-  status?: string | null;
-  plan?: string | null;
-  current_period_end?: string | null;
-  lemon_subscription_id?: string | null;
 };
 export type LLMInfo = {
   model: string;
@@ -349,14 +280,6 @@ export type ProfileRow = {
   role: string;
   plan: string;
   created_at?: string | null;
-};
-export type SubscriptionRow = {
-  id: string;
-  user_id: string;
-  lemon_subscription_id?: string | null;
-  status: string;
-  plan: string;
-  current_period_end?: string | null;
 };
 export type ChatMessage = {
   role: string;
@@ -387,20 +310,15 @@ export const {
   useExchangeSessionV1AuthSessionPostMutation,
   useVerifyTokenV1AuthVerifyGetQuery,
   useGetMeQuery,
-  useCreateCheckoutMutation,
-  useCreatePortalMutation,
   useGetAdminStatsQuery,
   useGetAdminUsersQuery,
-  useGetAdminSubscriptionsQuery,
   useGetAdminUserQuery,
   useUpdateAdminUserMutation,
-  useUpdateAdminSubscriptionMutation,
   useGetAdminLLMQuery,
   useGetAdminLLMProvidersQuery,
   useGetAdminLLMSpendQuery,
   useGetAdminLLMAutonomousQuery,
   useUpdateAdminLLMMarginMutation,
   useUpdateLLMSettingsMutation,
-  useLemonSqueezyWebhookV1WebhooksLemonsqueezyPostMutation,
   useChatCompletionsV1ChatCompletionsPostMutation,
 } = injectedRtkApi;

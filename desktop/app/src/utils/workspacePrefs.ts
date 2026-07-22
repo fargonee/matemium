@@ -3,7 +3,14 @@ import type { SidebarView } from "../components/ProjectSidebar";
 
 const STORAGE_KEY = "matemium-workspace-prefs";
 
-export type ProjectFile = "scenes" | "assets";
+export type ProjectFile =
+  | "scenes"
+  | "helpers"
+  | "passport"
+  | "description"
+  | "tape"
+  | "roadmap"
+  | "narration";
 
 export interface GlobalWorkspacePrefs {
   sidebarView: SidebarView;
@@ -24,7 +31,7 @@ interface WorkspacePrefsStore {
 }
 
 const DEFAULT_GLOBAL: GlobalWorkspacePrefs = {
-  sidebarView: "sections",
+  sidebarView: "project",
   activeFile: "scenes",
 };
 
@@ -36,11 +43,11 @@ const DEFAULT_RENDER: ProjectRenderPrefs = {
 };
 
 function isSidebarView(value: string): value is SidebarView {
-  return value === "sections" || value === "outputs";
+  return value === "project";
 }
 
 function isProjectFile(value: string): value is ProjectFile {
-  return value === "scenes" || value === "assets";
+  return ["scenes", "helpers", "passport", "description", "tape", "roadmap", "narration"].includes(value);
 }
 
 function isVideoOrientation(value: string): value is VideoOrientation {

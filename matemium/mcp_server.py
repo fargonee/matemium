@@ -80,19 +80,29 @@ class SimpleEmitter(EventEmitter):
 
 server = Server("matemium-sidecar-mcp")
 
+EDITABLE_PROJECT_FILES = [
+    "scenes.py",
+    "helpers.py",
+    "brief/passport.json",
+    "brief/description.md",
+    "brief/tape.md",
+    "brief/roadmap.json",
+    "brief/narration.md",
+]
+
 @server.list_tools()
 async def list_tools() -> list[Tool]:
     """List available tools matching the agent schemas."""
     return [
         Tool(
             name="view_file",
-            description="Return current code so the agent has context. Only 'scenes.py' or 'assets.py'.",
+            description="Return an approved code or project-brief file.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "filename": {
                         "type": "string",
-                        "enum": ["scenes.py", "assets.py"],
+                        "enum": EDITABLE_PROJECT_FILES,
                     }
                 },
                 "required": ["filename"],
@@ -104,7 +114,7 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "filename": {"type": "string", "enum": ["scenes.py", "assets.py"]},
+                    "filename": {"type": "string", "enum": EDITABLE_PROJECT_FILES},
                     "instructions": {"type": "string", "description": "One-line summary of the edit intent"},
                     "patches": {
                         "type": "string",
@@ -278,7 +288,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 "tokens_spent": result.token_ledger.total_credits_spent(),
                 "artifacts": {
                     "scenes_created": (Path(ws) / "scenes.py").exists(),
-                    "assets_created": (Path(ws) / "assets.py").exists(),
+                    "helpers_created": (Path(ws) / "helpers.py").exists(),
                 }
             }
             return [TextContent(type="text", text=json.dumps(output, indent=2))]
@@ -299,9 +309,9 @@ async def list_resources() -> list[Resource]:
             mimeType="text/x-python",
         ),
         Resource(
-            uri="matemium://workspace/assets.py",
-            name="assets.py",
-            description="Supporting assets and computations",
+            uri="matemium://workspace/helpers.py",
+            name="helpers.py",
+            description="Supporting computations and reusable project data",
             mimeType="text/x-python",
         ),
         Resource(
@@ -317,9 +327,9 @@ async def read_resource(uri: str) -> list[ResourceContents]:
         ws = os.environ.get("MATEMIUM_ROOT", ".")
         content = (Path(ws) / "scenes.py").read_text(errors="replace")
         return [ResourceContents(uri=uri, mimeType="text/x-python", text=content)]
-    if uri == "matemium://workspace/assets.py":
+    if uri == "matemium://workspace/helpers.py":
         ws = os.environ.get("MATEMIUM_ROOT", ".")
-        content = (Path(ws) / "assets.py").read_text(errors="replace")
+        content = (Path(ws) / "helpers.py").read_text(errors="replace")
         return [ResourceContents(uri=uri, mimeType="text/x-python", text=content)]
     if uri == "matemium://rag/recent":
         # Could call retrieve with default

@@ -54,7 +54,7 @@ class UpdateUserRequest(BaseModel):
     plan: str | None = None
     role: str | None = None
     ai_calls_count: int | None = None
-    llm_credits: int | None = None  # admin can grant/revoke platform tokens
+    llm_credits: int | None = None  # deprecated compatibility field; ignored
 
 
 class UpdateSubscriptionRequest(BaseModel):
@@ -78,9 +78,7 @@ async def admin_stats(
     supabase: SupabaseService = Depends(get_supabase_service),
 ) -> AdminStats:
     total = await supabase.count_profiles()
-    pro = await supabase.count_profiles(plan="pro")
-    active = await supabase.count_subscriptions("active")
-    return AdminStats(total_users=total, pro_users=pro, active_subscriptions=active)
+    return AdminStats(total_users=total, pro_users=0, active_subscriptions=0)
 
 
 @router.get("/admin/users", response_model=list[ProfileRow], operation_id="getAdminUsers")
@@ -122,27 +120,8 @@ async def admin_subscriptions(
     offset: int = Query(0, ge=0),
     q: str | None = Query(None, description="Search user_id or lemon id"),
 ) -> list[SubscriptionRow]:
-    rows = await supabase.list_subscriptions(limit=limit + offset)
-    if q:
-        ql = q.lower()
-        rows = [
-            r
-            for r in rows
-            if ql in (r.get("user_id", "") or "").lower()
-            or ql in (r.get("lemon_subscription_id", "") or "").lower()
-        ]
-    rows = rows[offset : offset + limit]
-    return [
-        SubscriptionRow(
-            id=row["id"],
-            user_id=row["user_id"],
-            lemon_subscription_id=row.get("lemon_subscription_id"),
-            status=row.get("status", "active"),
-            plan=row.get("plan", "pro"),
-            current_period_end=row.get("current_period_end"),
-        )
-        for row in rows
-    ]
+    _ = (supabase, limit, offset, q)
+    return []
 
 
 @router.get("/admin/users/{user_id}", response_model=AdminUserDetail, operation_id="getAdminUser")
@@ -198,9 +177,6 @@ async def update_admin_user(
         updates["ai_calls_count"] = max(0, body.ai_calls_count)
         updates["usage_updated_at"] = "now()"
 
-    if body.llm_credits is not None:
-        updates["llm_credits"] = max(0, body.llm_credits)
-
     if updates:
         await supabase.update_profile(user_id, updates)
 
@@ -219,26 +195,10 @@ async def update_admin_subscription(
     _: Annotated[AuthUser, Depends(require_admin)],
     supabase: SupabaseService = Depends(get_supabase_service),
 ) -> SubscriptionRow:
-    updates: dict = {}
-    for field in ("status", "plan", "current_period_end", "lemon_subscription_id"):
-        val = getattr(body, field)
-        if val is not None:
-            updates[field] = val
-
-    if updates:
-        await supabase.update_subscription(subscription_id, updates)
-
-    rows = await supabase._rest_get("subscriptions", {"id": f"eq.{subscription_id}", "select": "*"})
-    if not rows:
-        raise HTTPException(404, "Subscription not found")
-    row = rows[0]
-    return SubscriptionRow(
-        id=row["id"],
-        user_id=row["user_id"],
-        lemon_subscription_id=row.get("lemon_subscription_id"),
-        status=row.get("status", "active"),
-        plan=row.get("plan", "pro"),
-        current_period_end=row.get("current_period_end"),
+    _ = (subscription_id, body, supabase)
+    raise HTTPException(
+        status_code=410,
+        detail="Subscription management is disabled because Matemium is free.",
     )
 
 
@@ -264,7 +224,7 @@ async def admin_llm(
     )
 
 
-# ==================== Advanced LLM Management (our accounts + autonomous) ====================
+# ==================== Historical LLM pool management (disabled) ====================
 
 class PlatformProviderIn(BaseModel):
     name: str
@@ -293,20 +253,8 @@ async def list_platform_providers(
     _: Annotated[AuthUser, Depends(require_admin)],
     supabase: SupabaseService = Depends(get_supabase_service),
 ):
-    rows = await supabase.list_active_platform_providers()
-    return [
-        PlatformProviderOut(
-            id=r["id"],
-            name=r["name"],
-            display_name=r.get("display_name"),
-            api_base=r["api_base"],
-            is_active=r.get("is_active", True),
-            monthly_budget_usd=r.get("monthly_budget_usd"),
-            auto_replenish=r.get("auto_replenish", False),
-            has_key=bool(r.get("api_key")),
-        )
-        for r in rows
-    ]
+    _ = supabase
+    return []
 
 
 @router.post("/admin/llm/providers", response_model=PlatformProviderOut)
@@ -315,24 +263,10 @@ async def create_platform_provider(
     _: Annotated[AuthUser, Depends(require_admin)],
     supabase: SupabaseService = Depends(get_supabase_service),
 ):
-    data = body.model_dump()
-    # Never return key
-    key = data.pop("api_key", None)
-    if key:
-        data["api_key"] = key  # stored server-side
-
-    await supabase._rest_post("llm_providers", data)
-    # return fresh
-    created = await supabase.get_platform_provider(body.name)
-    return PlatformProviderOut(
-        id=created["id"],
-        name=created["name"],
-        display_name=created.get("display_name"),
-        api_base=created["api_base"],
-        is_active=created.get("is_active", True),
-        monthly_budget_usd=created.get("monthly_budget_usd"),
-        auto_replenish=created.get("auto_replenish", False),
-        has_key=bool(created.get("api_key")),
+    _ = (body, supabase)
+    raise HTTPException(
+        status_code=410,
+        detail="Matemium no longer supports shared LLM provider pools.",
     )
 
 
@@ -360,8 +294,8 @@ async def update_margin(
     _: Annotated[AuthUser, Depends(require_admin)],
     supabase: SupabaseService = Depends(get_supabase_service),
 ):
-    await supabase._rest_post("system_settings", {
-        "key": "llm_profit_margin",
-        "value": body.margin
-    }, upsert=True)
-    return {"margin": body.margin}
+    _ = (body, supabase)
+    raise HTTPException(
+        status_code=410,
+        detail="Model resale margins are disabled because Matemium does not sell AI credits.",
+    )

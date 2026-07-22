@@ -1,15 +1,15 @@
-"""LLM-agnostic proxy for code generation (chat) and audio (TTS).
+"""Legacy LLM helpers for server-side compatibility.
 
 Design:
-- LLM agnostic: works with any OpenAI-compatible provider (OpenAI, Groq, xAI, OpenRouter, Together, Fireworks, local vLLM, etc.).
-- BYO support: if user_api_key (and optional provider/base) is supplied, use the *user's* key (no platform credit consumption).
-- Platform mode: use server keys + deduct from user's llm_credits.
-- Audio creations: separate text-to-speech path (also supports BYO or platform).
+- Current desktop clients call OpenRouter directly from the user's computer.
+- Matemium servers do not store provider keys or proxy external AI requests.
+- This module remains for tests and old compatibility boundaries only.
 """
 
 from __future__ import annotations
 
 import uuid
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -38,7 +38,7 @@ PROVIDER_BASES: dict[str, str] = {
     "fireworks": "https://api.fireworks.ai/inference/v1",
 }
 
-DEFAULT_CHAT_MODEL = "gpt-4o-mini"
+DEFAULT_CHAT_MODEL = "openai/gpt-4o-mini"
 DEFAULT_TTS_MODEL = "tts-1"
 DEFAULT_TTS_VOICE = "alloy"
 
@@ -60,56 +60,37 @@ async def resolve_llm_for_user(
     user_id: str,
     *,
     provider: str | None = None,
-    use_personal: bool = False,
+    use_personal: bool = True,
     for_tts: bool = False,
 ) -> dict[str, Any]:
     """
     Server-side only resolution.
-    - If use_personal and user has a stored key for the provider → use BYO (no cost to us).
-    - Else → pick one of our platform llm_providers.
+    - If the user has a stored key for the provider, use that BYO key.
+    - OpenRouter is the default provider.
+    - There is no Matemium platform-key fallback.
     Never accepts raw keys from client.
     """
     from .supabase import get_supabase_service
 
     supabase = get_supabase_service()
 
-    prov = (provider or "openai").lower()
+    prov = (provider or "openrouter").lower()
 
-    if use_personal:
-        personal = await supabase.get_user_personal_key(user_id, prov, for_tts=for_tts)
-        if personal and personal.get("api_key"):
-            base = PROVIDER_BASES.get(personal["provider"].lower(), settings.llm_api_base)
-            return {
-                "mode": "personal",
-                "provider": personal["provider"],
-                "base_url": base,
-                "api_key": personal["api_key"],
-                "model": personal.get("model"),
-            }
-
-    # Platform mode - use our managed keys
-    platform = await supabase.pick_best_platform_provider(prov)
-    if platform and platform.get("api_key"):
-        base = platform.get("api_base") or PROVIDER_BASES.get(platform["name"].lower(), settings.llm_api_base)
+    personal = await supabase.get_user_personal_key(user_id, prov, for_tts=for_tts)
+    if personal and personal.get("api_key"):
+        resolved_provider = str(personal.get("provider") or prov).lower()
+        base = PROVIDER_BASES.get(resolved_provider, settings.llm_api_base)
         return {
-            "mode": "platform",
-            "provider": platform["name"],
+            "mode": "byo_external",
+            "provider": personal.get("provider") or prov,
             "base_url": base,
-            "api_key": platform["api_key"],
-            "model": None,
+            "api_key": personal["api_key"],
+            "model": personal.get("model"),
         }
 
-    # Fallback to legacy global settings
-    if settings.llm_api_key:
-        return {
-            "mode": "platform",
-            "provider": "openai",
-            "base_url": settings.llm_api_base,
-            "api_key": settings.llm_api_key,
-            "model": settings.llm_model,
-        }
-
-    raise RuntimeError("No LLM configuration available (neither personal nor platform)")
+    raise RuntimeError(
+        f"No user-owned API key configured for {prov}. Connect OpenRouter or add a provider key."
+    )
 
 
 async def complete_chat(
@@ -117,10 +98,10 @@ async def complete_chat(
     *,
     user_id: str | None = None,
     provider: str | None = None,
-    use_personal: bool = False,
+    use_personal: bool = True,
     model_override: str | None = None,
 ) -> ChatCompletionResponse:
-    """Main entry. Resolution of secrets always happens server-side via user_id + config."""
+    """Legacy server entry. Desktop clients call external providers directly."""
     if settings.llm_stub:
         return _stub_response(request)
 
@@ -133,16 +114,58 @@ async def complete_chat(
 
     model = model_override or resolved.get("model") or settings.llm_model or DEFAULT_CHAT_MODEL
 
-    if resolved["mode"] == "personal":
-        # BYO - no cost logging/deduction here (done at higher level if wanted)
-        return await _openai_compatible_chat(
-            request, resolved["base_url"], resolved["api_key"], model
-        )
-
-    # Platform - we will log cost after the call (see route)
     return await _openai_compatible_chat(
         request, resolved["base_url"], resolved["api_key"], model
     )
+
+
+async def complete_structured_agent(
+    request: "StructuredModelRequest",
+    *,
+    user_id: str,
+    provider: str | None = None,
+    use_personal: bool = True,
+) -> "StructuredModelResponse":
+    """Execute one provider-native, structured agent model call.
+
+    This is the Phase 2 gateway entry point. It deliberately does not execute
+    tools or authorize task completion; later runtime phases own those policies.
+    """
+    from matemium.agent.model_gateway import CallAccounting, StructuredModelGateway
+
+    resolved = await resolve_llm_for_user(
+        user_id,
+        provider=provider,
+        use_personal=use_personal,
+        for_tts=False,
+    )
+
+    async def transport(payload: dict[str, Any]) -> dict[str, Any]:
+        async with httpx.AsyncClient(base_url=resolved["base_url"], timeout=90.0) as client:
+            response = await client.post(
+                "/chat/completions",
+                headers={"Authorization": f"Bearer {resolved['api_key']}"},
+                json=payload,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    started = time.monotonic()
+    response = await StructuredModelGateway(transport).complete(request)
+    latency_ms = max(0, round((time.monotonic() - started) * 1000))
+    request_id = response.provider_response_id or f"agent-call-{uuid.uuid4().hex}"
+    provider_name = str(resolved.get("provider") or provider or "unknown")
+    response_model = response.model or request.model
+    response.call_accounting = CallAccounting(
+        provider=provider_name,
+        model=response_model,
+        request_id=request_id,
+        billing_mode="byo_external",
+        latency_ms=latency_ms,
+        cost_usd=0.0,
+        charged_credits=0,
+    )
+    return response
 
 
 async def generate_speech(
@@ -150,9 +173,9 @@ async def generate_speech(
     *,
     user_id: str | None = None,
     provider: str | None = None,
-    use_personal: bool = False,
+    use_personal: bool = True,
 ) -> bytes:
-    """Text-to-speech. Secrets resolved server-side."""
+    """Legacy server TTS helper. Desktop/provider-direct TTS should not use this path."""
     if settings.llm_stub:
         # Return tiny fake audio for tests
         return b"FAKE_AUDIO_MP3_STUB"
@@ -250,10 +273,7 @@ def _stub_response(request: ChatCompletionRequest) -> ChatCompletionResponse:
         f"\"{last_user[:80]}{'...' if len(last_user) > 80 else ''}\", "
         f"try adding a heading and a math line with CanvasBuilder."
     )
-    code_edit = CodeEdit(
-        description="Add intro heading and sample equation",
-        full_file=_sample_scenes_py(),
-    )
+    code_edit = CodeEdit(description="Add intro heading and sample equation", full_file=_sample_scenes_py())
     return ChatCompletionResponse(
         id=f"chatcmpl-stub-{uuid.uuid4().hex[:12]}",
         message=ChatMessage(role="assistant", content=assistant_text),
@@ -320,10 +340,29 @@ async def _openai_compatible_chat(
 
     choice = data["choices"][0]["message"]
     usage = data.get("usage", {})
-    code_edit = extract_code_edit(choice["content"])
+    from matemium.agent.edit_normalization import has_edit_proposal, normalize_model_edit
+
+    normalized = None if request.use_autonomous_agent else normalize_model_edit(
+        choice["content"], request.scenes_excerpt
+    )
+    if normalized:
+        code_edit = CodeEdit(
+            description=normalized.description,
+            search=normalized.search,
+            replace=normalized.replace,
+            full_file=normalized.full_file,
+        )
+        assistant_content = "Prepared a validated, bounded edit from the model proposal. Review the diff below and choose Apply to editor; no file has been changed yet."
+    else:
+        code_edit = None
+        assistant_content = (
+            "The model proposed a code change, but it was not safely applicable to the current file: its precondition was missing or ambiguous, or the change exceeded the bounded-edit policy. Nothing was changed. Ask for a smaller edit or use autonomous mode with verification."
+            if has_edit_proposal(choice["content"])
+            else choice["content"]
+        )
     resp = ChatCompletionResponse(
         id=data.get("id", f"chatcmpl-{uuid.uuid4().hex[:12]}"),
-        message=ChatMessage(role="assistant", content=choice["content"]),
+        message=ChatMessage(role="assistant", content=assistant_content),
         code_edit=code_edit,
         model=data.get("model", model),
         stub=False,

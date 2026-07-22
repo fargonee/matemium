@@ -27,7 +27,7 @@ def _classify_builder_call(method: str, args_text: str) -> tuple[str, dict[str, 
     if method == "add_math":
         match = LATEX_IN_CALL_RE.search(args_text)
         if match:
-            payload["latex_ref"] = f"assets.latex_{method}"
+            payload["latex_ref"] = f"helpers.latex_{method}"
     if method == "add_3d":
         payload["surface_ref"] = "assets.mesh_definitions"
     return method, payload

@@ -119,7 +119,7 @@ class AssetsConfig:
 
 @dataclass(frozen=True)
 class DecoupledArtifacts:
-    """Phase 3 engineer output ready for scenes.py / assets.py emission."""
+    """Phase 3 engineer output ready for scenes.py / helpers.py emission."""
 
     scenes: ScenesConfig
     assets: AssetsConfig

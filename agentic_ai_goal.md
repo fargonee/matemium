@@ -1,82 +1,236 @@
-# Specification: Evolving Matemium into an Autonomous ReAct Agent
+# Specification: Matemium Autonomous Agent Runtime
 
-This specification outlines the architecture, principles, and implementation roadmap required to transition the Matemium AI assistant from a rigid, phase-based workflow into a dynamic, true ReAct (Reasoning + Acting) autonomous agent.
+**Status:** Target architecture; not yet fully implemented
 
----
+**Last updated:** 2026-07-18
 
-## 1. The Core Paradigm Shift
+**Audience:** Desktop, sidecar, cloud-router, local-model, and agent-runtime contributors
 
-Currently, the Matemium local agent operates on a **hardcoded pipeline** (Director → Engineer → Critic). While effective for basic operations, it lacks the flexibility to handle ambiguous errors, perform deep codebase exploration, or course-correct gracefully.
+This document is the normative specification for Matemium's autonomous authoring agent. The agent must be a bounded, observable, stateful task executor—not a prompt wrapped in an unstructured ReAct loop.
 
-The goal is to shift to an **Autonomous ReAct (Reasoning and Acting) loop**. In this model, the agent is given a top-level objective and a suite of tools. The agent autonomously decides:
-1.  **What information it needs** (Thought).
-2.  **How to get it or change it** (Action / Tool Call).
-3.  **How to adapt based on the result** (Observation).
+## 1. Product objective
 
----
+Given one user objective, the agent should inspect the active Matemium workspace, form and revise a plan, make safe edits, validate the result using project-aware checks, recover from ordinary failures, and finish only when it has evidence that the objective is satisfied.
 
-## 2. Architectural Pillars
+Autonomy means choosing the next useful action within an explicit policy and budget. It does not mean unrestricted filesystem or shell access.
 
-To enable true autonomy while protecting context limits (the "Hero" of context management), the system must implement the following pillars:
+## 2. Required properties
 
-### A. The ReAct Loop Engine
-The core runner must support iterative, multi-turn executions triggered by a single user prompt.
-*   **System Prompt:** The agent is instructed on its available tools, its objective, and the strict requirement to reason before acting.
-*   **Tool Calling Schema:** We must implement standard OpenAI-compatible tool definitions (or generic JSON-schema definitions for local GGUF models) that the LLM can invoke.
-*   **Execution Wrapper:** A robust `while` loop that captures the LLM's tool call, executes the local Python function, appends the tool output as a "user" or "tool" message, and re-queries the LLM until it emits a "Task Complete" signal or final response.
+The production runtime must provide:
 
-### B. Radical Context Minimization (Tool Design)
-The agent must never be forced to process the entire codebase at once. Tools must be designed for surgical precision.
-*   **`read_file(path, start_line, end_line)`:** Force the agent to read narrow slices of code.
-*   **`search_codebase(regex_pattern, dir_path)`:** Allow the agent to grep for usages and symbols.
-*   **`list_directory(path)`:** Allow the agent to navigate the project structure autonomously.
-*   **`replace_in_file(path, search_string, replace_string)`:** The exact, surgical Aider-style block we already perfected, now wrapped as an explicit, targeted tool.
+1. Provider-native structured tool calling, with a schema-constrained compatibility adapter for local models.
+2. Persistent run state: objective, plan, facts, actions, changes, diagnostics, verification evidence, budgets, and terminal outcome.
+3. Explicit lifecycle states and legal transitions instead of treating “no tool call” as success.
+4. Typed tool results and machine-readable errors.
+5. Enforced completion gates backed by verification evidence.
+6. Context compaction and structured working memory.
+7. Loop, stall, timeout, cancellation, and budget controls.
+8. Per-provider-call token and cost accounting.
+9. Resumable runs and an auditable event stream.
+10. End-to-end evaluation on realistic Matemium authoring and repair tasks.
 
-### C. Self-Healing & Validation (The "Critic" as an Action)
-Currently, the Critic is a hardcoded fallback phase. In a ReAct agent, validation is just another tool output.
-*   **`run_compiler()`:** A tool the agent can call to attempt a build. The observation returned is the `stderr` or compilation success.
-*   If `run_compiler()` fails, the agent *autonomously* decides to read the problematic line, formulate a fix, apply it using `replace_in_file`, and call `run_compiler()` again.
+## 3. Runtime model
 
-### D. Sub-Agent Compression (Hierarchical Delegation)
-For complex tasks (e.g., "Implement a new 3D tape scene"), the main "Orchestrator" agent should not bloat its context.
-*   The Orchestrator can call a tool: `delegate_task(agent_role="Researcher", instruction="Find where the SolutionTape class is defined and summarize its API.")`
-*   A fresh, isolated ReAct loop spawns, performs the task, and returns a dense summary. The Orchestrator's context remains clean and fast.
+The runtime is a state machine. Planner, executor, and verifier are logical responsibilities; they may share one model, use different prompts, or use different models.
 
----
+```text
+RECEIVED -> UNDERSTANDING -> PLANNING -> EXECUTING -> VERIFYING
+                             ^             |             |
+                             |             v             v
+                             +---------- RECOVERING    COMPLETED
+                                               |
+                                    BLOCKED / FAILED / CANCELLED
+```
 
-## 3. Implementation Roadmap
+Legal terminal outcomes are:
 
-### Phase 1: Tool Infrastructure
-1.  Define a standard interface for Tools (Name, Description, Input Schema, Execution Callable).
-2.  Implement the core toolset:
-    *   `read_file_slice`
-    *   `grep_search`
-    *   `list_files`
-    *   `apply_diff_patch` (using our existing Aider logic)
-    *   `run_matemium_compiler`
+- `completed`: all applicable completion gates passed.
+- `blocked`: user input or unavailable external capability is required.
+- `failed`: the runtime exhausted recovery or budget with a concrete failure.
+- `cancelled`: cancellation was requested and acknowledged.
 
-### Phase 2: The ReAct Engine Loop
-1.  Build the `AgentRunner` class that handles the `while` loop.
-2.  Integrate JSON-schema/Grammar parsing to reliably extract the LLM's thought and chosen tool.
-3.  Implement safety boundaries (e.g., `max_iterations = 15` to prevent infinite loops).
+An assistant message without tool calls is only a proposal to finish. The orchestrator must transition to `VERIFYING`; only the verifier may authorize `completed`.
 
-### Phase 3: The Orchestrator System Prompt
-Design the master system prompt:
-> "You are an autonomous AI engineering agent for the Matemium platform. You operate in a continuous loop of Thought, Action, and Observation.
-> You must never guess code structure; always use your search and read tools to verify assumptions before modifying files.
-> Once you have modified a file, you must run the compiler tool to verify your changes. Do not report success until the compiler passes."
+## 4. Persistent run state
 
-### Phase 4: UI/UX Transparency (The Desktop Client)
-Integrate the ReAct loop logs into the desktop application's UI (building upon the `AI-CHAT-PROGRESS-SPEC.md`).
-*   Show the user real-time stream of:
-    *   🧠 *Thinking...*
-    *   🛠️ *Agent called `grep_search("CanvasBuilder")`*
-    *   👀 *Observation received (14 matches)*
-    *   🧠 *Thinking...*
-    *   ✏️ *Agent applied code patch to `scenes.py`*
-    *   ✅ *Agent ran compiler (Success)*
+Every run must have a durable `AgentRunState` equivalent to:
 
----
+```json
+{
+  "run_id": "uuid",
+  "project_id": "string",
+  "objective": "normalized user objective",
+  "status": "planning",
+  "plan": [{"id": "step-1", "text": "...", "status": "pending"}],
+  "facts": [],
+  "files_inspected": [],
+  "changes": [],
+  "diagnostics": [],
+  "verification": [],
+  "budgets": {"model_calls": 20, "tool_calls": 40, "tokens": 100000, "wall_seconds": 900},
+  "usage": {"model_calls": 0, "tool_calls": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0},
+  "last_progress_at": "timestamp",
+  "terminal_reason": null
+}
+```
 
-## 4. Conclusion
-By migrating from a rigid pipeline to a ReAct tool-calling architecture, Matemium's AI will evolve from a simple script-generator into a robust, context-aware co-programmer capable of independent debugging, surgical refactoring, and complex, multi-file orchestration.
+State must be checkpointed after every model response, tool result, plan revision, and transition. Restarting the app must not silently convert a running task into a completed or lost task.
+
+## 5. Structured model protocol
+
+Cloud providers should receive native JSON-schema tool definitions and return native tool calls. The runtime must support multiple tool calls when the provider supports them, while executing conflicting writes serially.
+
+Local models may use a grammar-constrained envelope, but the adapter must normalize it to the same internal types. Regex-extracted XML such as `<thought>` and `<tool_call>` is not a production protocol.
+
+The model emits only:
+
+- user-facing progress summaries;
+- zero or more typed tool calls;
+- a plan revision;
+- a finish proposal containing claimed outcomes and requested verification.
+
+Private chain-of-thought must not be required, stored, billed as a UI feature, or streamed. The UI receives concise action rationales and evidence instead.
+
+## 6. Tool contract
+
+Tools are allow-listed, workspace-scoped capabilities. Each tool returns a common envelope:
+
+```json
+{
+  "status": "success | retryable_error | blocked | fatal_error",
+  "code": "STABLE_MACHINE_CODE",
+  "summary": "short human-readable result",
+  "data": {},
+  "evidence": [],
+  "retry_hint": null,
+  "truncated": false
+}
+```
+
+Minimum authoring tool groups:
+
+- Discovery: list workspace, search symbols/text, read bounded file slices, inspect project metadata.
+- Editing: apply validated patches with precondition hashes; create only product-approved files.
+- Validation: lint, import/check project, compile/render preview, inspect diagnostics.
+- Visual verification: inspect rendered frames or derived scene metadata when visual correctness is part of the objective.
+- Run control: request user input, report blockers, and checkpoint progress.
+
+Tool requirements:
+
+- Paths must resolve inside the active workspace and follow the product's file-boundary policy.
+- Read and search outputs must have deterministic limits and report truncation.
+- Mutations must record before/after hashes and changed ranges.
+- Patch application must fail on missing or ambiguous preconditions.
+- Tool exceptions must never be flattened into unclassified prose.
+- Arbitrary shell access is excluded from the normal authoring agent.
+
+## 7. Planning and execution policy
+
+The agent must create a short, revisable plan for every mutation task. It may skip a formal plan only for a read-only response requiring at most one tool action.
+
+Before editing, the runtime must have evidence that the relevant file or symbol was inspected. After an edit, the plan must identify the validation action. Failed observations should revise the plan rather than merely append more conversation.
+
+The orchestrator owns policy enforcement. Prompt instructions alone are insufficient for requirements such as “inspect before edit” and “validate after edit.”
+
+## 8. Completion gates
+
+Completion is authorized only when all applicable gates pass:
+
+1. The objective has explicit acceptance criteria, inferred conservatively when the user did not provide them.
+2. Every changed file is recorded and its final content is available to verification.
+3. Syntax/import/project checks pass.
+4. Relevant tests or compiler checks pass.
+5. A render succeeds when the task changes rendered behavior.
+6. Visual evidence is inspected when layout, animation, camera, geometry, or appearance is material.
+7. No unresolved fatal diagnostic remains.
+8. The final response accurately reports checks that ran, checks that did not run, and remaining limitations.
+
+A compile pass alone is necessary for many authoring tasks but is not proof of visual or semantic correctness.
+
+## 9. Recovery, stalls, and budgets
+
+Recovery policy must classify errors before retrying. Invalid arguments, stale patches, compiler diagnostics, provider failures, and unavailable dependencies require different actions.
+
+The runtime must detect lack of progress using at least:
+
+- repeated equivalent tool calls;
+- repeated observations with no state change;
+- repeated patch failures on the same target;
+- plan steps cycling between the same statuses;
+- model finish proposals rejected by the same gate.
+
+Default policy should allow a small number of targeted recoveries per failure signature, then transition to `blocked` or `failed` with evidence. Budgets apply independently to model calls, tool calls, tokens, cost, elapsed time, compile retries, and render retries.
+
+Cancellation must stop scheduling new actions, attempt to cancel active render/model work, checkpoint state, and emit `cancelled`.
+
+## 10. Context and memory
+
+The prompt context is assembled from structured state, not an ever-growing transcript. It should contain:
+
+- objective and acceptance criteria;
+- current plan and active step;
+- relevant inspected excerpts;
+- compact facts and symbol summaries;
+- current changed-file summaries;
+- latest diagnostics and verification evidence;
+- remaining budgets.
+
+Older observations are compacted into factual summaries with source references. Raw outputs remain in the audit log and can be reloaded. Summaries must not replace unresolved diagnostics or exact text needed for a pending patch.
+
+Conversation history preceding the latest user message must be preserved or deliberately summarized; production routes must not silently reduce the objective to the last message.
+
+## 11. Accounting and observability
+
+Usage is recorded for every provider call, including input/output tokens, provider, model, latency, request ID, source mode (`byo_external` or `local`), and calculated/estimated provider cost when available. A multi-turn run must not be accounted as a single opaque call, and Matemium must not deduct credits.
+
+The event stream uses versioned, typed events such as:
+
+- `run_started`, `state_changed`, `plan_updated`;
+- `action_started`, `action_completed`;
+- `verification_started`, `verification_completed`;
+- `usage_recorded`, `checkpoint_saved`;
+- `input_required`, `run_completed`, `run_failed`, `run_cancelled`.
+
+Events must not expose secrets, private reasoning, full credentials, or unbounded file/compiler output.
+
+## 12. Security and user control
+
+The runtime must preserve the desktop/sidecar trust boundary. The cloud routes model traffic but does not directly mutate local files or render projects. Local execution validates every proposed action.
+
+Destructive, out-of-scope, or policy-sensitive actions require an explicit approval class. Changes should be recoverable through snapshots or an edit journal. Resuming a run must revalidate workspace hashes so stale plans cannot overwrite newer user edits.
+
+## 13. Delegation
+
+Sub-agents are optional, isolated child runs—not unrestricted recursive agents. Delegation is justified only for a bounded task whose compressed result reduces parent context, such as API research or independent visual review.
+
+Each child receives a scoped objective, read/write capability set, and budget. It returns a typed result with evidence. Parent and child writes must not race; the parent remains responsible for final verification and completion.
+
+## 14. Evaluation and release gates
+
+Unit tests for parsers and mocked loops are insufficient. The evaluation suite must include realistic scenarios:
+
+- create a valid scene from an ambiguous request;
+- modify an existing scene without damaging unrelated sections;
+- recover from syntax, import, LaTeX, and stale-patch errors;
+- detect a compile-successful but visually incorrect result;
+- handle user edits made during a paused run;
+- compact long runs without losing unresolved facts;
+- cancel and resume;
+- stop repeated ineffective actions;
+- account correctly for every model call;
+- behave consistently across cloud and supported local models.
+
+Release requires measured thresholds for task success, false-success rate, destructive-edit rate, mean model/tool calls, cost, cancellation latency, and recovery success. False completion is a critical failure.
+
+## 15. Migration constraints
+
+Existing filesystem and compiler helpers may be adapted behind typed contracts. The current `ReActAgentRunner`, XML parser, and prompt-only enforcement are prototype components and must not define the production architecture.
+
+Migration should preserve the classic chat mode until the new runtime passes evaluation gates. The autonomous-mode toggle must identify the runtime version, and unfinished legacy runs must never be presented as verified successes.
+
+## 16. Source-of-truth documents
+
+- This file defines autonomous runtime behavior and guarantees.
+- [`ai-agent-architecture.md`](ai-agent-architecture.md) defines product boundaries and tool placement.
+- [`TODO-react-agentic-ai-transition.md`](TODO-react-agentic-ai-transition.md) tracks migration work and must not claim completion without the corresponding release gate.
+- [`matemium/ipc/PROTOCOL.md`](matemium/ipc/PROTOCOL.md) defines sidecar transport contracts.

@@ -110,7 +110,7 @@ def part_area(b: CanvasBuilder) -> None:
 
     # 1. Assert base files were generated
     scenes_file = tmp_path / "scenes.py"
-    assets_file = tmp_path / "assets.py"
+    assets_file = tmp_path / "helpers.py"
     assert scenes_file.is_file()
     assert assets_file.is_file()
 

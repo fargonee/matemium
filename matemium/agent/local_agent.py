@@ -40,7 +40,7 @@ Keep your language clear, compelling, and professional. Always use double backsl
 ENGINEER_SYSTEM_PROMPT = """You are a highly disciplined Manim/Matemium compiler specialist.
 Your goal is to refine and generate Python animation layouts using strict, decoupled structural syntax:
 - `scenes.py`: Clean chronological timelines using CanvasBuilder.
-- `assets.py`: Heavy lifting, pure mathematics, LaTeX strings, coordinate generation matrices, and mesh definitions.
+- `helpers.py`: Heavy lifting, pure mathematics, LaTeX strings, coordinate generation matrices, and mesh definitions.
 
 You will be given:
 1. The educational script.
@@ -104,7 +104,7 @@ def local_engineer_agent(session: ProjectSession, retriever_fn: Any = None) -> D
         runner = LocalInferenceRunner()
 
         scenes_file = session.project_dir / "scenes.py"
-        assets_file = session.project_dir / "assets.py"
+        assets_file = session.project_dir / "helpers.py"
 
         scenes_content = scenes_file.read_text(encoding="utf-8") if scenes_file.is_file() else ""
         assets_content = assets_file.read_text(encoding="utf-8") if assets_file.is_file() else ""
@@ -125,10 +125,10 @@ RAG context: {rag_context}
 Here is the current base scenes.py:
 {scenes_content}
 
-Here is the current base assets.py:
+Here is the current base helpers.py:
 {assets_content}
 
-Please generate an aider-style SEARCH/REPLACE diff patch block to enhance assets.py with more detailed math matrices, grids, or latex styling if relevant."""
+Please generate an aider-style SEARCH/REPLACE diff patch block to enhance helpers.py with more detailed math matrices, grids, or latex styling if relevant."""
 
         from .grammars import AIDER_DIFF_GBNF
         patches = runner.generate(ENGINEER_SYSTEM_PROMPT, user_msg, grammar=AIDER_DIFF_GBNF)
@@ -141,7 +141,7 @@ Please generate an aider-style SEARCH/REPLACE diff patch block to enhance assets
             if assets_content.count(search_block) == 1:
                 updated_assets = apply_patches(assets_content, blocks)
                 assets_file.write_text(updated_assets, encoding="utf-8")
-                print("[Local Engineer] Applied GGUF code refinements to assets.py successfully.")
+                print("[Local Engineer] Applied GGUF code refinements to helpers.py successfully.")
             elif scenes_content.count(search_block) == 1:
                 updated_scenes = apply_patches(scenes_content, blocks)
                 scenes_file.write_text(updated_scenes, encoding="utf-8")
@@ -162,7 +162,7 @@ def make_local_critic_patch_fn(project_dir: Path) -> Callable[[str], None]:
             return
 
         scenes_file = project_dir / "scenes.py"
-        assets_file = project_dir / "assets.py"
+        assets_file = project_dir / "helpers.py"
 
         scenes_content = scenes_file.read_text(encoding="utf-8") if scenes_file.is_file() else ""
         assets_content = assets_file.read_text(encoding="utf-8") if assets_file.is_file() else ""
@@ -172,7 +172,7 @@ def make_local_critic_patch_fn(project_dir: Path) -> Callable[[str], None]:
         user_msg = f"""Failing scenes.py code:
 {scenes_content}
 
-Failing assets.py code:
+Failing helpers.py code:
 {assets_content}
 
 Compiler stderr output:
@@ -198,7 +198,7 @@ Please generate a precise SEARCH/REPLACE patch block to repair the failing file.
                     updated_assets = apply_patches(assets_content, blocks)
                     assets_file.write_text(updated_assets, encoding="utf-8")
                     err_summary = stderr.splitlines()[-1] if stderr else ""
-                    print(f"[Local Critic] Patched assets.py successfully to resolve: {err_summary}")
+                    print(f"[Local Critic] Patched helpers.py successfully to resolve: {err_summary}")
                 else:
                     print("[Local Critic Warning] SEARCH block matched multiple times or was absent.")
         except Exception as e:

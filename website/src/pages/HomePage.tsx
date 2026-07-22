@@ -41,7 +41,7 @@ export function HomePage() {
         <div className="relative mx-auto grid max-w-6xl gap-12 lg:grid-cols-2 lg:items-center">
           <div>
             <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-accent">
-              Commercial desktop app
+              Free desktop app
             </p>
             <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
               Math lessons that scroll like a document, animate like a film
@@ -57,7 +57,7 @@ export function HomePage() {
               </Link>
               <Link to="/pricing">
                 <Button variant="secondary" size="lg">
-                  View pricing
+                  Free access
                 </Button>
               </Link>
             </div>
@@ -70,7 +70,7 @@ export function HomePage() {
               </li>
               <li>
                 <strong className="block text-base text-text">Flexible AI</strong> built in
-                <span className="text-xs text-text-muted"> — your keys or our tokens with auto pricing</span>
+                <span className="text-xs text-text-muted"> — your provider keys or local models</span>
               </li>
             </ul>
           </div>
@@ -126,8 +126,8 @@ export function HomePage() {
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-3xl font-bold tracking-tight">Ready to create?</h2>
           <p className="mt-3 text-text-muted">
-            Sign in with Google, manage your plan through Matemium Cloud, and download the
-            licensed desktop app from your dashboard.
+            Sign in with Google, download the desktop app, and connect OpenRouter
+            locally from your computer.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link to="/login">
@@ -135,7 +135,7 @@ export function HomePage() {
             </Link>
             <Link to="/pricing">
               <Button variant="secondary" size="lg">
-                Compare plans
+                Free access
               </Button>
             </Link>
           </div>

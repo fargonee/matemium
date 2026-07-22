@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "suite_id": "matemium-agent-delegation-v1",
+  "enabled_by_default": false,
+  "minimum_selected_complex_cases": 5,
+  "required_comparison": {
+    "task_success_rate": "delegated > single_agent",
+    "false_success_rate": "delegated <= single_agent",
+    "unsafe_edit_rate": "delegated <= single_agent"
+  },
+  "selected_case_ids": [
+    "create-ambiguous-scene",
+    "repair-latex-error",
+    "recover-stale-patch",
+    "detect-visual-overlap",
+    "long-context-compaction"
+  ],
+  "policy": "Delegation remains disabled until a measured report satisfies every comparison. A child result is evidence for the parent, never completion authorization."
+}

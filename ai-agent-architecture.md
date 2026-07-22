@@ -1,11 +1,14 @@
 # Matemium AI Agent Architecture
 
-**Status:** Core agent mechanics (2026-06-26). **Product-level decisions** have evolved — see [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).  
+**Status:** Product-boundary reference updated for the target autonomous runtime (2026-07-18). The current XML/regex ReAct loop is a legacy prototype, not the completed architecture.
+
 **Audience:** Desktop shell, cloud router, sidecar, and AI integration authors.
 
 **PAD Phase 10:** Packaging/CI/docs complete; MCP (phase 9) and RAG (phase 6) integrated into agent tools. See [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md).
 
-This document records the **core agent mechanics**: tool calling (`view_file`/`edit_file`/`compile_manim`), Search/Replace patches, self-correction loop, two-file boundary, and context handling.
+This document records product placement and trust boundaries: local tool execution, Search/Replace patches, the bounded project workspace, sidecar validation, and context sources. The normative runtime behavior—state, planning, recovery, completion gates, accounting, and evaluation—is defined in [`agentic_ai_goal.md`](agentic_ai_goal.md).
+
+The production agent is a persistent state machine. A model response without tool calls is a finish proposal, not evidence of completion. Prompt instructions do not replace orchestrator-enforced policy.
 
 **Product decisions** (vector DB/RAG, lazy loading, first-run downloads, Jina embeddings, strict UX gating, thin YouTube publishing, local+hosted MCP, minimal control-plane sidecar) are documented in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
@@ -20,26 +23,28 @@ This document records the **core agent mechanics**: tool calling (`view_file`/`e
 | LLM returns prose + optional diff blocks | LLM **calls tools** to inspect, edit, and compile |
 | User applies diffs manually | Backend applies **Search/Replace patches** to editor state |
 | User triggers render | Agent calls **`compile_manim`** and reads stderr |
-| Single-turn chat | **Self-correction loop** until compile succeeds |
-| One `scenes.py` buffer | Strict **two-file boundary**: `scenes.py` + `assets.py` |
+| Single-turn chat | **Stateful plan/execute/verify loop** with honest terminal outcomes |
+| One `scenes.py` buffer | Bounded **project workspace**: `scenes.py` + `helpers.py` + `brief/` |
 
-The cloud remains a **thin LLM router** (auth, billing, entitlements). The desktop owns file state, patch application, sidecar lifecycle, and render feedback. **No cloud rendering.**
+The cloud remains a **thin optional LLM helper/router** for user-owned provider keys and profile sync. The desktop owns file state, patch application, sidecar lifecycle, and render feedback. **No cloud rendering, no Matemium-owned model quota.**
 
 ---
 
 ## 2. Agent tool surface (function calling)
 
-The LLM receives structured tools — not raw shell access. Wrap backend Python/Rust functions as OpenAI-compatible function definitions. Frameworks like LangGraph or LangChain may orchestrate the loop; the wire contract is what matters.
+The LLM receives structured tools—not raw shell access. Cloud models use provider-native function calling. Local models use a grammar/schema-constrained adapter normalized to the same internal request type. Regex-extracted XML is not a production wire contract. A framework may implement orchestration, but Matemium's state and tool contracts remain framework-independent.
+
+Every result uses the typed envelope specified in [`agentic_ai_goal.md`](agentic_ai_goal.md): status, stable code, summary, structured data, evidence, retry hint, and truncation state. Executors must not flatten failures into ordinary strings.
 
 ### 2.1 Core tools
 
 | Tool | Purpose | Backend mapping |
 |------|---------|-----------------|
-| `view_file(filename)` | Return current code so the agent has context | Read workspace buffer (`scenes.py` or `assets.py`) |
+| `view_file(filename)` | Return current project file so the agent has context | Read workspace buffer (`scenes.py`, `helpers.py`, or approved `brief/*`) |
 | `edit_file(filename, instructions, patches)` | Apply localized edits | Parse Search/Replace blocks → update editor buffer |
 | `compile_manim(filename, scene_name, quality)` | Verify animation compiles | Sidecar `check_project` + `render_project` (or preview quality) |
 
-**Allowed `filename` values (strict):** `scenes.py`, `assets.py` only. No other paths.
+**Allowed `filename` values (strict):** `scenes.py`, `helpers.py`, `brief/passport.json`, `brief/description.md`, `brief/tape.md`, `brief/roadmap.json`, and `brief/narration.md`. Media changes use dedicated media tools, not arbitrary path edits.
 
 ### 2.2 Tool schemas (reference)
 
@@ -49,7 +54,18 @@ The LLM receives structured tools — not raw shell access. Wrap backend Python/
   "parameters": {
     "type": "object",
     "properties": {
-      "filename": { "type": "string", "enum": ["scenes.py", "assets.py"] }
+      "filename": {
+        "type": "string",
+        "enum": [
+          "scenes.py",
+          "helpers.py",
+          "brief/passport.json",
+          "brief/description.md",
+          "brief/tape.md",
+          "brief/roadmap.json",
+          "brief/narration.md"
+        ]
+      }
     },
     "required": ["filename"]
   }
@@ -62,7 +78,18 @@ The LLM receives structured tools — not raw shell access. Wrap backend Python/
   "parameters": {
     "type": "object",
     "properties": {
-      "filename": { "type": "string", "enum": ["scenes.py", "assets.py"] },
+      "filename": {
+        "type": "string",
+        "enum": [
+          "scenes.py",
+          "helpers.py",
+          "brief/passport.json",
+          "brief/description.md",
+          "brief/tape.md",
+          "brief/roadmap.json",
+          "brief/narration.md"
+        ]
+      },
       "instructions": { "type": "string", "description": "One-line summary of the edit intent" },
       "patches": {
         "type": "string",
@@ -93,7 +120,7 @@ The LLM receives structured tools — not raw shell access. Wrap backend Python/
 }
 ```
 
-`compile_manim` always targets `scenes.py` — the entry file the sidecar imports. `assets.py` is imported by `scenes.py` when needed.
+`compile_manim` always targets `scenes.py` — the entry file the sidecar imports. `helpers.py` is imported by `scenes.py` when reusable computations, LaTeX helpers, geometry builders, or media-reference helpers are needed.
 
 ### 2.3 Who executes tools
 
@@ -116,7 +143,8 @@ On every user prompt, the frontend bundles what the user sees so the agent does 
 | Field | Source | Example |
 |-------|--------|---------|
 | `scenes.py` | Editor buffer (saved or dirty) | Full file text |
-| `assets.py` | Secondary drawer buffer | Full file text (empty template if new project) |
+| `helpers.py` | Secondary code buffer | Full file text (empty/minimal template if new project) |
+| `brief/*` | Project brief bundle | Passport, description, tape plan, roadmap, narration |
 | `active_file` | Focused editor pane | `"scenes.py"` |
 | `cursor` | Monaco caret | `{ "line": 42, "column": 8 }` |
 | `selection` | Highlighted range | `{ "start_line": 14, "end_line": 22, "text": "..." }` |
@@ -179,9 +207,9 @@ For Matemium authoring, patches target `CanvasBuilder` calls inside `part_*` fun
 
 ---
 
-## 5. Self-correction loop
+## 5. Stateful execution and recovery
 
-Manim/Matemium code fails often (syntax, stale APIs, LaTeX errors). The agent architecture handles this autonomously.
+Manim/Matemium code fails often (syntax, stale APIs, LaTeX errors). Recovery occurs inside a checkpointed run with an explicit plan, classified errors, independent budgets, stall detection, and completion gates.
 
 ```
 [User Prompt]
@@ -202,7 +230,7 @@ Manim/Matemium code fails often (syntax, stale APIs, LaTeX errors). The agent ar
       ▼              ▼                ▼
 [Feed error back to LLM]      [Show video + final reply]
       │
-      └──► (retry edit_file → compile_manim, max N attempts)
+      └──► (classify → revise plan → bounded recovery → verify)
 ```
 
 ### 5.1 Loop policy
@@ -211,7 +239,9 @@ Manim/Matemium code fails often (syntax, stale APIs, LaTeX errors). The agent ar
 |-----------|---------|-------|
 | `max_compile_retries` | 5 | Per user turn |
 | `retry_quality` | `preview` | Fast feedback; upgrade to `medium` on success if user requested final |
-| `stop_condition` | `compile_manim` returns `ok: true` | Agent may respond to user only after verified compile |
+| `stop_condition` | Applicable completion gates pass | Compile alone does not prove semantic or visual correctness |
+
+Retries are keyed by failure signature, not only by a global counter. Repeating an equivalent action with an unchanged observation counts as a stall. The runtime terminates as `blocked`, `failed`, or `cancelled` when appropriate; it must not turn exhaustion into success.
 
 ### 5.2 `compile_manim` tool result
 
@@ -242,7 +272,7 @@ The orchestrator appends the failure payload as the tool result; the LLM analyze
 
 ---
 
-## 6. Agent lifecycle (single request)
+## 6. Agent lifecycle (persistent run)
 
 ```
 +------------------+
@@ -282,20 +312,26 @@ The orchestrator appends the failure payload as the tool result; the LLM analyze
 
 ---
 
-## 7. Two-file project boundary (`scenes.py` + `assets.py`)
+## 7. Bounded project workspace (`scenes.py` + `helpers.py` + `brief/`)
 
-Agent mode enforces a **strict two-file workspace**. This is the commercial sweet spot for Matemium desktop — not the dev-repo `helpers.py` pattern.
+Agent mode enforces a **bounded project workspace**. It is richer than the old two-file model, but still intentionally constrained: one render entrypoint, one Python support file, structured brief files, media folders, and app-managed renders. The agent must not turn a user project into an open-ended repository.
 
 ### 7.1 File roles
 
 | File | Role | UI surface |
 |------|------|------------|
 | **`scenes.py`** | **The Timeline** — `# ---DIV: ---` section markers, `part_*` functions, `CanvasScene` class, readable `CanvasBuilder` layout | Main **Visual Script Workspace** (section cards) |
-| **`assets.py`** | **The Engine Room** — raw computations, coordinate arrays, custom LaTeX groupings, heavy 3D mesh definitions, reusable data helpers | Secondary **Advanced Assets Drawer** |
+| **`helpers.py`** | **The Helper Room** — raw computations, coordinate arrays, custom LaTeX groupings, reusable geometry/data helpers | Secondary code drawer |
+| **`brief/passport.json`** | Structured creative/production identity: topic, audience, difficulty, style, duration, language, constraints, learning goals | Form editor with JSON fallback |
+| **`brief/description.md`** | Human-readable project brief and intent | Markdown editor |
+| **`brief/tape.md`** | Director's tape plan: beats, reveal comments, camera notes, visual intent | Markdown editor with beat navigation |
+| **`brief/roadmap.json`** | Phases, completion, current working point, blockers | AI-owned file shown as a read-only route in desktop; keep JSON valid and update progress only from supported project evidence |
+| **`brief/narration.md`** | Voiceover, captions, timing hints, pronunciation notes | Markdown/script editor |
+| **`media/images`, `media/video`, `media/audio`** | User-provided media referenced by project code or brief | Media browser with previews |
 
 ```python
 # scenes.py — visual narrative only
-from assets import parabola_samples, matrix_tex
+from helpers import parabola_samples, matrix_tex
 
 def part_graph(b: CanvasBuilder) -> None:
     xs, ys = parabola_samples(a=1, b=-2, c=1)
@@ -304,7 +340,7 @@ def part_graph(b: CanvasBuilder) -> None:
 ```
 
 ```python
-# assets.py — computations and data (no CanvasScene)
+# helpers.py — computations and data (no CanvasScene)
 def parabola_samples(a: float, b: float, c: float, *, n: int = 50):
     ...
 
@@ -312,34 +348,48 @@ def matrix_tex() -> str:
     return r"\begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix}"
 ```
 
-### 7.2 Why two files (not unlimited)
+### 7.2 Why bounded files (not unlimited)
 
 | Benefit | Explanation |
 |---------|-------------|
-| **Separation of concerns** | Visual timeline vs. math engine room |
-| **UI sync** | Predictable dual-pane layout — no tab explosion |
-| **Agent reliability** | Two targets reduce import loops and duplicate utility files |
-| **Token economics** | Context payload stays small and predictable for cloud routing |
+| **Separation of concerns** | Visual timeline, reusable Python, and creative/production intent have different homes |
+| **UI sync** | Predictable navigation: Script, Helpers, Brief, Media, Renders |
+| **Agent reliability** | Approved targets reduce import loops and duplicate utility files |
+| **Token economics** | Context payload stays bounded and purpose-specific for cloud routing |
+| **Persistent intent** | Brief files preserve the user's creative decisions beyond the latest code buffer |
 
 ### 7.3 Agent constraints
 
-- **Never** create `utils.py`, `helpers.py`, or additional modules in desktop workspaces.
-- **Never** `view_file` or `edit_file` paths outside the two-file enum.
-- Imports in `scenes.py` may reference `assets` only (plus `canvas`).
+- **Never** create `utils.py`, extra Python modules, arbitrary nested source folders, or hidden scratch files in desktop workspaces.
+- **Never** `view_file` or `edit_file` paths outside the approved enum.
+- Imports in `scenes.py` may reference `helpers` only (plus `canvas` and standard/library dependencies already available to the engine).
+- `brief/*.json` edits must keep valid JSON. The UI should provide structured form/checklist editing first and raw JSON fallback second.
+- `brief/*.md` edits should preserve human-readable structure; do not replace project memory with opaque generated blobs.
+- Media files are managed through dedicated UI/tooling. Code and brief files reference media by stable relative paths under `media/`.
 
-**Dev repo note:** `projects/<name>/helpers.py` remains valid for engine development and parity tests. Desktop product workspaces use `assets.py` as the second file name.
+**Migration note:** Historical desktop workspaces and docs used `assets.py` for helper code. New workspaces use `helpers.py`; `assets` is reserved for real media/project assets and app-level downloadable runtime assets.
 
 ### 7.4 Workspace layout (agent mode)
 
 ```
 ~/Matemium/workspaces/<project-id>/
-├── scenes.py          # Timeline (required)
-├── assets.py          # Engine room (required in agent mode; may be minimal)
-├── project.json       # metadata; authoring_mode: "two_file"
-└── renders/           # app-managed output dirs
+├── project.json
+├── scenes.py
+├── helpers.py
+├── brief/
+│   ├── passport.json
+│   ├── description.md
+│   ├── tape.md
+│   ├── roadmap.json
+│   └── narration.md
+├── media/
+│   ├── images/
+│   ├── video/
+│   └── audio/
+└── renders/
 ```
 
-Templates: [`shared/templates/scenes.py`](shared/templates/scenes.py), [`shared/templates/assets.py`](shared/templates/assets.py).
+Templates: [`shared/templates/scenes.py`](shared/templates/scenes.py) and future `helpers.py` / `brief/` templates under [`shared/templates/`](shared/templates/).
 
 ---
 
@@ -453,7 +503,7 @@ def get_workspace_dir() -> str:
 
 User project workspaces are separate from the sidecar binary path — passed per-request as `workspace` in IPC. `MATEMIUM_ROOT` is set to the **project workspace**, not the executable directory.
 
-**Cross-platform paths:** Windows uses backslashes (`C:\Users\...\Matemium`); macOS and Linux use forward slashes. Agent `edit_file` targets logical filenames only (`scenes.py`, `assets.py`). The Rust orchestrator joins paths with `PathBuf`; the sidecar uses `os.path.join` / `pathlib.Path`. Never hardcode directory separators in tools or prompts.
+**Cross-platform paths:** Windows uses backslashes (`C:\Users\...\Matemium`); macOS and Linux use forward slashes. Agent `edit_file` targets approved logical filenames only (`scenes.py`, `helpers.py`, and `brief/*`). The Rust orchestrator joins paths with `PathBuf`; the sidecar uses `os.path.join` / `pathlib.Path`. Never hardcode directory separators in tools or prompts.
 
 ---
 
@@ -462,10 +512,10 @@ User project workspaces are separate from the sidecar binary path — passed per
 | Tier | Mode | Project shape | User experience |
 |------|------|---------------|-----------------|
 | **v1 — Chat API** | Completions + optional diff blocks | Single `scenes.py` | User reviews/applies patches |
-| **v2 — Agent (Cloud)** | Tool loop + self-correction | **`scenes.py` + `assets.py` only** | Agent edits, compiles, fixes autonomously via cloud router |
-| **v3 — Local Agent** | Same tools, local model | Two-file | Offline-capable local orchestration using GGUF models (3B / 7B) |
+| **v2 — Agent (Cloud)** | Tool loop + self-correction | **`scenes.py` + `helpers.py` + `brief/`** | Agent edits code/brief, compiles, fixes autonomously via cloud router |
+| **v3 — Local Agent** | Same tools, local model | Bounded project workspace | Offline-capable local orchestration using GGUF models (3B / 7B) |
 
-v1 remains supported for simple chat. **v2 (Cloud)** and **v3 (Local)** are the primary target architectures. See `PRODUCT-ARCHITECTURE-DECISIONS.md` Section 15 for complete details on the local GGUF model specifications, lazy download sizes, and runtime sidecar handshake.
+v1 remains supported for simple chat. **v2 (external provider via BYO/OpenRouter)** is preferred by default, while **v3 (Local)** remains available for offline/user-controlled workflows. See `PRODUCT-ARCHITECTURE-DECISIONS.md` Sections 4A and 15 for the OpenRouter OAuth flow, user-owned provider policy, local GGUF model specifications, lazy download sizes, and runtime sidecar handshake.
 
 ---
 
@@ -473,8 +523,8 @@ v1 remains supported for simple chat. **v2 (Cloud)** and **v3 (Local)** are the 
 
 | In scope | Out of scope |
 |----------|--------------|
-| Auth, billing, rate limits | File I/O, patch apply, render |
-| Forwarding tool-call messages to LLM | Running Manim |
+| Optional auth, provider preferences, endpoint abuse protection | File I/O, patch apply, render |
+| Forwarding tool-call messages to user-selected LLM provider | Running Manim |
 | Returning assistant messages + tool calls | Storing rendered video |
 
 The desktop orchestrator runs the tool loop:
@@ -482,8 +532,9 @@ The desktop orchestrator runs the tool loop:
 1. Send context bundle + user message to cloud.
 2. Receive tool calls (`edit_file`, `compile_manim`, ...).
 3. Execute locally; append tool results.
-4. Repeat until compile succeeds or retry budget exhausted.
-5. Show final assistant message + video preview.
+4. Classify failures, revise the plan, and recover within the run budgets.
+5. Apply the relevant completion gates, including render and visual evidence when required.
+6. Show the final assistant message and verification manifest only after the verifier authorizes completion.
 
 ---
 
@@ -493,9 +544,11 @@ The agent system prompt lives at [`shared/prompts/agent-system.txt`](shared/prom
 
 1. Review user request and file context.
 2. Use `edit_file` with Search/Replace blocks — never rewrite whole files.
-3. Call `compile_manim` to verify changes.
-4. On compile failure, analyze traceback, fix via `edit_file`, re-compile.
-5. Respond to the user only after a successful compile (or explicit retry exhaustion).
+3. Call the relevant validation tools after changes.
+4. On failure, classify the diagnostic, revise the plan, and recover within policy budgets.
+5. Submit a finish proposal; the orchestrator—not the prompt—enforces completion gates.
+
+The current prompt is a legacy authoring prompt and must be replaced by role-specific prompts using the structured model protocol. It must not request or stream private chain-of-thought.
 
 v1 chat authoring prompt (no tools): [`shared/prompts/scene-authoring-system.txt`](shared/prompts/scene-authoring-system.txt).
 
@@ -503,15 +556,19 @@ v1 chat authoring prompt (no tools): [`shared/prompts/scene-authoring-system.txt
 
 ## 12. Implementation phases
 
-| Phase | Deliverable | Depends on |
-|-------|-------------|------------|
-| **A1 — Patch engine** | Rust Search/Replace parser + Monaco sync | — |
-| **A2 — Context bundler** | Selection, section map, last errors in chat payload | A1 |
-| **A3 — Tool loop orchestrator** | Desktop executes tool calls; cloud round-trip | A1, A2 |
-| **A4 — Async render bridge** | `start_render` + streamed events | Existing sidecar IPC |
-| **A5 — Two-file workspace** | `assets.py` template + drawer UI | A1 |
-| **A6 — TinyTeX bootstrap** | First-run install + PATH injection | Sidecar packaging |
-| **A7 — Agent system prompt** | Deploy `agent-system.txt` to cloud router | A3 |
+The authoritative, gated migration plan is [`TODO-react-agentic-ai-transition.md`](TODO-react-agentic-ai-transition.md). Its major stages are:
+
+| Phase | Deliverable |
+|-------|-------------|
+| **0** | Baseline, benchmark tasks, and measurable acceptance thresholds |
+| **1–2** | Durable run state machine and structured cloud/local model gateway |
+| **3–4** | Typed safe tools, mutation journal, planner, policy, and recovery engine |
+| **5–6** | Verification controller, completion manifest, compact context, and memory |
+| **7** | Per-call accounting, versioned streaming, cancellation, resume, and approvals |
+| **8** | Optional scoped delegation, enabled only when benchmarks justify it |
+| **9** | End-to-end evaluation, shadow deployment, gated rollout, and rollback |
+
+Earlier patch, context, render, workspace, and TinyTeX work remains enabling infrastructure; it does not by itself constitute a production autonomous agent.
 
 ---
 

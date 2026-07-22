@@ -10,6 +10,7 @@ Cross-layer schemas and protocol references. **No runtime code** — only contra
 | [`prompts/scene-authoring-system.txt`](prompts/scene-authoring-system.txt) | v1 chat system prompt |
 | [`prompts/agent-system.txt`](prompts/agent-system.txt) | v2 autonomous agent system prompt |
 | [`templates/scenes.py`](templates/scenes.py) | New project `scenes.py` template |
-| [`templates/assets.py`](templates/assets.py) | New project `assets.py` template (agent mode) |
+
+Target desktop project templates should cover `scenes.py`, `helpers.py`, `brief/passport.json`, `brief/description.md`, `brief/tape.md`, `brief/roadmap.json`, `brief/narration.md`, and empty `assets/` folders. `assets` means real project media or app-managed runtime downloads, not Python helper code.
 
 Engine Python types remain authoritative for `SheetDSL` (internal IR). Do not duplicate the full DSL schema here until a JSON authoring path returns.

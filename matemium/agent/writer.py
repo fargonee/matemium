@@ -1,4 +1,4 @@
-"""Patch engine — SEARCH/REPLACE writes for decoupled scenes.py and assets.py."""
+"""Patch engine for decoupled scenes.py and helpers.py workspaces."""
 
 from __future__ import annotations
 
@@ -160,18 +160,18 @@ def _inject_wait_into_part(part_source: str, duration: float) -> str:
 
 
 def _decouple_part_body(body: str, block_index: int) -> str:
-    """Rewrite inline LaTeX/3D literals to assets.* references."""
+    """Rewrite inline LaTeX/3D literals to helpers.* references."""
     latex_idx = 0
 
     def math_repl(match: re.Match[str]) -> str:
         nonlocal latex_idx
-        ref = f"assets.latex_{block_index}_{latex_idx}()"
+        ref = f"helpers.latex_{block_index}_{latex_idx}()"
         latex_idx += 1
         return f"b.add_math({ref})"
 
     result = ADD_MATH_RE.sub(math_repl, body)
     if ADD_3D_RE.search(result):
-        result = ADD_3D_RE.sub(f'b.add_3d(assets.surface_{block_index}())', result, count=1)
+        result = ADD_3D_RE.sub(f'b.add_3d(helpers.surface_{block_index}())', result, count=1)
     return result
 
 
@@ -193,7 +193,7 @@ def _normalize_part_function(block_body: str, fn_name: str) -> str:
 
 
 def emit_assets_replace(artifacts: DecoupledArtifacts) -> str:
-    """Render assets.py REPLACE payload (pure data, no narrative)."""
+    """Render helpers.py replacement payload (pure data, no narrative)."""
     lines: list[str] = []
 
     latex_funcs: list[str] = []
@@ -290,8 +290,8 @@ class {class_name}(CanvasScene):
 
 
 def build_assets_patches(artifacts: DecoupledArtifacts) -> list[PatchBlock]:
-    """Patches transforming template assets.py into decoupled engine room."""
-    template = load_template("assets.py")
+    """Patches transforming template helpers.py into the decoupled engine room."""
+    template = load_template("helpers.py")
     search = (
         "def example_values() -> tuple[float, float]:\n"
         '    """Sample numeric helper for scenes.py."""\n'
@@ -303,7 +303,7 @@ def build_assets_patches(artifacts: DecoupledArtifacts) -> list[PatchBlock]:
         '    return r"x^2 - 5x + 6 = 0"'
     )
     if search not in template:
-        raise PatchError("assets.py template changed; bootstrap SEARCH anchor missing")
+        raise PatchError("helpers.py template changed; bootstrap SEARCH anchor missing")
     return [PatchBlock(search=search, replace=emit_assets_replace(artifacts))]
 
 
@@ -322,7 +322,7 @@ def build_scenes_patches(
         "from canvas.builder import CanvasBuilder\n"
     )
     import_replace = (
-        "import assets\n"
+        "import helpers\n"
         "\n"
         "from canvas import CanvasScene, CanvasSettings\n"
         "from canvas.builder import CanvasBuilder\n"
@@ -413,17 +413,17 @@ def write_decoupled_project(
     session: ProjectSession | None = None,
     apply_watermark: bool | None = None,
 ) -> WriterResult:
-    """Write decoupled scenes.py and assets.py via SEARCH/REPLACE patches only."""
+    """Write decoupled scenes.py and helpers.py via SEARCH/REPLACE patches only."""
     project_dir = Path(project_dir)
     artifacts = build_decoupled_artifacts(script, blueprint)
     scenes_path = project_dir / "scenes.py"
-    assets_path = project_dir / "assets.py"
+    assets_path = project_dir / "helpers.py"
 
     if apply_watermark is None:
         apply_watermark = should_apply_watermark_for_session(session) if session else False
 
     bootstrap_template_file(scenes_path, "scenes.py")
-    bootstrap_template_file(assets_path, "assets.py")
+    bootstrap_template_file(assets_path, "helpers.py")
 
     assets_patches = build_assets_patches(artifacts)
     scenes_patches = build_scenes_patches(script, blueprint, apply_watermark=apply_watermark)
@@ -439,7 +439,7 @@ def write_decoupled_project(
         assets_path=assets_path,
         patches_applied=assets_applied + scenes_applied,
         patch_documents={
-            "assets.py": assets_document,
+            "helpers.py": assets_document,
             "scenes.py": scenes_document,
         },
     )

@@ -458,9 +458,9 @@ def test_writer_emits_search_replace_patch_documents(tmp_path: Path):
     blueprint = build_mute_blueprint(SAMPLE_SCRIPT)
     result = write_decoupled_project(tmp_path, SAMPLE_SCRIPT, blueprint)
     assert SEARCH_MARKER in result.patch_documents["scenes.py"]
-    assert SEARCH_MARKER in result.patch_documents["assets.py"]
+    assert SEARCH_MARKER in result.patch_documents["helpers.py"]
     assert result.patch_documents["scenes.py"].count(SEARCH_MARKER) == 3
-    assert result.patch_documents["assets.py"].count(SEARCH_MARKER) == 1
+    assert result.patch_documents["helpers.py"].count(SEARCH_MARKER) == 1
 
 
 def test_writer_applies_patches_incrementally_on_disk(tmp_path: Path, monkeypatch):
@@ -477,7 +477,7 @@ def test_writer_applies_patches_incrementally_on_disk(tmp_path: Path, monkeypatc
         track,
     )
     write_decoupled_project(tmp_path, SAMPLE_SCRIPT, blueprint)
-    assert calls == ["assets.py", "scenes.py"]
+    assert calls == ["helpers.py", "scenes.py"]
 
 
 def test_writer_decoupled_project_writes_files_with_waits(tmp_path: Path):
@@ -485,7 +485,7 @@ def test_writer_decoupled_project_writes_files_with_waits(tmp_path: Path):
     result = write_decoupled_project(tmp_path, SAMPLE_SCRIPT, blueprint)
 
     scenes_path = tmp_path / "scenes.py"
-    assets_path = tmp_path / "assets.py"
+    assets_path = tmp_path / "helpers.py"
     assert scenes_path.is_file()
     assert assets_path.is_file()
     assert result.patches_applied == 4
@@ -497,15 +497,15 @@ def test_writer_decoupled_project_writes_files_with_waits(tmp_path: Path):
     for segment in blueprint.segments:
         assert f"b.wait(duration={segment.wait_duration})" in scenes
 
-    assert "import assets" in scenes
+    assert "import helpers" in scenes
     assert "class AgentScene" in scenes
-    assert "assets.latex_" in scenes
+    assert "helpers.latex_" in scenes
     assert "add_heading" not in assets
     assert "def latex_" in assets
     assert "def surface_" in assets
 
     compile(scenes, "scenes.py", "exec")
-    compile(assets, "assets.py", "exec")
+    compile(assets, "helpers.py", "exec")
     with workspace_context(tmp_path):
         module = load_scenes_module(tmp_path)
         assert hasattr(module, "AgentScene")
@@ -518,13 +518,13 @@ def test_writer_decoupled_output_is_deterministic(tmp_path: Path):
     write_decoupled_project(project_a, SAMPLE_SCRIPT, blueprint)
     write_decoupled_project(project_b, SAMPLE_SCRIPT, blueprint)
     assert (project_a / "scenes.py").read_text() == (project_b / "scenes.py").read_text()
-    assert (project_a / "assets.py").read_text() == (project_b / "assets.py").read_text()
+    assert (project_a / "helpers.py").read_text() == (project_b / "helpers.py").read_text()
 
 
 def test_lifecycle_engineer_writes_scenes_and_assets_on_disk(tmp_path: Path):
     result = run_lifecycle(tmp_path / "disk_project", "Factor quadratics", ProcessingMode.MUTE)
     assert (tmp_path / "disk_project" / "scenes.py").is_file()
-    assert (tmp_path / "disk_project" / "assets.py").is_file()
+    assert (tmp_path / "disk_project" / "helpers.py").is_file()
     scenes = (tmp_path / "disk_project" / "scenes.py").read_text(encoding="utf-8")
     for segment in result.blueprint.segments:
         assert f"b.wait(duration={segment.wait_duration})" in scenes

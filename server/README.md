@@ -7,9 +7,10 @@ Thin middleware for the desktop app. **No rendering, no Manim, no DSL compilatio
 | In scope | Out of scope |
 |----------|--------------|
 | User authentication (JWT / API keys) | Video encoding |
-| Subscription & credit entitlements | Scene import or lint |
-| Rate limiting per plan | Storing rendered media |
-| Chat LLM proxy (OpenAI-compatible) | Returning Sheet DSL JSON as primary output |
+| User profile/provider preference sync | Scene import or lint |
+| Abuse/rate protection for Matemium endpoints | Storing rendered media |
+| BYO chat LLM proxy helpers (OpenAI-compatible) | Returning Sheet DSL JSON as primary output |
+| OpenRouter OAuth callback/key exchange support | Selling subscriptions, AI tokens, or pooled provider keys |
 
 The server returns **natural language + optional code edit blocks** (v1 chat) or **tool-call messages** (v2 agent) for `scenes.py` / `assets.py` — not compiled animations. Agent orchestration spec: [`ai-agent-architecture.md`](../ai-agent-architecture.md).
 
@@ -49,24 +50,24 @@ Or: `uvicorn matemium_server.app:app --reload --port 8080`
 | `POST` | `/v1/auth/token` | — | Dev desktop stub (`MATEMIUM_AUTH_STUB=true`) |
 | `POST` | `/v1/auth/session` | — | Exchange Supabase access token (Google sign-in) |
 | `GET` | `/v1/auth/verify` | Bearer | Validate current token |
-| `GET` | `/v1/me` | Bearer | Profile + subscription (website dashboard) |
-| `POST` | `/v1/billing/checkout` | Bearer | Lemon Squeezy checkout URL |
-| `POST` | `/v1/billing/portal` | Bearer | Lemon Squeezy customer portal URL |
-| `POST` | `/v1/webhooks/lemonsqueezy` | X-Signature | Full subscription + order (incl. refunds) sync → Supabase (register in Lemon Squeezy) |
-| `GET` | `/v1/admin/stats` | Admin | User/subscription counts |
+| `GET` | `/v1/me` | Bearer | Profile + provider preferences (website/dashboard) |
+| `POST` | `/v1/billing/checkout` | Bearer | Historical/disabled unless paid offerings return |
+| `POST` | `/v1/billing/portal` | Bearer | Historical/disabled unless paid offerings return |
+| `POST` | `/v1/webhooks/lemonsqueezy` | X-Signature | Historical billing sync endpoint; not part of current product policy |
+| `GET` | `/v1/admin/stats` | Admin | User counts and operational stats |
 | `GET` | `/v1/admin/users` | Admin | User list |
 | `GET` | `/v1/admin/subscriptions` | Admin | Subscription list |
 | `POST` | `/v1/chat/completions` | Bearer | Chat LLM proxy for desktop |
 | `POST` | `/v1/agent/turn` | Bearer | (planned) Agent tool loop |
 
-**Auth:** Website and desktop send `Authorization: Bearer <supabase_access_token>`. The server verifies via Supabase Auth and reads entitlements from Postgres. Desktop dev can use stub tokens when `MATEMIUM_AUTH_STUB=true`.
+**Auth:** Website and desktop send `Authorization: Bearer <supabase_access_token>`. The server verifies via Supabase Auth and reads profile/provider settings from Postgres. Desktop dev can use stub tokens when `MATEMIUM_AUTH_STUB=true`.
 
 **Website SPA:** The marketing/dashboard site is a Vite React app at `http://localhost:5173`. It calls this server from the browser; set `MATEMIUM_SITE_URL` and `MATEMIUM_CORS_ORIGINS` accordingly. OpenAPI at `/openapi.json` includes `BearerAuth` on website routes — regenerate the RTK Query client with `cd website && npm run codegen` (server must be running).
 
 **v1 chat:** desktop calls `/v1/chat/completions` with project context; user applies edits locally.
 
 Production-grade additions:
-- Per-plan rate limiting (free vs pro) on chat with `X-RateLimit-*` headers.
+- Abuse/rate protection on Matemium endpoints with `X-RateLimit-*` headers; limits must not imply paid tiers unless the product policy changes.
 - Structured request logging + `X-Request-ID`.
 - Global error responses + startup validation (stubs disabled in prod).
 - Basic AI usage counters surfaced in `/me` (used by dashboard Usage view).
@@ -78,10 +79,11 @@ Production-grade additions:
 
 See [`.env.example`](.env.example). Production requires:
 - Supabase service role key
-- LLM API key (unless using stubs)
-- Lemon Squeezy keys (if billing enabled)
+- OpenRouter OAuth callback configuration if using the one-click connection flow
+- No Matemium-owned LLM API key is required for production BYO mode
+- Lemon Squeezy keys only if historical billing endpoints are deliberately re-enabled
 
-**Lemon Squeezy billing**: Full setup instructions (products, webhooks, env vars, testing) are in the root [`../LEMON_SQUEEZY_SETUP.md`](../LEMON_SQUEEZY_SETUP.md).
+**Lemon Squeezy billing**: The root [`../LEMON_SQUEEZY_SETUP.md`](../LEMON_SQUEEZY_SETUP.md) is historical. Matemium currently does not charge users or sell subscriptions.
 
 ## Deployment
 
@@ -97,9 +99,7 @@ fly launch --no-deploy --name matemium-server --region ord
 
 # Set secrets (production)
 fly secrets set JWT_SECRET="$(openssl rand -hex 32)"
-fly secrets set LLM_API_KEY="sk-..."
-fly secrets set LLM_API_BASE="https://api.openai.com/v1"
-fly secrets set LLM_MODEL="gpt-4o-mini"
+fly secrets set OPENROUTER_OAUTH_CALLBACK_URL="https://your-app.example.com/openrouter/callback"
 fly secrets set LLM_STUB="false"
 
 fly deploy
@@ -123,9 +123,7 @@ In the Railway dashboard, set environment variables:
 | Variable | Example |
 |----------|---------|
 | `JWT_SECRET` | random 32+ byte secret |
-| `LLM_API_KEY` | OpenAI-compatible key |
-| `LLM_API_BASE` | `https://api.openai.com/v1` |
-| `LLM_MODEL` | `gpt-4o-mini` |
+| `OPENROUTER_OAUTH_CALLBACK_URL` | `https://your-app.example.com/openrouter/callback` |
 | `LLM_STUB` | `false` |
 
 Verify: `curl -s https://<your-app>.up.railway.app/health`
@@ -152,10 +150,10 @@ See also the root [STRUCTURE.md](../STRUCTURE.md) for publish boundaries.
    | `MATEMIUM_SUPABASE_ANON_KEY`           | `sb_publishable_...`                                 |       |
    | `MATEMIUM_SUPABASE_SERVICE_ROLE_KEY`   | `sb_secret_...` (keep private)                       | Needed for DB + admin ops |
    | `MATEMIUM_CORS_ORIGINS`                | `https://your-project.pages.dev,https://*.pages.dev,https://*.northflank.app` | Add Cloudflare Pages + server origins |
-   | `MATEMIUM_SITE_URL`                    | `https://your-project.pages.dev`                     | Used for billing redirects |
+   | `MATEMIUM_SITE_URL`                    | `https://your-project.pages.dev`                     | Used for site redirects |
    | `MATEMIUM_LLM_STUB`                    | `false`                                              | Set false for real LLM |
-   | `MATEMIUM_LLM_API_KEY`                 | `sk-...`                                             |       |
-   | `MATEMIUM_LEMON_SQUEEZY_*`             | ...                                                  | If using billing |
+   | `MATEMIUM_OPENROUTER_OAUTH_CALLBACK_URL` | `https://.../openrouter/callback`                  | For one-click OpenRouter connection |
+   | `MATEMIUM_LEMON_SQUEEZY_*`             | ...                                                  | Historical only; current product does not charge users |
    | `MATEMIUM_ADMIN_EMAILS`                | `you@...`                                            |       |
 
 3. Northflank will expose a public URL like `https://matemium-server-abc123.northflank.app`.
@@ -194,7 +192,7 @@ cd server && source .venv/bin/activate && python -m matemium_server
 
 1. Run all Supabase migrations in order:
    - schema.sql
-   - 002_lemon_squeezy.sql (if needed)
+   - 002_lemon_squeezy.sql (historical billing only; skip for current free product unless schema compatibility is needed)
    - 003_usage_counters.sql
    - 004_user_llm_and_credits.sql
    - 005_llm_management.sql
@@ -203,15 +201,15 @@ cd server && source .venv/bin/activate && python -m matemium_server
    - `MATEMIUM_ENV=production`
    - `MATEMIUM_AUTH_STUB=false`
    - `MATEMIUM_LLM_STUB=false`
-   - `MATEMIUM_LLM_API_KEY=...` (your platform key)
-   - `MATEMIUM_LEMON_SQUEEZY_*` (real keys + `TEST_MODE=false`)
-   - `MATEMIUM_LEMON_SQUEEZY_TOKEN_VARIANTS=variantId:1000,other:5000`
+   - `MATEMIUM_OPENROUTER_OAUTH_CALLBACK_URL=...` if OpenRouter OAuth is enabled
+   - Do not configure a Matemium platform LLM key for user traffic; users bring their own keys
+   - Do not configure Lemon Squeezy variables unless paid offerings are intentionally reintroduced
    - Supabase service role, admin emails, CORS with your real domains.
 
-3. For LLM management (autonomous pricing):
-   - Set `llm_profit_margin` in `system_settings` table (default 0.40).
-   - Populate `llm_providers` (via admin API or SQL) with your platform accounts + budgets.
-   - Update `llm_model_pricing` with accurate costs.
+3. For LLM management:
+   - Treat provider records as user-owned BYO configuration, not Matemium-owned accounts or budgets.
+   - Do not calculate profit margins or deduct Matemium credits for BYO calls.
+   - Record provider/model/usage metadata only for user visibility, debugging, and abuse protection.
 
 4. Website build: set `VITE_API_URL` and `VITE_SITE_URL` to production values before `npm run build`.
 
@@ -222,6 +220,6 @@ cd server && source .venv/bin/activate && python -m matemium_server
    - Update desktop (later) to point to prod server.
 
 6. Post-launch:
-   - Monitor LLM spend via Admin → LLM page.
-   - Rotate keys regularly.
-   - Encrypt user `*_api_key` columns in production (pgsodium recommended).
+   - Monitor endpoint health and provider failures without treating usage as Matemium spend.
+   - Encourage users to rotate their own provider keys regularly.
+   - Encrypt user `*_api_key` columns in production if keys are stored server-side at all (pgsodium recommended).

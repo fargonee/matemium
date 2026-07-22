@@ -1,8 +1,12 @@
 # Lemon Squeezy Billing Integration Guide
 
-This project uses [Lemon Squeezy](https://www.lemonsqueezy.com) for payments and subscriptions (Pro plan).
+**Status: historical / disabled by product decision as of 2026-07-21.**
 
-Everything required to integrate is already prepared in the codebase:
+Matemium is now completely free to use and does not sell subscriptions, paid plans, shared AI credits, or Matemium-owned model access. This document remains only as an implementation record in case payment infrastructure is deliberately reintroduced later. It is not current launch guidance.
+
+Previously, this project used [Lemon Squeezy](https://www.lemonsqueezy.com) for payments and subscriptions (Pro plan).
+
+Everything below describes the historical integration that was prepared in the codebase:
 
 - Supabase schema (`profiles` + `subscriptions` tables with `lemon_*` columns)
 - Server endpoints: `/v1/billing/checkout`, `/v1/billing/portal`, `/v1/webhooks/lemonsqueezy`
@@ -11,6 +15,8 @@ Everything required to integrate is already prepared in the codebase:
 - Plan syncing to profile + subscription records (used for entitlements)
 
 ## 1. Prerequisites
+
+Do not follow these steps for the current free product. They apply only if a future product decision explicitly reintroduces paid offerings.
 
 - A Supabase project (already used for auth)
 - A Lemon Squeezy account
@@ -144,6 +150,8 @@ In the Lemon Squeezy dashboard (Test mode), after creating a test subscription, 
 
 ## 8. Production Checklist
 
+Current product policy requires this checklist to remain unchecked unless paid offerings are reintroduced.
+
 - [ ] Set `MATEMIUM_LEMON_SQUEEZY_TEST_MODE=false`
 - [ ] Use live API key + correct variant ID
 - [ ] Webhook URL points to your public server (HTTPS)
@@ -230,4 +238,4 @@ npm run codegen
 
 ---
 
-Once the steps above are completed, Lemon Squeezy billing is fully integrated.
+Do not enable this flow for the current product. Matemium is free, and AI usage is paid directly by users to their chosen external provider when they use cloud models.

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "suite_id": "matemium-agent-baseline-v1",
+  "release_thresholds": {
+    "task_success_rate_min": 0.85,
+    "false_success_rate_max": 0.01,
+    "destructive_edit_rate_max": 0.0,
+    "recovery_success_rate_min": 0.8,
+    "usage_reconciliation_rate_min": 0.99,
+    "cancellation_p95_seconds_max": 3.0,
+    "resume_success_rate_min": 0.95,
+    "stall_detection_rate_min": 0.95
+  },
+  "report_only_metrics": [
+    "model_calls_mean",
+    "tool_calls_mean",
+    "input_tokens_mean",
+    "output_tokens_mean",
+    "cost_mean",
+    "wall_seconds_p50",
+    "wall_seconds_p95"
+  ],
+  "policy": "All release thresholds must pass on the complete suite for each supported production runtime/model profile. Any destructive edit is a release blocker. Threshold changes require a reviewed specification change."
+}

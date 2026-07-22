@@ -19,7 +19,7 @@
       "description": "v1 chat: optional single-file patch",
       "properties": {
         "description": { "type": "string" },
-        "filename": { "type": "string", "enum": ["scenes.py", "assets.py"] },
+        "filename": { "type": "string", "enum": ["scenes.py", "helpers.py", "brief/passport.json", "brief/description.md", "brief/tape.md", "brief/roadmap.json", "brief/narration.md"] },
         "search": { "type": ["string", "null"] },
         "replace": { "type": ["string", "null"] },
         "full_file": { "type": ["string", "null"] },

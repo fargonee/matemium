@@ -235,7 +235,7 @@ def stub_director_agent(user_prompt: str, mode: ProcessingMode) -> DirectorOutpu
 
 
 def stub_engineer_agent(session: ProjectSession) -> DecoupledArtifacts:
-    """Phase 3 stub — decoupled configs + on-disk scenes.py/assets.py via patch engine."""
+    """Phase 3 stub — decoupled configs + on-disk scenes.py/helpers.py via patch engine."""
     assert session.director_output is not None
     assert session.blueprint is not None
     from .writer import write_decoupled_project

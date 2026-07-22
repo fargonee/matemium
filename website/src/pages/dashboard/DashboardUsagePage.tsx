@@ -10,13 +10,10 @@ export function DashboardUsagePage() {
   const user = useSelector((state: RootState) => state.auth.user);
   const { data: account, isLoading, error, refetch } = useGetMeQuery(undefined, { skip: !user });
 
-  const plan = account?.profile.plan ?? "free";
   const usage = account?.usage;
   const ai = usage?.ai_calls_count ?? 0;
-  const credits = account?.profile.llm_credits ?? 0;
 
-  // Simple illustrative limits (server enforces real rate limits)
-  const limit = plan === "pro" || plan === "teams" ? 5000 : 200;
+  const limit = 500;
 
   if (isLoading) {
     return (
@@ -33,16 +30,16 @@ export function DashboardUsagePage() {
   return (
     <div className="grid gap-5 md:grid-cols-2">
       <Card>
-        <p className="text-sm text-text-subtle">Platform LLM Credits Remaining</p>
-        <p className="mt-2 text-4xl font-bold tabular-nums">{credits}</p>
-        <p className="text-xs text-text-muted mt-1">Spend these when using our hosted models (BYO keys do not consume credits).</p>
+        <p className="text-sm text-text-subtle">AI access</p>
+        <p className="mt-2 text-4xl font-bold tabular-nums">BYO</p>
+        <p className="text-xs text-text-muted mt-1">External AI uses your connected provider account. Local models run on your computer.</p>
       </Card>
 
       <Card>
         <p className="text-sm text-text-subtle">AI interactions (legacy counter)</p>
         <p className="mt-2 text-4xl font-bold tabular-nums">{ai}</p>
         <p className="mt-1 text-sm text-text-muted">
-          of ~{limit} this period (approximate). Pro plans receive higher priority and limits.
+          of ~{limit} this period (approximate). Rate limiting protects the shared service, not paid tiers.
         </p>
         <div className="mt-4 h-2 w-full rounded bg-border">
           <div
@@ -58,10 +55,10 @@ export function DashboardUsagePage() {
           <li>• Each AI chat turn in the desktop increments the counter.</li>
           <li>• Limits are soft guidance; hard rate-limiting protects the service.</li>
           <li>• Usage data is refreshed from your account on each dashboard load.</li>
-          <li>• Pro users receive higher throughput and priority processing.</li>
+          <li>• Provider costs and limits are controlled by your chosen AI provider.</li>
         </ul>
-        <a href="/pricing" className="mt-4 inline-block text-sm font-medium">
-          Compare plans →
+        <a href="/dashboard/account" className="mt-4 inline-block text-sm font-medium">
+          Manage provider keys →
         </a>
       </Card>
     </div>

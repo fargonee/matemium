@@ -24,6 +24,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run as MCP server (stdio) exposing tools/resources for local agents/clients. Requires 'mcp' extra.",
     )
+    parser.add_argument(
+        "--llm-worker",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--local-openai-server",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument("--host", default="127.0.0.1", help=argparse.SUPPRESS)
+    parser.add_argument("--port", type=int, default=0, help=argparse.SUPPRESS)
     return parser
 
 
@@ -45,6 +57,16 @@ def main(argv: list[str] | None = None) -> int:
         import asyncio
         asyncio.run(run_mcp())
         return 0
+
+    if args.llm_worker:
+        from .agent.llm_worker import worker_main
+
+        return worker_main()
+
+    if args.local_openai_server:
+        from .agent.local_openai_server import main as run_local_openai_server
+
+        return run_local_openai_server(["--host", args.host, "--port", str(args.port)])
 
     # Sidecar protocol traffic uses stdout; keep stderr for engine logs.
     if hasattr(sys.stdout, "reconfigure"):

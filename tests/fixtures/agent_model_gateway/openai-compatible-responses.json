@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "families": ["openai", "groq", "xai", "openrouter", "together", "fireworks"],
+  "tool_response": {
+    "id": "recorded-response-1",
+    "model": "recorded-model",
+    "choices": [
+      {
+        "finish_reason": "tool_calls",
+        "message": {
+          "role": "assistant",
+          "content": "I inspected the objective and will gather the relevant files.",
+          "tool_calls": [
+            {
+              "id": "call-read",
+              "type": "function",
+              "function": {
+                "name": "read_file",
+                "arguments": "{\"path\":\"scenes.py\"}"
+              }
+            },
+            {
+              "id": "call-search",
+              "type": "function",
+              "function": {
+                "name": "search_workspace",
+                "arguments": "{\"query\":\"part_intro\"}"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "usage": {"prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150}
+  },
+  "plan_response": {
+    "id": "recorded-response-2",
+    "model": "recorded-model",
+    "choices": [
+      {
+        "finish_reason": "tool_calls",
+        "message": {
+          "role": "assistant",
+          "content": "I have enough context to revise the plan.",
+          "tool_calls": [
+            {
+              "id": "call-plan",
+              "type": "function",
+              "function": {
+                "name": "update_plan",
+                "arguments": "{\"steps\":[{\"id\":\"inspect\",\"status\":\"completed\"},{\"id\":\"edit\",\"status\":\"pending\"}],\"reason\":\"Workspace inspection completed\"}"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "finish_response": {
+    "id": "recorded-response-3",
+    "model": "recorded-model",
+    "choices": [
+      {
+        "finish_reason": "tool_calls",
+        "message": {
+          "role": "assistant",
+          "content": "The requested changes are ready for independent verification.",
+          "tool_calls": [
+            {
+              "id": "call-finish",
+              "type": "function",
+              "function": {
+                "name": "finish_task",
+                "arguments": "{\"summary\":\"Updated the introduction\",\"claimed_outcomes\":[\"Heading changed\"],\"requested_verification\":[\"project_check\"]}"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

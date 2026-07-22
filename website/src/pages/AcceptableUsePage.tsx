@@ -31,7 +31,7 @@ export function AcceptableUsePage() {
         <ul>
           <li>Generate or assist in the creation of content intended to deceive, defraud, or cause harm (including deepfakes, misinformation campaigns, or misleading educational material presented as authoritative without disclosure).</li>
           <li>Produce material that promotes violence, discrimination, illegal activities, or child sexual exploitation.</li>
-          <li>Attempt to jailbreak, extract training data, reverse engineer the underlying models, or otherwise abuse the LLM providers we route through.</li>
+          <li>Attempt to jailbreak, extract training data, reverse engineer the underlying models, or otherwise abuse connected LLM providers.</li>
           <li>Generate large volumes of low-quality or spam content at scale in a manner that imposes unreasonable load on our systems or the LLM providers.</li>
           <li>Create automated bots that interact with the AI without meaningful human oversight, except as expressly authorized.</li>
         </ul>
@@ -46,7 +46,7 @@ export function AcceptableUsePage() {
           <li>Interfere with or disrupt the integrity or performance of the Service or the data contained therein.</li>
           <li>Attempt to gain unauthorized access to any portion of the Service, other accounts, or computer systems.</li>
           <li>Use the Service in a manner that could damage, disable, overburden, or impair the Service or interfere with any other party's use.</li>
-          <li>Share credentials or allow others to use your Pro or Teams subscription in violation of the plan terms.</li>
+          <li>Share credentials or use another person&apos;s connected provider account without authorization.</li>
         </ul>
 
         <h2>4. User Content Responsibilities</h2>
@@ -60,9 +60,9 @@ export function AcceptableUsePage() {
         </p>
         <ul>
           <li>Removing or disabling access to content that violates this policy.</li>
-          <li>Suspending or terminating your account and license.</li>
+          <li>Suspending or terminating your account access.</li>
           <li>Reporting illegal activity to law enforcement authorities.</li>
-          <li>Cooperating with any investigation by LLM providers or payment processors.</li>
+          <li>Cooperating with any investigation by LLM providers or infrastructure providers.</li>
         </ul>
         <p>
           We may also implement technical measures (such as rate limiting) to prevent abuse.

@@ -38,6 +38,7 @@ tar = "0.4"
 tokio-util = { version = "0.7", features = ["io"] }
 futures-util = "0.3"
 urlencoding = "2"
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

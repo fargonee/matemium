@@ -101,6 +101,6 @@ async def enforce_rate_limit(request: Request, user_id: str | None, plan: str = 
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Rate limit exceeded. Upgrade for higher limits.",
+            detail="Rate limit exceeded. Please wait before retrying.",
             headers=headers,
         )

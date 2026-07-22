@@ -40,11 +40,16 @@ async fn auth_and_chat_against_stub_server() {
             messages: vec![ChatMessage {
                 role: "user".to_string(),
                 content: "Add a heading".to_string(),
+                references: None,
             }],
             project_id: None,
+            conversation_id: None,
             scenes_excerpt: Some("class MyScene(CanvasScene): pass".to_string()),
             llm_provider: None,
             use_personal_llm: None,
+            model: None,
+            use_autonomous_agent: None,
+            agent_runtime_version: None,
         },
     )
     .await
