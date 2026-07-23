@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 from pathlib import Path
-from typing import Iterator, List, Literal, Tuple, Union
+from typing import Any, Iterator, List, Literal, Optional, Tuple, Union
 
 from manim import (
     DEGREES,
@@ -68,6 +68,104 @@ from .measure import build_mobject, make_render_surface, _OBJECT_KINDS
 from .registry import MobjectRegistry
 
 
+# ---------------------------------------------------------------------------
+# Per-item error isolation
+# ---------------------------------------------------------------------------
+
+class TimelineExecutionError(Exception):
+    """Raised when a timeline item fails during CanvasScene.construct().
+
+    Carries structured, machine-parseable fields so the desktop sidecar's
+    AI self-correction loop can pinpoint and fix the offending item without
+    having to parse a raw traceback.
+
+    Attributes:
+        timeline_index: 0-based position of the failing item in the timeline.
+        item_kind:      Broad category — "element", "camera_move",
+                        "camera_keyframe", "transform", "plot_trace",
+                        "solid_lift", "solid_rotate", "camera_inspect",
+                        "camera_focus", "flex_group", or "unknown".
+        item_type:      The ``type`` field of the DSL object (e.g. "MathTex",
+                        "CameraMove") or the Python class name as a fallback.
+        element_id:     The ``id`` of the offending DSL item, or ``None`` when
+                        the item carries no stable identifier.
+        cause:          The original exception message (str).
+        original:       The original exception instance for chained tracebacks.
+    """
+
+    def __init__(
+        self,
+        *,
+        timeline_index: int,
+        item_kind: str,
+        item_type: str,
+        element_id: Optional[str],
+        cause: str,
+        original: BaseException,
+    ) -> None:
+        self.timeline_index = timeline_index
+        self.item_kind = item_kind
+        self.item_type = item_type
+        self.element_id = element_id
+        self.cause = cause
+        self.original = original
+        super().__init__(
+            f"[timeline:{timeline_index}] kind={item_kind!r} type={item_type!r}"
+            + (f" id={element_id!r}" if element_id is not None else "")
+            + f" — {cause}"
+        )
+
+    def to_dict(self) -> dict:
+        """Machine-parseable representation for IPC / AI self-correction."""
+        return {
+            "error": "TimelineExecutionError",
+            "timeline_index": self.timeline_index,
+            "item_kind": self.item_kind,
+            "item_type": self.item_type,
+            "element_id": self.element_id,
+            "cause": self.cause,
+        }
+
+
+def _item_meta(payload: Any) -> Tuple[str, str, Optional[str]]:
+    """Extract (item_kind, item_type, element_id) from a timeline payload.
+
+    Works for both single items and flex-group lists.
+    """
+    from .dsl import (
+        CanvasElement, CameraMove, CameraKeyframe, TransformElement,
+        PlotTrace, SolidLift, SolidRotate, CameraInspect, CameraFocus,
+    )
+
+    if isinstance(payload, list):
+        # flex_group — use the first element's metadata
+        if payload:
+            first = payload[0]
+            return (
+                "flex_group",
+                getattr(first, "type", type(first).__name__),
+                getattr(first, "flex_group", None) or getattr(first, "id", None),
+            )
+        return ("flex_group", "unknown", None)
+
+    kind_map = {
+        CanvasElement: "element",
+        CameraMove: "camera_move",
+        CameraKeyframe: "camera_keyframe",
+        TransformElement: "transform",
+        PlotTrace: "plot_trace",
+        SolidLift: "solid_lift",
+        SolidRotate: "solid_rotate",
+        CameraInspect: "camera_inspect",
+        CameraFocus: "camera_focus",
+    }
+    item_kind = next(
+        (v for cls, v in kind_map.items() if isinstance(payload, cls)),
+        "unknown",
+    )
+    item_type = getattr(payload, "type", type(payload).__name__)
+    element_id = getattr(payload, "id", None)
+    return item_kind, item_type, element_id
 
 
 
@@ -97,6 +195,45 @@ class CanvasScene(ThreeDScene):
         self.settings: CanvasSettings = dsl.canvas_settings
         self.registry = MobjectRegistry(viewport_margin=3.0)
         self.camera_ctl: CameraController | None = None
+
+        # --- DSL validation pass (pre-render) ---
+        # Run before any Manim setup so errors surface immediately with clear
+        # diagnostics rather than as cryptic AttributeErrors mid-render.
+        # Validation is non-fatal for warnings; errors are printed loudly but
+        # do NOT abort __init__ (the render itself will fail at the offending
+        # item, which is the correct Manim failure mode).  Authors who want a
+        # hard pre-render gate can call dsl.validate(raise_on_error=True)
+        # themselves before constructing CanvasScene.
+        try:
+            issues = dsl.validate(raise_on_error=False)
+            errors = [i for i in issues if i.severity.value == "error"]
+            warnings = [i for i in issues if i.severity.value == "warning"]
+            if errors:
+                import sys
+                print(
+                    f"\n[Matemium] DSL validation found {len(errors)} error(s) "
+                    f"and {len(warnings)} warning(s) before render:\n",
+                    file=sys.stderr,
+                )
+                for issue in issues:
+                    print(f"  {issue}", file=sys.stderr)
+                print(
+                    "\nRender will proceed but may fail at the offending item. "
+                    "Fix the issues above for a clean render.\n",
+                    file=sys.stderr,
+                )
+            elif warnings:
+                import sys
+                print(
+                    f"[Matemium] DSL validation: {len(warnings)} warning(s):",
+                    file=sys.stderr,
+                )
+                for w in warnings:
+                    print(f"  {w}", file=sys.stderr)
+        except Exception:
+            # Validation itself must never crash the scene — it is a best-effort
+            # diagnostic layer.  Swallow any unexpected errors silently.
+            pass
         # Phase 3
         self.root_tape = getattr(dsl, "root_tape", None)
         # Phase 8
@@ -141,27 +278,42 @@ class CanvasScene(ThreeDScene):
         # Tape internal content lazy unless in tape-scroll-mode.
         # Default identity root tape keeps full legacy lazy path.
         # Execute the timeline in order (the "compiler")
-        for kind, payload in self._iter_timeline_batches():
-            if kind == "flex_group":
-                self._handle_flex_group_reveal(payload)
-            elif isinstance(payload, CameraMove):
-                self._handle_camera_move(payload)
-            elif isinstance(payload, CameraKeyframe):
-                self._handle_camera_keyframe(payload)
-            elif isinstance(payload, CanvasElement):
-                self._handle_element_reveal(payload)
-            elif isinstance(payload, TransformElement):
-                self._handle_transform(payload)
-            elif isinstance(payload, PlotTrace):
-                self._handle_plot_trace(payload)
-            elif isinstance(payload, SolidLift):
-                self._handle_solid_lift(payload)
-            elif isinstance(payload, SolidRotate):
-                self._handle_solid_rotate(payload)
-            elif isinstance(payload, CameraInspect):
-                self._handle_camera_inspect(payload)
-            elif isinstance(payload, CameraFocus):
-                self._handle_camera_focus(payload)
+        for tl_index, (kind, payload) in enumerate(self._iter_timeline_batches()):
+            try:
+                if kind == "flex_group":
+                    self._handle_flex_group_reveal(payload)
+                elif isinstance(payload, CameraMove):
+                    self._handle_camera_move(payload)
+                elif isinstance(payload, CameraKeyframe):
+                    self._handle_camera_keyframe(payload)
+                elif isinstance(payload, CanvasElement):
+                    self._handle_element_reveal(payload)
+                elif isinstance(payload, TransformElement):
+                    self._handle_transform(payload)
+                elif isinstance(payload, PlotTrace):
+                    self._handle_plot_trace(payload)
+                elif isinstance(payload, SolidLift):
+                    self._handle_solid_lift(payload)
+                elif isinstance(payload, SolidRotate):
+                    self._handle_solid_rotate(payload)
+                elif isinstance(payload, CameraInspect):
+                    self._handle_camera_inspect(payload)
+                elif isinstance(payload, CameraFocus):
+                    self._handle_camera_focus(payload)
+            except TimelineExecutionError:
+                # Already wrapped — re-raise as-is so the structured diagnostic
+                # propagates cleanly without double-wrapping.
+                raise
+            except Exception as exc:
+                item_kind, item_type, element_id = _item_meta(payload)
+                raise TimelineExecutionError(
+                    timeline_index=tl_index,
+                    item_kind=item_kind,
+                    item_type=item_type,
+                    element_id=element_id,
+                    cause=str(exc),
+                    original=exc,
+                ) from exc
 
         # Hold at the end so the last view is visible
         self.wait(1.5)

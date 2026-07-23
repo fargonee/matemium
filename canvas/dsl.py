@@ -9,10 +9,75 @@ import json
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, Optional, Union, List, Dict
+from typing import Any, Literal, Optional, Union, List, Dict, Sequence
 
 # Phase 1: world transforms (forward import to avoid cycles)
 from .coords import WorldTransform, Vector3
+
+
+# ---------------------------------------------------------------------------
+# DSL validation primitives
+# ---------------------------------------------------------------------------
+
+class ValidationSeverity(str, Enum):
+    """Severity level for a DSL validation issue."""
+    ERROR = "error"    # Render will definitely fail or produce wrong output.
+    WARNING = "warning"  # Suspicious but may still render.
+
+
+@dataclass
+class ValidationIssue:
+    """A single structured issue found during SheetDSL.validate().
+
+    Attributes:
+        severity:   "error" or "warning".
+        code:       Short machine-readable tag (e.g. "unknown_element_type",
+                    "duplicate_element_id").
+        message:    Human-readable description of the problem.
+        element_id: The id of the offending DSL item, when applicable.
+        field:      The specific field that triggered the issue, when applicable.
+    """
+    severity: ValidationSeverity
+    code: str
+    message: str
+    element_id: Optional[str] = None
+    field: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "severity": self.severity.value,
+            "code": self.code,
+            "message": self.message,
+            "element_id": self.element_id,
+            "field": self.field,
+        }
+
+    def __str__(self) -> str:
+        parts = [f"[{self.severity.value.upper()}:{self.code}]"]
+        if self.element_id:
+            parts.append(f"id={self.element_id!r}")
+        if self.field:
+            parts.append(f"field={self.field!r}")
+        parts.append(self.message)
+        return " ".join(parts)
+
+
+class DSLValidationError(ValueError):
+    """Raised by SheetDSL.validate(raise_on_error=True) when errors are found.
+
+    Attributes:
+        issues: All issues (errors + warnings) found during validation.
+        errors: Only the error-severity issues.
+    """
+
+    def __init__(self, issues: List[ValidationIssue]) -> None:
+        self.issues = issues
+        self.errors = [i for i in issues if i.severity == ValidationSeverity.ERROR]
+        lines = [str(i) for i in self.errors]
+        super().__init__(
+            f"SheetDSL has {len(self.errors)} validation error(s):\n"
+            + "\n".join(f"  {l}" for l in lines)
+        )
 
 
 class ObservationMode(str, Enum):
@@ -586,6 +651,258 @@ class SheetDSL:
     timeline: List[TimelineItem] = field(default_factory=list)
     root_objects: List["WorldObject"] = field(default_factory=list)
     tapes: List["TapeObject"] = field(default_factory=list)
+
+    # ------------------------------------------------------------------
+    # Validation pass
+    # ------------------------------------------------------------------
+
+    def validate(self, *, raise_on_error: bool = False) -> List[ValidationIssue]:
+        """Run a structural validation pass over this DSL.
+
+        Checks performed
+        ----------------
+        1. Element ``type`` is a known kind (core primitives or registered
+           kinds in ``_OBJECT_KINDS`` from ``canvas/measure.py``).
+        2. No duplicate element ids across the timeline and tape local_elements.
+        3. ``parent_object_id`` references an existing tape/world object id.
+        4. ``TransformElement``, ``CameraFocus``, ``CameraInspect``,
+           ``SolidLift``, ``SolidRotate`` targets reference existing element ids.
+        5. ``flex_group`` members are consistent (all share the same group id
+           and are consecutive ``CanvasElement`` items).
+
+        The method is tolerant of the mid-migration state (both
+        ``canvas_position`` and ``WorldTransform`` may be present) and does
+        not require Manim to be importable.
+
+        Parameters
+        ----------
+        raise_on_error:
+            When ``True``, raises :class:`DSLValidationError` if any
+            error-severity issues are found.  Warnings are always returned
+            but never cause a raise.
+
+        Returns
+        -------
+        List[ValidationIssue]
+            All issues found (errors + warnings), in discovery order.
+        """
+        issues: List[ValidationIssue] = []
+
+        # --- Collect known element types (late import to avoid circular deps) ---
+        known_types: set = set()
+        try:
+            from .measure import _OBJECT_KINDS  # type: ignore[import]
+            known_types = set(_OBJECT_KINDS.keys())
+        except Exception:
+            pass
+
+        # Core primitives that are always valid even if _OBJECT_KINDS is empty
+        # or not yet populated (e.g. in lightweight test environments).
+        _CORE_PRIMITIVES = {
+            "MathTex", "Text", "ThreeDGraph", "Surface", "Solid3D",
+            "Axes", "NumberPlane", "ParametricFunction", "VGroup",
+            "Dot", "Arrow", "Image", "SVG",
+            # Legacy / topic-specific (kept for backward compat)
+            "GridBoard", "GridMark", "QuadraticPlot", "QuadraticPlotPair",
+        }
+        known_types |= _CORE_PRIMITIVES
+
+        # --- Pre-pass: collect ALL element ids and tape/world-object ids ---
+        # This must be done before the validation pass so that reference checks
+        # (e.g. SolidLift.element_id) are order-independent — a target that
+        # appears later in the timeline than its referencing action is still valid.
+        all_element_ids: set = set()
+        # Also collect tape/world-object ids for parent_object_id checks
+        tape_and_world_ids: set = set()
+
+        for tape in self.tapes:
+            if tape and getattr(tape, "id", None):
+                tape_and_world_ids.add(tape.id)
+            for elem in getattr(tape, "local_elements", []) or []:
+                if elem and getattr(elem, "id", None):
+                    all_element_ids.add(elem.id)
+
+        for wo in self.root_objects:
+            if wo and getattr(wo, "id", None):
+                tape_and_world_ids.add(wo.id)
+                if wo.element and getattr(wo.element, "id", None):
+                    all_element_ids.add(wo.element.id)
+
+        # Collect all timeline item ids in one sweep (order-independent)
+        for item in self.timeline:
+            item_id = getattr(item, "id", None)
+            if item_id is not None:
+                all_element_ids.add(item_id)
+
+        # --- Validation pass: iterate timeline items ---
+        seen_ids: set = set()
+        # Track flex_group membership for consistency check
+        flex_groups: Dict[str, List[int]] = {}  # group_id -> list of timeline indices
+
+        for tl_idx, item in enumerate(self.timeline):
+            item_id = getattr(item, "id", None)
+
+            # --- Check 2: duplicate ids ---
+            if item_id is not None:
+                if item_id in seen_ids:
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="duplicate_element_id",
+                        message=f"Duplicate id {item_id!r} at timeline index {tl_idx}.",
+                        element_id=item_id,
+                        field="id",
+                    ))
+                else:
+                    seen_ids.add(item_id)
+
+            if isinstance(item, CanvasElement):
+                # --- Check 1: known type ---
+                if known_types and item.type not in known_types:
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.WARNING,
+                        code="unknown_element_type",
+                        message=(
+                            f"Element type {item.type!r} is not a known kind. "
+                            "Register it via register_object_kind() or it will "
+                            "fall back to the placeholder renderer."
+                        ),
+                        element_id=item_id,
+                        field="type",
+                    ))
+
+                # --- Check 3: parent_object_id ---
+                if item.parent_object_id is not None:
+                    if item.parent_object_id not in tape_and_world_ids:
+                        issues.append(ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            code="unknown_parent_object_id",
+                            message=(
+                                f"parent_object_id={item.parent_object_id!r} does not "
+                                "reference any known tape or world object id."
+                            ),
+                            element_id=item_id,
+                            field="parent_object_id",
+                        ))
+
+                # --- Check 5: flex_group consistency ---
+                fg = item.flex_group
+                if fg is not None:
+                    flex_groups.setdefault(fg, []).append(tl_idx)
+
+            elif isinstance(item, TransformElement):
+                # --- Check 4: source_id references existing element ---
+                if item.source_id and item.source_id not in all_element_ids:
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="unknown_target_element_id",
+                        message=(
+                            f"TransformElement source_id={item.source_id!r} does not "
+                            "reference any known element id."
+                        ),
+                        element_id=item_id,
+                        field="source_id",
+                    ))
+
+            elif isinstance(item, (SolidLift, SolidRotate, CameraInspect)):
+                # --- Check 4: element_id references existing element ---
+                target_id = getattr(item, "element_id", None)
+                if target_id and target_id not in all_element_ids:
+                    item_type_name = type(item).__name__
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="unknown_target_element_id",
+                        message=(
+                            f"{item_type_name} element_id={target_id!r} does not "
+                            "reference any known element id."
+                        ),
+                        element_id=item_id,
+                        field="element_id",
+                    ))
+
+            elif isinstance(item, CameraFocus):
+                # --- Check 4: element_id references existing element ---
+                if item.element_id and item.element_id not in all_element_ids:
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="unknown_target_element_id",
+                        message=(
+                            f"CameraFocus element_id={item.element_id!r} does not "
+                            "reference any known element id."
+                        ),
+                        element_id=item_id,
+                        field="element_id",
+                    ))
+
+            elif isinstance(item, PlotTrace):
+                # --- Check 4: element_id references existing element ---
+                if item.element_id and item.element_id not in all_element_ids:
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="unknown_target_element_id",
+                        message=(
+                            f"PlotTrace element_id={item.element_id!r} does not "
+                            "reference any known element id."
+                        ),
+                        element_id=item_id,
+                        field="element_id",
+                    ))
+
+        # --- Check 5: flex_group items must be consecutive CanvasElements ---
+        # Build a quick index: timeline_index -> item
+        tl_by_idx = {i: item for i, item in enumerate(self.timeline)}
+        for group_id, indices in flex_groups.items():
+            if len(indices) < 2:
+                # Single-item flex_group is suspicious but not an error
+                issues.append(ValidationIssue(
+                    severity=ValidationSeverity.WARNING,
+                    code="flex_group_single_member",
+                    message=(
+                        f"flex_group={group_id!r} has only one member "
+                        "(index {indices[0]}). A flex group with a single item "
+                        "has no effect."
+                    ),
+                    element_id=None,
+                    field="flex_group",
+                ))
+                continue
+
+            # Check consecutiveness
+            for a, b in zip(indices, indices[1:]):
+                if b != a + 1:
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="flex_group_non_consecutive",
+                        message=(
+                            f"flex_group={group_id!r} members are not consecutive "
+                            f"in the timeline (gap between indices {a} and {b}). "
+                            "Non-consecutive flex items will not be batched correctly."
+                        ),
+                        element_id=None,
+                        field="flex_group",
+                    ))
+
+            # Check all members are CanvasElements
+            for idx in indices:
+                item = tl_by_idx.get(idx)
+                if item is not None and not isinstance(item, CanvasElement):
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="flex_group_non_element_member",
+                        message=(
+                            f"flex_group={group_id!r} member at index {idx} is "
+                            f"{type(item).__name__!r}, not a CanvasElement. "
+                            "Only CanvasElement items may belong to a flex group."
+                        ),
+                        element_id=getattr(item, "id", None),
+                        field="flex_group",
+                    ))
+
+        if raise_on_error:
+            errors = [i for i in issues if i.severity == ValidationSeverity.ERROR]
+            if errors:
+                raise DSLValidationError(issues)
+
+        return issues
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SheetDSL":

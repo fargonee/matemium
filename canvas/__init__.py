@@ -30,6 +30,10 @@ from .dsl import (
     WorldObject,
     # Phase 2
     TapeObject,
+    # Validation
+    ValidationIssue,
+    ValidationSeverity,
+    DSLValidationError,
 )
 # Phase 1+: world coordinate primitives (exported for authors and tests)
 from .coords import Vector3, WorldTransform, resolve_world_position
@@ -44,7 +48,7 @@ from .measure import (
 )
 from .measurement import MeasuredSize, MeasurementBackend, BoundingBox3D
 from .measurement.manim_backend import ManimMeasurementBackend
-from .scene import CanvasScene
+from .scene import CanvasScene, TimelineExecutionError
 from .builder import CanvasBuilder
 
 # High-level builder (recommended for most use, especially AI-generated videos):
@@ -87,6 +91,7 @@ __all__ = [
     "EntryAnimation",
     "StateBehavior",
     "CanvasScene",
+    "TimelineExecutionError",
     "MobjectRegistry",
     "RegistryEntry",
     "CameraController",
@@ -105,4 +110,8 @@ __all__ = [
     "ObservationTarget",
     "ObservationMode",  # Phase 8
     "resolve_world_position",
+    # DSL validation
+    "ValidationIssue",
+    "ValidationSeverity",
+    "DSLValidationError",
 ]
