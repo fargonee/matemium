@@ -1,21 +1,227 @@
-MIT License
+# Matemium Source-Available License
 
-Copyright (c) 2026 Matemium contributors
+**Version 1.0 — July 2026**
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Copyright © 2026 Matemium contributors
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This license governs the Matemium software distributed by or on behalf of the Matemium project, including its desktop application, local rendering engine, bundled sidecar, website source code, server components, documentation, and related source files (collectively, the **“Software”**).
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Third-party components included with or used by the Software remain governed by their respective licenses.
+
+## 1. Definitions
+
+For purposes of this license:
+
+**“Matemium Project”** means the official Matemium software project and its repositories, websites, releases, and services maintained by the Matemium maintainers.
+
+**“Official Repository”** means a source-code repository designated by the Matemium maintainers as an official repository of the Matemium Project.
+
+**“You”** means the individual or legal entity exercising permissions granted by this license.
+
+**“Modification”** means any change, adaptation, translation, extension, or derivative work based on the Software.
+
+**“Redistribute”** means to provide, publish, sublicense, sell, transfer, or otherwise make copies of the Software or a Modification available to another person or to the public.
+
+**“Competing Product or Service”** means a publicly offered product or service whose primary functionality is substantially derived from, reproduces, or substitutes for the core functionality of Matemium.
+
+Internal tools, private experiments, educational demonstrations, and software that merely interoperates with Matemium are not Competing Products or Services.
+
+## 2. License grant
+
+Subject to the conditions and restrictions in this license, the Matemium contributors grant You a worldwide, non-exclusive, royalty-free, revocable-on-breach license to:
+
+1. use the Software for personal, educational, research, nonprofit, and internal organizational purposes;
+2. inspect and study the source code;
+3. download and copy the Software for Your own use;
+4. run the Software on devices and infrastructure that You own or control;
+5. make and use private Modifications;
+6. evaluate and test the Software;
+7. create a fork for the purpose of preparing contributions to the Matemium Project; and
+8. submit bug fixes, features, documentation, translations, tests, and other contributions to an Official Repository.
+
+The permissions granted under this section continue for as long as You comply with this license.
+
+## 3. Internal organizational use
+
+Businesses, schools, universities, nonprofit organizations, and other entities may use the Software internally, including for internal teaching, content creation, research, employee work, and private infrastructure.
+
+Internal organizational use does not include:
+
+1. selling or licensing the Software to third parties;
+2. distributing an unofficial Matemium application or build;
+3. providing the Software as a public hosted service;
+4. operating a Competing Product or Service; or
+5. commercially exploiting the Software itself as a product.
+
+Content created using Matemium, including videos, lessons, images, scripts, and educational materials, belongs to its creator and may be used commercially. This license restricts exploitation of the Software, not content produced using the Software.
+
+## 4. Contribution forks
+
+You may publicly maintain a fork solely when reasonably necessary to prepare, discuss, or submit contributions to the Matemium Project.
+
+A contribution fork must:
+
+1. retain all copyright, attribution, and license notices;
+2. clearly state that it is unofficial;
+3. link to the Official Repository where reasonably practical;
+4. not be presented as an official Matemium release;
+5. not provide downloadable end-user releases, installers, hosted deployments, or packaged derivative products; and
+6. not be used to operate a Competing Product or Service.
+
+The contribution-fork permission does not authorize general redistribution or the creation of an independently distributed Matemium edition.
+
+## 5. Restrictions
+
+Except where You have received prior written permission from the Matemium maintainers, You may not:
+
+1. Redistribute the Software or substantial portions of it;
+2. publish or distribute a Modification, derivative build, unofficial edition, installer, binary package, or application based on the Software;
+3. sell, sublicense, lease, rent, or commercially redistribute the Software;
+4. provide paid access to the Software itself;
+5. offer the Software as a hosted or managed service to third parties;
+6. operate a Competing Product or Service based substantially on the Software;
+7. remove, obscure, or alter copyright, attribution, trademark, authorship, or license notices;
+8. represent a Modification or unofficial build as an official Matemium release;
+9. use the Matemium name, logos, branding, or trademarks in a way that implies endorsement or official status; or
+10. assist another person in violating this license.
+
+These restrictions do not prevent You from:
+
+1. discussing or reviewing the Software;
+2. publishing small code excerpts for criticism, documentation, education, or bug reports where legally permitted;
+3. creating software that communicates or interoperates with Matemium without copying substantial protected portions of the Software;
+4. publishing content created with Matemium; or
+5. submitting contributions through an Official Repository.
+
+## 6. Permission for other uses
+
+The Matemium maintainers may grant separate written permission for uses that this license does not otherwise permit, including:
+
+1. commercial redistribution;
+2. OEM or bundled distribution;
+3. public hosted services;
+4. derivative products;
+5. independently maintained editions;
+6. commercial licensing; and
+7. other partnerships or special uses.
+
+Permission may be subject to separate conditions, fees, agreements, or attribution requirements.
+
+## 7. Contributions
+
+By intentionally submitting a contribution to an Official Repository, You represent that:
+
+1. You created the contribution or otherwise have the legal right to submit it;
+2. the contribution does not knowingly violate another person’s copyright, patent, trademark, privacy, or other rights; and
+3. You have disclosed any applicable third-party license requirements.
+
+You grant the Matemium Project and its maintainers a worldwide, perpetual, irrevocable, non-exclusive, royalty-free license to:
+
+1. use, reproduce, modify, adapt, and prepare derivative works from the contribution;
+2. incorporate the contribution into the Software;
+3. distribute and publicly display the contribution as part of the Matemium Project;
+4. sublicense the contribution as part of the Matemium Project; and
+5. distribute the contribution under this license or a future license applied to the Matemium Project.
+
+You retain copyright ownership in Your original contribution.
+
+Submitting a contribution does not guarantee that it will be accepted, merged, maintained, or included in a release.
+
+The Matemium Project may additionally require contributors to certify compliance with a Developer Certificate of Origin or another contribution agreement.
+
+## 8. Official releases
+
+Only the Matemium maintainers or persons expressly authorized by them may designate a build, package, website, repository, or service as an official Matemium release.
+
+Nothing in this license restricts the Matemium maintainers from:
+
+1. distributing official source or binary releases;
+2. offering the Software under additional or different license terms;
+3. providing commercial licenses;
+4. changing the license of future releases; or
+5. discontinuing or modifying the Matemium Project.
+
+A change to the license of a future release does not retroactively remove rights validly granted for a previous release.
+
+## 9. User-created content
+
+This license does not claim ownership of videos, lessons, animations, scripts, images, audio, educational materials, or other original content created by users with the Software.
+
+Users are responsible for ensuring that their content and use of third-party materials comply with applicable laws and licenses.
+
+## 10. Third-party components
+
+The Software may include or depend on third-party libraries, runtimes, frameworks, fonts, tools, or other materials, including components such as Manim Community Edition, Tauri, Python, FFmpeg, and LaTeX distributions.
+
+Each third-party component remains subject to its own license terms.
+
+Where a third-party license grants rights that cannot lawfully be restricted by this license, the third-party license controls with respect to that component.
+
+This license applies only to the portions of Matemium for which the Matemium contributors have authority to grant rights.
+
+## 11. No trademark license
+
+This license does not grant permission to use the Matemium name, logos, visual identity, domain names, or trademarks except as reasonably necessary to identify the Software, describe compatibility, provide attribution, or identify an unofficial contribution fork.
+
+You may not use Matemium branding in a manner that suggests sponsorship, endorsement, affiliation, or official status without written permission.
+
+## 12. Compliance with law
+
+You may not use the Software in violation of applicable law.
+
+You are responsible for Your use of the Software, Your Modifications, Your generated content, and any systems on which You operate the Software.
+
+## 13. Termination
+
+Your rights under this license terminate automatically if You materially violate its terms.
+
+If the violation is curable, Your rights will be reinstated automatically when:
+
+1. You correct the violation within 30 days after becoming aware of it; and
+2. it is Your first violation of this license.
+
+For repeated, intentional, or non-curable violations, reinstatement requires written permission from the Matemium maintainers.
+
+Upon termination, You must stop using and distributing any copies or Modifications not otherwise permitted by applicable law.
+
+Sections concerning contributions, ownership, disclaimers, limitation of liability, and interpretation survive termination.
+
+## 14. Disclaimer of warranties
+
+THE SOFTWARE IS PROVIDED **“AS IS”** AND **“AS AVAILABLE,”** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, EXPRESS, IMPLIED, OR STATUTORY.
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE MATEMIUM CONTRIBUTORS DISCLAIM ALL WARRANTIES, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, RELIABILITY, SECURITY, AND ERROR-FREE OPERATION.
+
+YOU ARE RESPONSIBLE FOR REVIEWING OUTPUT GENERATED BY THE SOFTWARE, INCLUDING MATHEMATICAL, EDUCATIONAL, PROGRAMMING, AND AI-ASSISTED OUTPUT.
+
+## 15. Limitation of liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE MATEMIUM CONTRIBUTORS, MAINTAINERS, AND COPYRIGHT HOLDERS WILL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF DATA, PROFITS, REVENUE, GOODWILL, BUSINESS OPPORTUNITY, OR SERVICE AVAILABILITY, ARISING FROM OR RELATED TO THE SOFTWARE OR THIS LICENSE.
+
+THIS LIMITATION APPLIES REGARDLESS OF THE LEGAL THEORY OF LIABILITY AND EVEN IF A CONTRIBUTOR OR MAINTAINER HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+Where applicable law does not permit a complete exclusion of liability, liability will be limited to the greatest extent permitted by law.
+
+## 16. Severability
+
+If any provision of this license is held unenforceable, that provision will be interpreted or limited to the minimum extent necessary to make it enforceable.
+
+If it cannot be made enforceable, it will be severed without affecting the remaining provisions.
+
+## 17. No waiver
+
+A failure to enforce any provision of this license does not waive the right to enforce that provision or any other provision later.
+
+## 18. Entire license
+
+This license represents the complete license grant for the Matemium-owned portions of the Software unless a separate written agreement applies.
+
+No contributor, user, distributor, or other person may modify this license on behalf of the Matemium Project without authorization from the Matemium maintainers.
+
+## 19. Contact and permissions
+
+Requests for commercial licenses, redistribution rights, hosted-service permission, partnership arrangements, or other exceptions should be directed to the official contact address published by the Matemium Project.
+
+---
+
+**Source-available notice:** This is a source-available license and is not an Open Source Initiative-approved open-source license.

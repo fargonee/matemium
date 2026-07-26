@@ -18,6 +18,11 @@ import { EULAPage } from "@/pages/EULAPage";
 import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { PricingPage } from "@/pages/PricingPage";
+import { DownloadPage } from "@/pages/DownloadPage";
+import { RoadmapPage } from "@/pages/RoadmapPage";
+import { ShowcasePage } from "@/pages/ShowcasePage";
+import { SourcePage } from "@/pages/SourcePage";
+import { SupportPage } from "@/pages/SupportPage";
 import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
 import { RefundPolicyPage } from "@/pages/RefundPolicyPage";
 import { TermsOfServicePage } from "@/pages/TermsOfServicePage";
@@ -31,6 +36,11 @@ export function App() {
         <Routes>
           <Route element={<RootLayout />}>
             <Route index element={<HomePage />} />
+            <Route path="showcase" element={<ShowcasePage />} />
+            <Route path="download" element={<DownloadPage />} />
+            <Route path="support" element={<SupportPage />} />
+            <Route path="roadmap" element={<RoadmapPage />} />
+            <Route path="source" element={<SourcePage />} />
             <Route path="pricing" element={<PricingPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="auth/callback" element={<AuthCallbackPage />} />

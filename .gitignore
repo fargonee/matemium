@@ -117,6 +117,8 @@ screenshots/
 !website/public/**/*.svg
 !website/public/**/*.ico
 !website/public/**/*.icns
+!website/public/media/
+!website/public/media/**/*.mp4
 !public/**/*.png
 !public/**/*.jpg
 !public/**/*.svg

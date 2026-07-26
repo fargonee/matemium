@@ -1,143 +1,298 @@
 import { Link } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { OutputCard } from "@/components/output-card";
 
-const FEATURES = [
+const OUTPUTS = [
   {
-    title: "Infinite learning sheet",
-    body: "Content anchors on the XY plane. The camera pans down; elements reveal lazily and persist in a registry.",
+    title: "Quadratic graphs",
+    description: "A visual comparison of how each coefficient reshapes a parabola.",
+    video: "/media/quadratic-graphs.mp4",
+    poster: "/media/quadratic-graphs.jpg",
+    accent: "violet" as const,
   },
   {
-    title: "Reels & YouTube",
-    body: "Portrait 9:16 by default. Landscape 16:9 for YouTube. Long lessons auto-chunk into vertical clips.",
+    title: "Electromagnetic waves",
+    description: "Equations, spatial diagrams, and motion on one continuous reasoning tape.",
+    video: "/media/em-waves.mp4",
+    poster: "/media/em-waves.jpg",
+    accent: "cyan" as const,
   },
   {
-    title: "CSS-like layout",
-    body: "Flex rows, inline styled runs, margins, and widths — declarative structure instead of hand-positioning frames.",
-  },
-  {
-    title: "3D when you need it",
-    body: "Surfaces, solids, camera inspect paths, and isolate-zoom focus without thrashing between 2D and 3D.",
-  },
-  {
-    title: "Desktop app",
-    body: "Code editor, AI assistant, live preview, and bundled local rendering — no cloud video pipeline.",
-  },
-  {
-    title: "Static export",
-    body: "Export the full reasoning tape as PNG or PDF study material in natural aspect ratio.",
+    title: "Inscribed sphere",
+    description: "True 3D geometry, labeled and inspected without leaving the lesson.",
+    video: "/media/inscribed-sphere.mp4",
+    poster: "/media/inscribed-sphere.jpg",
+    accent: "amber" as const,
   },
 ];
+
+const WORKFLOW = [
+  ["01", "Describe", "Begin with the mathematical idea, audience, and the lesson you want to make."],
+  ["02", "Choose a path", "Create a mute film, synthesize a voice, or build around your own performance."],
+  ["03", "Shape with the agent", "Approve the structure and answer focused creative decisions before generation."],
+  ["04", "Render & repair", "Render locally, inspect the evidence, and correct visual problems in context."],
+  ["05", "Deliver", "Export portrait reels, landscape lessons, or the entire reasoning tape as a study sheet."],
+];
+
+const VALUES = [
+  ["Local by design", "Rendering, LaTeX, video encoding, and project files stay on your machine."],
+  ["Mathematics in space", "Lay ideas out like a document, then move through them like a film—across 2D and 3D."],
+  ["Your work is yours", "Keep and publish the lessons, videos, images, and scripts you create, including commercially."],
+];
+
+function ArrowIcon() {
+  return (
+    <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+      <path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+      <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.4" />
+      <path d="m8.3 6.9 5 3.1-5 3.1V6.9Z" fill="currentColor" />
+    </svg>
+  );
+}
 
 export function HomePage() {
   return (
     <>
-      <section className="relative overflow-hidden px-4 pb-20 pt-16">
-        <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_70%_20%,rgba(45,91,255,0.18),transparent),radial-gradient(ellipse_50%_40%_at_20%_80%,rgba(110,231,168,0.06),transparent)]"
-          aria-hidden
-        />
-        <div className="relative mx-auto grid max-w-6xl gap-12 lg:grid-cols-2 lg:items-center">
-          <div>
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-accent">
-              Free desktop app
-            </p>
-            <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
-              Math lessons that scroll like a document, animate like a film
+      <section className="hero-grid relative isolate overflow-hidden border-b border-border px-5 pb-20 pt-12 md:pb-28 md:pt-20">
+        <div className="hero-glow pointer-events-none absolute inset-0 -z-10" aria-hidden />
+        <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div className="max-w-2xl">
+            <div className="eyebrow mb-6">
+              <span className="status-dot" />
+              Free, source-available desktop studio
+            </div>
+            <h1 className="font-display text-[clamp(3.5rem,8vw,7.2rem)] leading-[0.86] tracking-[-0.055em]">
+              Give mathematical ideas <span className="text-gradient italic">motion.</span>
             </h1>
-            <p className="mt-5 max-w-xl text-lg text-text-muted">
-              Matemium is a layout-to-animation compiler for educators and creators.
-              Describe your lesson on an infinite vertical learning sheet — the app
-              handles layout, camera movement, local rendering, and social-ready exports.
+            <p className="mt-8 max-w-xl text-lg leading-8 text-text-muted md:text-xl">
+              Matemium turns a mathematical idea into a structured lesson, an animated
+              reasoning tape, and a finished film—all inside one local-first studio.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/login">
-                <Button size="lg">Sign in to get started</Button>
+            <div className="mt-9 flex flex-wrap gap-3">
+              <Link to="/download" className="button-primary">
+                Get Matemium <ArrowIcon />
               </Link>
-              <Link to="/pricing">
-                <Button variant="secondary" size="lg">
-                  Free access
-                </Button>
+              <Link to="/showcase" className="button-secondary">
+                <PlayIcon /> Watch the work
               </Link>
             </div>
-            <ul className="mt-8 flex flex-wrap gap-6 text-sm text-text-subtle">
-              <li>
-                <strong className="block text-base text-text">9:16</strong> reels-first
-              </li>
-              <li>
-                <strong className="block text-base text-text">Local</strong> rendering
-              </li>
-              <li>
-                <strong className="block text-base text-text">Flexible AI</strong> built in
-                <span className="text-xs text-text-muted"> — your provider keys or local models</span>
-              </li>
-            </ul>
+            <div className="mt-9 flex flex-wrap gap-x-7 gap-y-3 text-sm text-text-subtle">
+              <span className="flex items-center gap-2"><span className="check">✓</span> Local rendering</span>
+              <span className="flex items-center gap-2"><span className="check">✓</span> No subscription</span>
+              <span className="flex items-center gap-2"><span className="check">✓</span> Creator-owned output</span>
+            </div>
           </div>
 
-          <div className="mx-auto w-full max-w-sm" aria-hidden>
-            <div className="rounded-[20px] border-2 border-border-strong bg-bg-elevated p-4 shadow-2xl">
-              <div className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-text-subtle">
-                9:16 viewport
+          <div className="hero-stage mx-auto w-full max-w-[740px]">
+            <div className="studio-window" aria-hidden>
+              <div className="studio-titlebar">
+                <div className="flex gap-1.5"><i /><i /><i /></div>
+                <span>Matemium</span>
+                <span className="engine-pill">Engine connected</span>
               </div>
-              <div className="space-y-2">
-                <div className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm font-semibold">
-                  Quadratic factoring
+              <div className="studio-body">
+                <div className="studio-sidebar">
+                  <b>quadratic_graphs</b>
+                  <span>scenes.py</span><span>helpers.py</span>
+                  <small>BRIEF</small>
+                  <span>Description</span><span>Passport</span><span className="active">Roadmap</span>
                 </div>
-                <div className="rounded-lg border border-border bg-bg-card px-3 py-2 text-center font-mono text-sm">
-                  x² − 5x + 6 = 0
+                <div className="studio-roadmap">
+                  <small>PRODUCTION ROADMAP</small>
+                  <strong>Project phases</strong>
+                  <div className="phase-line">
+                    <div><i>01</i><span>Project creation<small>Complete</small></span></div>
+                    <div className="current"><i>02</i><span>Project description<small>We are here</small></span></div>
+                    <div><i>03</i><span>Production path<small>Coming next</small></span></div>
+                  </div>
+                  <div className="path-grid">
+                    <span>◇ Visual-first</span><span>◉ Voice synthesis</span><span>≈ Custom voice</span>
+                  </div>
                 </div>
-                <div className="rounded-lg border border-border bg-bg-card px-3 py-2 text-xs text-text-muted">
-                  Find two numbers: ×6, sum −5
+                <div className="studio-agent">
+                  <b>Agent</b>
+                  <p>How should the graph comparison unfold?</p>
+                  <span className="choice active">Compare coefficients side by side</span>
+                  <span className="choice">Build one graph at a time</span>
                 </div>
-                <div className="rounded-lg border border-accent px-3 py-2 text-center font-mono text-sm">
-                  (x − 2)(x − 3) = 0
-                </div>
+              </div>
+            </div>
+
+            <div className="portrait-player">
+              <video
+                autoPlay
+                muted
+                loop
+                playsInline
+                poster="/media/quadratic-graphs.jpg"
+                preload="metadata"
+                aria-label="Matemium quadratic graphs animation"
+              >
+                <source src="/media/quadratic-graphs.mp4" type="video/mp4" />
+              </video>
+              <div className="player-label">
+                <span>Rendered locally</span>
+                <span>9:16</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="features" className="border-y border-border bg-bg-elevated px-4 py-20">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-10 max-w-2xl">
-            <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent">
-              Why Matemium
+      <section className="border-b border-border bg-bg-elevated/60 px-5">
+        <div className="mx-auto grid max-w-7xl divide-y divide-border py-2 md:grid-cols-4 md:divide-x md:divide-y-0">
+          {[
+            ["Infinite sheet", "Document-like composition"],
+            ["2D + 3D", "One continuous visual world"],
+            ["Agent-assisted", "Decisions before generation"],
+            ["Portrait + landscape", "Built for every destination"],
+          ].map(([title, body]) => (
+            <div key={title} className="px-0 py-5 first:pl-0 md:px-7">
+              <strong className="block text-sm text-text">{title}</strong>
+              <span className="mt-1 block text-xs text-text-subtle">{body}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="section-shell" id="showcase">
+        <div className="section-heading">
+          <div>
+            <p className="section-kicker">Made with Matemium</p>
+            <h2>See the mathematics.<br /><span className="text-text-muted">Then see the tool.</span></h2>
+          </div>
+          <div className="max-w-md">
+            <p>
+              Every example below is rendered by the Matemium engine. Hover or tap to
+              watch equations, plots, and spatial objects become a continuous explanation.
             </p>
-            <h2 className="text-3xl font-bold tracking-tight">A document compiler for animated math</h2>
-            <p className="mt-3 text-text-muted">
-              Traditional animation tools are sequence-oriented. Matemium models a continuous
-              reasoning tape — earlier steps stay visible and the camera scrolls down.
+            <Link to="/showcase" className="text-link mt-5">Explore the showcase <ArrowIcon /></Link>
+          </div>
+        </div>
+        <div className="mt-12 grid gap-5 md:grid-cols-3">
+          {OUTPUTS.map((output) => <OutputCard key={output.title} {...output} />)}
+        </div>
+      </section>
+
+      <section className="border-y border-border bg-bg-elevated/50 px-5 py-24 md:py-32">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-3xl">
+            <p className="section-kicker">The production journey</p>
+            <h2 className="section-title">A creative process,<br />not a prompt box.</h2>
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-text-muted">
+              Matemium’s agent does not rush from one sentence to generated code. It helps
+              establish intent, asks for meaningful decisions, and follows the work through
+              rendering and visual repair.
             </p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((feature) => (
-              <Card key={feature.title}>
-                <h3 className="font-semibold">{feature.title}</h3>
-                <p className="mt-2 text-sm text-text-muted">{feature.body}</p>
-              </Card>
+          <div className="workflow-line mt-16">
+            {WORKFLOW.map(([number, title, description]) => (
+              <article key={number} className="workflow-step">
+                <span>{number}</span>
+                <h3>{title}</h3>
+                <p>{description}</p>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="px-4 py-20">
-        <div className="mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight">Ready to create?</h2>
-          <p className="mt-3 text-text-muted">
-            Sign in with Google, download the desktop app, and connect OpenRouter
-            locally from your computer.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link to="/login">
-              <Button size="lg">Sign in</Button>
-            </Link>
-            <Link to="/pricing">
-              <Button variant="secondary" size="lg">
-                Free access
-              </Button>
-            </Link>
+      <section className="section-shell overflow-hidden">
+        <div className="grid items-center gap-16 lg:grid-cols-[0.85fr_1.15fr]">
+          <div>
+            <p className="section-kicker">The infinite reasoning tape</p>
+            <h2 className="section-title">Lay it out like a document. Move through it like a film.</h2>
+            <p className="mt-6 text-lg leading-8 text-text-muted">
+              Traditional animation starts with a timeline. Matemium starts with the logic
+              of the lesson. Ideas remain spatially connected while the camera reveals,
+              revisits, compares, and inspects them.
+            </p>
+            <div className="mt-9 grid gap-7 sm:grid-cols-2">
+              <div>
+                <span className="metric">9:16</span>
+                <p className="mt-2 text-sm text-text-subtle">Portrait lessons and reels by default.</p>
+              </div>
+              <div>
+                <span className="metric">∞</span>
+                <p className="mt-2 text-sm text-text-subtle">A continuous sheet instead of disconnected slides.</p>
+              </div>
+            </div>
+          </div>
+          <div className="tape-visual">
+            <div className="tape-rail" />
+            {[
+              ["01", "Define the idea", "ax² + bx + c = 0"],
+              ["02", "Compare", "How does each coefficient move the graph?"],
+              ["03", "Inspect in motion", "Trace • focus • transform"],
+              ["04", "Keep the reasoning", "Export video or the entire sheet"],
+            ].map(([number, title, body], index) => (
+              <div key={number} className={`tape-card tape-card-${index + 1}`}>
+                <span>{number}</span><div><strong>{title}</strong><p>{body}</p></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-border bg-bg-elevated/50 px-5 py-24 md:py-32">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-px overflow-hidden rounded-3xl border border-border bg-border md:grid-cols-3">
+            {VALUES.map(([title, body], index) => (
+              <article key={title} className="bg-bg-card p-8 md:p-10">
+                <span className={`value-mark value-mark-${index + 1}`}>{index + 1}</span>
+                <h3 className="mt-12 text-xl font-semibold">{title}</h3>
+                <p className="mt-3 leading-7 text-text-muted">{body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section-shell">
+        <div className="support-panel">
+          <div className="support-orbit" aria-hidden />
+          <div className="relative z-10 max-w-3xl">
+            <p className="section-kicker text-[#b7adff]">Built freely. Sustained together.</p>
+            <h2 className="font-display text-4xl tracking-tight md:text-6xl">
+              Help build the agentic experience Matemium deserves.
+            </h2>
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-[#c6c1db]">
+              The desktop studio and rendering engine are built. The next level—deeper
+              planning, automated visual repair, evaluation, and voice workflows—requires
+              ongoing AI resources that one maintainer cannot sustainably fund alone.
+            </p>
+            <div className="mt-9 flex flex-wrap gap-3">
+              <Link to="/support" className="button-light">Support Matemium <ArrowIcon /></Link>
+              <Link to="/roadmap" className="button-on-dark">See what support enables</Link>
+            </div>
+            <p className="mt-6 text-sm text-[#9791ae]">
+              Contributions do not unlock a paid tier. They keep Matemium available and move
+              the shared project forward.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-border px-5 py-24 md:py-32">
+        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div>
+            <p className="section-kicker">Ready when you are</p>
+            <h2 className="font-display max-w-4xl text-5xl leading-[0.95] tracking-tight md:text-7xl">
+              Your next mathematical story can start here.
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/download" className="button-primary">Get Matemium <ArrowIcon /></Link>
+            <a href="https://github.com/fargonee/math" target="_blank" rel="noreferrer" className="button-secondary">
+              View source
+            </a>
           </div>
         </div>
       </section>

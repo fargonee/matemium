@@ -24,9 +24,9 @@ These pages are implemented as React routes in the marketing/dashboard website:
   - Historical only unless paid offerings are reintroduced.
   - Current product policy: Matemium does not charge users, sell subscriptions, or sell AI credits.
 
-- **End User License Agreement (EULA)** — `/license`
-  - Specific to the desktop application and PyInstaller sidecar
-  - License grant for free use, inspection, personal use, education, and contribution to the official project
+- **Source-Available Software License** — `/license`
+  - Specific to the desktop application, bundled sidecar, and Matemium source tree
+  - License grant for inspection, personal use, education, internal use, and contribution to the official project
   - Private modifications permitted
   - Redistribution, publication of derivative builds, commercial use, and operation of competing forks require written permission
   - "AS IS" warranty disclaimer + liability caps
@@ -39,7 +39,7 @@ These pages are implemented as React routes in the marketing/dashboard website:
 
 ## Key Product Facts Relevant to Legal Protection
 
-- **Source-available software**: Matemium's source code is publicly available for inspection, personal use, education, and contribution to the official project. It is built on top of Manim Community Edition (MIT licensed), but the compiler, DSL, registry, builder API, desktop integration, and AI orchestration are original work.
+- **Source-available software**: Matemium's source code is publicly available for inspection, personal use, education, and contribution to the official project under the Matemium Source-Available License. Private modifications are allowed. Redistribution, publication of derivative builds, commercial use, and competing forks require written permission.
 - **Local execution only**: All rendering, Manim compilation, LaTeX (TinyTeX), and video encoding happens on the user's machine. The cloud never receives video files or full project directories.
 - **Cloud is thin and optional**: Auth/profile sync and BYO LLM routing helpers only. AI receives only project excerpts (`scenes.py` + prompts) when the user explicitly uses chat/agent features.
 - **No monetization**: Matemium does not sell subscriptions, charge for app access, resell AI model access, or provide in-app AI tokens.
@@ -59,8 +59,8 @@ These pages are implemented as React routes in the marketing/dashboard website:
 
 3. **Desktop App**
    - Display or link the EULA on first launch or in the installer.
-   - Consider bundling a short LICENSE.txt or EULA acceptance dialog.
-   - Bundle clear license text explaining free use, source inspection, contribution, private modification, and restricted redistribution/commercial forks.
+   - Consider bundling a short LICENSE.txt or license acceptance dialog.
+   - Bundle clear license text explaining inspection, personal/internal use, contribution, private modification, and restricted redistribution/commercial forks.
 
 4. **LLM Provider Terms**
    - Review OpenRouter and any directly supported provider terms. Users bring their own keys, but Matemium should still explain that provider usage is governed by the provider's policies.
@@ -105,4 +105,4 @@ Login consent text updated in `LoginPage.tsx`.
 
 **Disclaimer**: These documents are provided as a starting point tailored to the current architecture of Matemium. They are not a substitute for professional legal advice. Laws vary by jurisdiction. Consult qualified counsel before relying on these policies for commercial operations, especially once payments are live and users are in multiple countries.
 
-Last reviewed: 2026-07-21
+Last reviewed: 2026-07-26

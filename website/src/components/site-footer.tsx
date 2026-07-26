@@ -1,59 +1,50 @@
 import { Link } from "react-router-dom";
 
+const GROUPS = [
+  {
+    title: "Explore",
+    links: [["Showcase", "/showcase"], ["Download", "/download"], ["Roadmap", "/roadmap"], ["Support", "/support"]],
+  },
+  {
+    title: "Project",
+    links: [["Source & license", "/source"], ["GitHub", "https://github.com/fargonee/math"], ["Contributing", "https://github.com/fargonee/math/blob/main/CONTRIBUTING.md"], ["Sign in", "/login"]],
+  },
+  {
+    title: "Legal",
+    links: [["Privacy", "/privacy"], ["Terms", "/terms"], ["Refunds", "/refund"], ["Software license", "/license"], ["Acceptable use", "/acceptable-use"]],
+  },
+];
+
 export function SiteFooter() {
   return (
-    <footer className="border-t border-border bg-bg py-12">
-      <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 md:grid-cols-4">
-        <div className="md:col-span-1">
-          <div className="mb-3 inline-flex items-center gap-2 font-semibold">
-            <img src="/assets/matemium-logo-180.png" alt="Matemium" width={28} height={28} />
+    <footer className="border-t border-border bg-[#080a0e] px-5 py-16">
+      <div className="mx-auto grid max-w-7xl gap-12 md:grid-cols-[1.25fr_2fr]">
+        <div>
+          <Link to="/" className="brand-link">
+            <img src="/assets/matemium-logo-180.png" alt="" width={34} height={34} />
             <span>Matemium</span>
-          </div>
-          <p className="max-w-xs text-sm text-text-subtle">
-            A free, source-available document compiler for animated math.
+          </Link>
+          <p className="mt-5 max-w-sm text-sm leading-6 text-text-subtle">
+            A free, source-available desktop studio for turning mathematical ideas into
+            structured, animated stories.
           </p>
+          <p className="mt-8 text-xs text-text-subtle">© 2026 Matemium contributors.</p>
         </div>
-
-        <div className="flex flex-col gap-2 text-sm">
-          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-subtle">
-            Product
-          </h4>
-          <Link to="/#features" className="text-text-muted hover:text-text">
-            Features
-          </Link>
-          <Link to="/pricing" className="text-text-muted hover:text-text">
-            Free access
-          </Link>
-          <Link to="/dashboard/downloads" className="text-text-muted hover:text-text">
-            Downloads
-          </Link>
-        </div>
-
-        <div className="flex flex-col gap-2 text-sm">
-          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-subtle">
-            Account
-          </h4>
-          <Link to="/login" className="text-text-muted hover:text-text">
-            Sign in
-          </Link>
-          <Link to="/dashboard" className="text-text-muted hover:text-text">
-            Dashboard
-          </Link>
-          <a href="mailto:contact@matemium.fargonee.space" className="text-text-muted hover:text-text">
-            Contact
-          </a>
-        </div>
-
-        <div className="flex flex-col gap-2 text-sm">
-          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-subtle">
-            Legal
-          </h4>
-          <Link to="/terms" className="text-text-muted hover:text-text">Terms of Service</Link>
-          <Link to="/privacy" className="text-text-muted hover:text-text">Privacy Policy</Link>
-          <Link to="/refund" className="text-text-muted hover:text-text">Refund Policy</Link>
-          <Link to="/license" className="text-text-muted hover:text-text">Software License</Link>
-          <Link to="/acceptable-use" className="text-text-muted hover:text-text">Acceptable Use</Link>
-          <span className="mt-1 text-text-subtle">© 2026 Matemium. All rights reserved.</span>
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+          {GROUPS.map((group) => (
+            <div key={group.title}>
+              <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-subtle">{group.title}</h2>
+              <div className="flex flex-col gap-3">
+                {group.links.map(([label, href]) =>
+                  href.startsWith("http") ? (
+                    <a key={label} href={href} target="_blank" rel="noreferrer" className="footer-link">{label}</a>
+                  ) : (
+                    <Link key={label} to={href} className="footer-link">{label}</Link>
+                  ),
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </footer>

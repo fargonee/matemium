@@ -1,22 +1,22 @@
 import { Link } from "react-router-dom";
 
 export function EULAPage() {
-  const lastUpdated = "July 21, 2026";
+  const lastUpdated = "July 26, 2026";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 text-sm leading-relaxed text-text-muted">
       <div className="mb-10">
         <Link to="/" className="text-accent hover:underline">← Back to Matemium</Link>
-        <h1 className="mt-4 text-3xl font-bold tracking-tight text-text">Software License</h1>
+        <h1 className="mt-4 text-3xl font-bold tracking-tight text-text">Source-Available Software License</h1>
         <p className="mt-1 text-text-subtle">Last updated: {lastUpdated}</p>
       </div>
 
       <div className="prose prose-invert max-w-none text-text-muted">
         <p>
-          Matemium is free to use and source-available. This license summary
-          applies to the desktop application, bundled sidecar, website, and
-          related Matemium software, except for third-party components that
-          retain their own licenses.
+          Matemium is free to use under the Matemium Source-Available License.
+          This license summary applies to the desktop application, bundled
+          sidecar, website, and related Matemium software, except for
+          third-party components that retain their own licenses.
         </p>
 
         <h2>1. Permitted Uses</h2>

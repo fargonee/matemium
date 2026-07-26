@@ -8,7 +8,7 @@ Output targets **9:16 portrait reels** (TikTok / Shorts) by default, with landsc
 
 ## Product direction
 
-Monorepo for a **free, source-available desktop app** — three deployable layers:
+Monorepo for a **free, source-available desktop app** under the Matemium Source-Available License — three deployable layers:
 
 | Layer | Path | Role |
 |-------|------|------|

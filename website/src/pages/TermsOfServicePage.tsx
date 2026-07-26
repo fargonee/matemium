@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
 export function TermsOfServicePage() {
-  const lastUpdated = "July 21, 2026";
+  const lastUpdated = "July 26, 2026";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 text-sm leading-relaxed text-text-muted">
@@ -31,9 +31,10 @@ export function TermsOfServicePage() {
 
         <h2>2. Free Use and Source Availability</h2>
         <p>
-          Matemium is free to use. Its source code is publicly available for
-          inspection, personal use, education, and contribution to the official
-          project. Private modifications are permitted.
+          Matemium is free to use under the Matemium Source-Available License.
+          Its source code is publicly available for inspection, personal use,
+          education, internal use, and contribution to the official project.
+          Private modifications are permitted.
         </p>
         <p>
           Redistribution, publication of derivative builds, commercial use, and

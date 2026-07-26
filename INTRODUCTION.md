@@ -4,9 +4,9 @@ Matemium is a **layout-to-animation compiler** for math education videos. It sit
 
 ---
 
-## Product direction (updated 2026-07-21)
+## Product direction (updated 2026-07-26)
 
-We are building a **free, source-available desktop application**. Matemium is completely free to use and its source code is publicly available for inspection, personal use, education, and contribution to the official project.
+We are building a **free, source-available desktop application** under the Matemium Source-Available License. Matemium is completely free to use and its source code is publicly available for inspection, personal use, education, internal use, and contribution to the official project.
 
 Private modifications are permitted. Redistribution, publication of derivative builds, commercial use, and operation of competing forks require written permission.
 
