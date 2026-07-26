@@ -4,7 +4,7 @@ const CHECKOUT_URL =
 const FUNDS = [
   ["Agent inference", "Longer, more capable planning and project-management runs for shared development and evaluation."],
   ["Visual repair", "Automated render inspection, failure analysis, and repeated correction against real video evidence."],
-  ["Evaluation", "A growing suite of mathematical projects that keeps agent behavior reliable as the system evolves."],
+  ["Cross-subject evaluation", "A growing suite of projects across science, computing, humanities, language, and mathematics that keeps agent behavior reliable."],
   ["Voice workflows", "Experiments in narration, provisional timing, transcription, and audio-led production."],
   ["Releases", "Build infrastructure, signing, distribution, storage, and cross-platform verification."],
   ["Time to maintain", "Space to fix bugs, answer users, improve documentation, and keep the source project healthy."],
@@ -51,6 +51,8 @@ export function SupportPage() {
             <p className="max-w-md">
               Contributions are directed toward the parts of an AI-assisted creative tool
               that require recurring resources—not toward creating artificial feature gates.
+              Every new subject is also a demanding evaluation of planning, authoring,
+              rendering, and visual repair.
             </p>
           </div>
           <div className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">

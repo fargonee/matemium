@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
 export function AcceptableUsePage() {
-  const lastUpdated = "June 26, 2026";
+  const lastUpdated = "July 26, 2026";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 text-sm leading-relaxed text-text-muted">
@@ -27,7 +27,7 @@ export function AcceptableUsePage() {
         </ul>
 
         <h2>2. AI and Chat Features — Specific Prohibitions</h2>
-        <p>The AI features (chat and agent) are powerful assistive tools for creating educational math animation content. You may not use them to:</p>
+        <p>The AI features (chat and agent) are powerful assistive tools for creating educational and explanatory visual content. You may not use them to:</p>
         <ul>
           <li>Generate or assist in the creation of content intended to deceive, defraud, or cause harm (including deepfakes, misinformation campaigns, or misleading educational material presented as authoritative without disclosure).</li>
           <li>Produce material that promotes violence, discrimination, illegal activities, or child sexual exploitation.</li>

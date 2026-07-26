@@ -21,6 +21,7 @@ import { PricingPage } from "@/pages/PricingPage";
 import { DownloadPage } from "@/pages/DownloadPage";
 import { RoadmapPage } from "@/pages/RoadmapPage";
 import { ShowcasePage } from "@/pages/ShowcasePage";
+import { ShowcaseProjectPage } from "@/pages/ShowcaseProjectPage";
 import { SourcePage } from "@/pages/SourcePage";
 import { SupportPage } from "@/pages/SupportPage";
 import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
@@ -37,6 +38,7 @@ export function App() {
           <Route element={<RootLayout />}>
             <Route index element={<HomePage />} />
             <Route path="showcase" element={<ShowcasePage />} />
+            <Route path="showcase/:slug" element={<ShowcaseProjectPage />} />
             <Route path="download" element={<DownloadPage />} />
             <Route path="support" element={<SupportPage />} />
             <Route path="roadmap" element={<RoadmapPage />} />

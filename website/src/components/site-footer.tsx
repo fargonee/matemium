@@ -25,8 +25,8 @@ export function SiteFooter() {
             <span>Matemium</span>
           </Link>
           <p className="mt-5 max-w-sm text-sm leading-6 text-text-subtle">
-            A free, source-available desktop studio for turning mathematical ideas into
-            structured, animated stories.
+            A free, source-available agentic studio for turning complex ideas into
+            structured visual stories.
           </p>
           <p className="mt-8 text-xs text-text-subtle">© 2026 Matemium contributors.</p>
         </div>

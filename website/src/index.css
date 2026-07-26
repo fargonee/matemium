@@ -382,6 +382,234 @@
     backdrop-filter: blur(8px);
   }
 
+  .capability-chip {
+    @apply inline-flex rounded-full border border-border-strong bg-bg-elevated px-2.5 py-1 font-mono text-[8px] uppercase tracking-wider text-text-subtle;
+  }
+
+  .subjects-section {
+    background:
+      radial-gradient(circle at 20% 15%, rgba(116, 103, 240, 0.1), transparent 25%),
+      radial-gradient(circle at 85% 80%, rgba(48, 177, 185, 0.07), transparent 24%),
+      #0d1016;
+  }
+
+  .subject-constellation {
+    @apply grid gap-px overflow-hidden rounded-3xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-4;
+  }
+
+  .subject-card {
+    @apply relative min-h-48 bg-bg-card p-6 transition-colors;
+  }
+
+  .subject-card:hover {
+    @apply bg-[#181c26];
+  }
+
+  .subject-card.published {
+    @apply cursor-pointer;
+    background:
+      radial-gradient(circle at 85% 15%, rgba(116, 103, 240, 0.17), transparent 42%),
+      var(--color-bg-card);
+  }
+
+  .subject-card:nth-child(1),
+  .subject-card:nth-child(2),
+  .subject-card:last-child {
+    @apply lg:col-span-2;
+  }
+
+  .subject-card-top {
+    @apply flex items-start justify-between gap-4;
+  }
+
+  .subject-symbol {
+    @apply flex h-10 min-w-10 items-center justify-center rounded-xl border border-border-strong bg-bg-elevated px-2 text-xl text-text-muted;
+    font-family: "Instrument Serif", Georgia, serif;
+  }
+
+  .subject-card.published .subject-symbol {
+    @apply border-accent/40 bg-accent/10 text-[#b7b0ff];
+  }
+
+  .subject-status {
+    @apply rounded-full border px-2.5 py-1 font-mono text-[7px] uppercase tracking-[0.12em];
+  }
+
+  .subject-status.published {
+    @apply border-success/25 bg-success/10 text-success;
+  }
+
+  .subject-status.in-production {
+    @apply border-border-strong text-text-subtle;
+  }
+
+  .subject-card h3 {
+    @apply mt-10 text-lg font-semibold;
+  }
+
+  .subject-card p {
+    @apply mt-2 max-w-xs text-sm leading-6 text-text-subtle;
+  }
+
+  .manifesto-line {
+    @apply mt-10 flex flex-col items-center justify-center gap-1 border-t border-border pt-10 text-center text-3xl md:flex-row md:gap-2 md:text-5xl;
+    font-family: "Instrument Serif", Georgia, serif;
+  }
+
+  .manifesto-line span {
+    @apply text-text-muted;
+  }
+
+  .manifesto-line strong {
+    @apply font-normal italic;
+    color: transparent;
+    background: linear-gradient(118deg, #f0ecff 5%, #998eff 52%, #65d5dd 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+  }
+
+  .subject-filters {
+    @apply flex flex-wrap justify-center gap-2;
+  }
+
+  .subject-filters button {
+    @apply inline-flex items-center gap-2 rounded-full border border-border bg-bg-elevated px-4 py-2 text-xs font-medium text-text-muted transition-colors hover:border-border-strong hover:text-text;
+  }
+
+  .subject-filters button span {
+    @apply rounded-full bg-bg px-1.5 py-0.5 font-mono text-[8px] text-text-subtle;
+  }
+
+  .subject-filters button.active {
+    @apply border-accent bg-accent/10 text-[#b9b3ff];
+  }
+
+  .future-subject-chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-border-strong bg-bg-card px-3 py-2 text-xs text-text-muted;
+  }
+
+  .future-subject-chip small {
+    @apply font-mono text-[7px] uppercase tracking-wider text-text-subtle;
+  }
+
+  .project-hero {
+    @apply pb-14 pt-16 md:pb-20 md:pt-24;
+    background:
+      radial-gradient(circle at 75% 20%, rgba(116, 103, 240, 0.13), transparent 30%),
+      linear-gradient(to bottom, rgba(255,255,255,.012), transparent);
+  }
+
+  .project-hero h1 {
+    @apply mt-5 text-5xl leading-none tracking-tight md:text-7xl;
+    font-family: "Instrument Serif", Georgia, serif;
+  }
+
+  .project-question {
+    @apply mt-6 max-w-xl text-xl leading-8 text-text md:text-2xl;
+  }
+
+  .project-meta {
+    @apply grid grid-cols-3 overflow-hidden rounded-2xl border border-border bg-bg-card;
+  }
+
+  .project-meta div {
+    @apply border-r border-border p-4 last:border-r-0 md:p-5;
+  }
+
+  .project-meta span {
+    @apply block font-mono text-[7px] uppercase tracking-wider text-text-subtle;
+  }
+
+  .project-meta strong {
+    @apply mt-2 block text-xs font-medium text-text md:text-sm;
+  }
+
+  .project-view-tabs {
+    @apply flex border-b border-border;
+  }
+
+  .project-view-tabs button {
+    @apply relative inline-flex items-center gap-2 px-5 py-4 text-sm font-medium text-text-subtle transition-colors hover:text-text;
+  }
+
+  .project-view-tabs button::after {
+    content: "";
+    @apply absolute bottom-[-1px] left-0 right-0 h-px scale-x-0 bg-accent transition-transform;
+  }
+
+  .project-view-tabs button.active {
+    @apply text-text;
+  }
+
+  .project-view-tabs button.active::after {
+    @apply scale-x-100;
+  }
+
+  .project-view-tabs button span {
+    @apply font-mono text-[10px] text-accent;
+  }
+
+  .project-watch-panel {
+    @apply grid gap-10 rounded-b-3xl border border-t-0 border-border bg-bg-elevated p-6 md:p-10 lg:grid-cols-[0.75fr_1.25fr] lg:items-center;
+  }
+
+  .project-watch-panel video {
+    @apply mx-auto w-full max-w-sm rounded-2xl border border-border-strong bg-black shadow-2xl;
+    aspect-ratio: 9 / 16;
+  }
+
+  .project-watch-panel h2,
+  .making-copy h2 {
+    @apply mt-4 text-4xl md:text-5xl;
+    font-family: "Instrument Serif", Georgia, serif;
+  }
+
+  .project-watch-panel > div > p:not(.section-kicker),
+  .making-copy > p:not(.section-kicker) {
+    @apply mt-5 max-w-xl leading-7 text-text-muted;
+  }
+
+  .project-watch-panel dl {
+    @apply mt-9 divide-y divide-border border-y border-border;
+  }
+
+  .project-watch-panel dl div {
+    @apply flex items-center justify-between gap-5 py-3 text-sm;
+  }
+
+  .project-watch-panel dt {
+    @apply text-text-subtle;
+  }
+
+  .project-watch-panel dd {
+    @apply text-text;
+  }
+
+  .making-panel {
+    @apply grid gap-10 rounded-b-3xl border border-t-0 border-border bg-bg-elevated p-6 md:p-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center;
+  }
+
+  .source-window {
+    @apply min-w-0 overflow-hidden rounded-2xl border border-border-strong bg-[#090b10] shadow-2xl;
+  }
+
+  .source-window-bar {
+    @apply flex items-center justify-between gap-4 border-b border-border bg-bg-card px-4 py-3 font-mono text-[8px] text-text-subtle;
+  }
+
+  .source-window-bar span {
+    @apply truncate;
+  }
+
+  .source-window-bar i {
+    @apply rounded-full border border-border-strong px-2 py-0.5 not-italic;
+  }
+
+  .source-window pre {
+    @apply max-h-[500px] overflow-auto p-5 text-[11px] leading-6 text-[#c8c5dc] md:p-7 md:text-xs;
+    tab-size: 2;
+  }
+
   .workflow-line {
     @apply grid border-t border-border md:grid-cols-5;
   }

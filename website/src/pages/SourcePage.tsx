@@ -17,7 +17,7 @@ export function SourcePage() {
         <p>
           Matemium’s implementation is visible under the Matemium Source-Available
           License. Learn from it, use it for permitted purposes, modify it privately,
-          and help improve the official project.
+          and help improve a visual reasoning engine designed to grow across subjects.
         </p>
         <div className="mt-9 flex flex-wrap justify-center gap-3">
           <a href="https://github.com/fargonee/math" target="_blank" rel="noreferrer" className="button-primary">

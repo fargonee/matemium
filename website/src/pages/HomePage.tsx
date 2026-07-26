@@ -1,33 +1,10 @@
 import { Link } from "react-router-dom";
 
 import { OutputCard } from "@/components/output-card";
-
-const OUTPUTS = [
-  {
-    title: "Quadratic graphs",
-    description: "A visual comparison of how each coefficient reshapes a parabola.",
-    video: "/media/quadratic-graphs.mp4",
-    poster: "/media/quadratic-graphs.jpg",
-    accent: "violet" as const,
-  },
-  {
-    title: "Electromagnetic waves",
-    description: "Equations, spatial diagrams, and motion on one continuous reasoning tape.",
-    video: "/media/em-waves.mp4",
-    poster: "/media/em-waves.jpg",
-    accent: "cyan" as const,
-  },
-  {
-    title: "Inscribed sphere",
-    description: "True 3D geometry, labeled and inspected without leaving the lesson.",
-    video: "/media/inscribed-sphere.mp4",
-    poster: "/media/inscribed-sphere.jpg",
-    accent: "amber" as const,
-  },
-];
+import { SHOWCASE_PROJECTS, SUBJECT_AREAS, subjectById } from "@/content/showcase";
 
 const WORKFLOW = [
-  ["01", "Describe", "Begin with the mathematical idea, audience, and the lesson you want to make."],
+  ["01", "Describe", "Begin with the idea, audience, and the understanding you want to create."],
   ["02", "Choose a path", "Create a mute film, synthesize a voice, or build around your own performance."],
   ["03", "Shape with the agent", "Approve the structure and answer focused creative decisions before generation."],
   ["04", "Render & repair", "Render locally, inspect the evidence, and correct visual problems in context."],
@@ -36,7 +13,7 @@ const WORKFLOW = [
 
 const VALUES = [
   ["Local by design", "Rendering, LaTeX, video encoding, and project files stay on your machine."],
-  ["Mathematics in space", "Lay ideas out like a document, then move through them like a film—across 2D and 3D."],
+  ["Knowledge in space", "Lay ideas out like a document, then move through them like a film—across 2D and 3D."],
   ["Your work is yours", "Keep and publish the lessons, videos, images, and scripts you create, including commercially."],
 ];
 
@@ -69,11 +46,11 @@ export function HomePage() {
               Free, source-available desktop studio
             </div>
             <h1 className="font-display text-[clamp(3.5rem,8vw,7.2rem)] leading-[0.86] tracking-[-0.055em]">
-              Give mathematical ideas <span className="text-gradient italic">motion.</span>
+              Give complex ideas <span className="text-gradient italic">motion.</span>
             </h1>
             <p className="mt-8 max-w-xl text-lg leading-8 text-text-muted md:text-xl">
-              Matemium turns a mathematical idea into a structured lesson, an animated
-              reasoning tape, and a finished film—all inside one local-first studio.
+              Matemium turns structured knowledge into visual stories—from mathematics
+              and science to algorithms, history, language, and beyond.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Link to="/download" className="button-primary">
@@ -88,6 +65,10 @@ export function HomePage() {
               <span className="flex items-center gap-2"><span className="check">✓</span> No subscription</span>
               <span className="flex items-center gap-2"><span className="check">✓</span> Creator-owned output</span>
             </div>
+            <p className="mt-7 max-w-lg border-l border-accent/60 pl-4 text-sm leading-6 text-text-subtle">
+              Built first for mathematics, where clarity and precision are non-negotiable.
+              Designed for every complex idea that deserves a clear explanation.
+            </p>
           </div>
 
           <div className="hero-stage mx-auto w-full max-w-[740px]">
@@ -166,18 +147,71 @@ export function HomePage() {
         <div className="section-heading">
           <div>
             <p className="section-kicker">Made with Matemium</p>
-            <h2>See the mathematics.<br /><span className="text-text-muted">Then see the tool.</span></h2>
+            <h2>See the reasoning.<br /><span className="text-text-muted">Then see the tool.</span></h2>
           </div>
           <div className="max-w-md">
             <p>
               Every example below is rendered by the Matemium engine. Hover or tap to
-              watch equations, plots, and spatial objects become a continuous explanation.
+              watch equations, plots, fields, and spatial objects become a continuous explanation.
             </p>
             <Link to="/showcase" className="text-link mt-5">Explore the showcase <ArrowIcon /></Link>
           </div>
         </div>
         <div className="mt-12 grid gap-5 md:grid-cols-3">
-          {OUTPUTS.map((output) => <OutputCard key={output.title} {...output} />)}
+          {SHOWCASE_PROJECTS.filter((project) => project.featured).map((project) => (
+            <OutputCard
+              key={project.slug}
+              {...project}
+              subjectLabel={subjectById(project.subject).name}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="subjects-section border-y border-border px-5 py-24 md:py-32">
+        <div className="mx-auto max-w-7xl">
+          <div className="section-heading">
+            <div>
+              <p className="section-kicker">Beyond one subject</p>
+              <h2>One studio.<br /><span className="text-text-muted">Every field of thought.</span></h2>
+            </div>
+            <div className="max-w-md">
+              <p>
+                Matemium is built for ideas that benefit from diagrams, staged explanation,
+                spatial relationships, transformation, and motion. Published work is only
+                the beginning of the library.
+              </p>
+              <Link to="/showcase" className="text-link mt-5">Follow the expanding showcase <ArrowIcon /></Link>
+            </div>
+          </div>
+          <div className="subject-constellation mt-14">
+            {SUBJECT_AREAS.map((subject) => (
+              <article
+                key={subject.id}
+                className={`subject-card ${subject.status === "published" ? "published" : ""}`}
+              >
+                {subject.status === "published" ? (
+                  <Link
+                    to={`/showcase?subject=${subject.id}`}
+                    className="absolute inset-0 z-10"
+                    aria-label={`Explore ${subject.name} projects`}
+                  />
+                ) : null}
+                <div className="subject-card-top">
+                  <span className="subject-symbol">{subject.symbol}</span>
+                  <span className={`subject-status ${subject.status}`}>
+                    {subject.status === "published" ? "Published" : "In production"}
+                  </span>
+                </div>
+                <h3>{subject.name}</h3>
+                <p>{subject.scope}</p>
+              </article>
+            ))}
+          </div>
+          <div className="manifesto-line">
+            <span>If it can be reasoned through,</span>
+            <strong>it can be staged.</strong>
+          </div>
         </div>
       </section>
 
@@ -211,7 +245,7 @@ export function HomePage() {
             <h2 className="section-title">Lay it out like a document. Move through it like a film.</h2>
             <p className="mt-6 text-lg leading-8 text-text-muted">
               Traditional animation starts with a timeline. Matemium starts with the logic
-              of the lesson. Ideas remain spatially connected while the camera reveals,
+              of the explanation. Ideas remain spatially connected while the camera reveals,
               revisits, compares, and inspects them.
             </p>
             <div className="mt-9 grid gap-7 sm:grid-cols-2">
@@ -285,7 +319,7 @@ export function HomePage() {
           <div>
             <p className="section-kicker">Ready when you are</p>
             <h2 className="font-display max-w-4xl text-5xl leading-[0.95] tracking-tight md:text-7xl">
-              Your next mathematical story can start here.
+              Your next visual explanation can start here.
             </h2>
           </div>
           <div className="flex flex-wrap gap-3">

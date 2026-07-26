@@ -20,8 +20,8 @@ export function TermsOfServicePage() {
         <h2>1. Service</h2>
         <p>
           Matemium is a layout-to-animation compiler and desktop application for
-          creating animated math education content. Rendering, compilation, and
-          export run locally on your device.
+          creating structured visual explanations across educational and technical
+          subjects. Rendering, compilation, and export run locally on your device.
         </p>
         <p>
           Cloud components may provide authentication, profile sync, provider-key

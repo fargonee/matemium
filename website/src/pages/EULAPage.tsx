@@ -43,8 +43,8 @@ export function EULAPage() {
         <h2>4. Disclaimer</h2>
         <p>
           The software is provided &quot;as is&quot; without warranties of any kind.
-          You are responsible for verifying educational and mathematical content
-          produced with Matemium.
+          You are responsible for verifying factual, educational, and subject-matter
+          content produced with Matemium.
         </p>
       </div>
     </div>

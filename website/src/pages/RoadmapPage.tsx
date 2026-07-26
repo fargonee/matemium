@@ -13,7 +13,8 @@ const NOW = [
   "Strengthen autonomous project planning",
   "Render evidence inspection and visual repair",
   "Production-path orchestration",
-  "Agent evaluation across varied mathematical projects",
+  "Agent evaluation across varied subjects and visual languages",
+  "Generalized project catalog and subject-aware examples",
 ];
 
 const NEXT = [
@@ -21,6 +22,7 @@ const NEXT = [
   "Deeper narration and custom-audio production",
   "Community project publishing",
   "More polished example projects and learning material",
+  "Reusable subject kits for domain-specific visual primitives",
 ];
 
 export function RoadmapPage() {
@@ -32,7 +34,8 @@ export function RoadmapPage() {
         <p>
           Matemium is not a concept awaiting an engine. The core creation and rendering
           system exists. The focus now is making the complete production journey more
-          autonomous, reliable, and accessible.
+          autonomous, reliable, and accessible across mathematics, science, computing,
+          engineering, humanities, language, and general education.
         </p>
       </section>
       <section className="section-shell pt-0">
