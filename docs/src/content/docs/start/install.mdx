@@ -1,0 +1,110 @@
+---
+title: Install Matemium
+description: Install the Matemium desktop application or set up the engine from source.
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem, Steps } from '@astrojs/starlight/components';
+
+Matemium is a desktop application with a bundled local rendering engine. The
+public installer experience is currently in early access.
+
+<div class="availability-grid">
+	<div><strong>Linux</strong><span>Early-access installer</span></div>
+	<div><strong>Windows</strong><span>Public release in progress</span></div>
+	<div><strong>macOS</strong><span>Public release in progress</span></div>
+</div>
+
+:::caution[Check release availability]
+Platform build infrastructure may exist before a signed public installer is
+ready. Use the [download page](https://matemium.fargonee.space/download) as the
+authoritative source for currently distributed builds.
+:::
+
+## Install the desktop application
+
+<Steps>
+1. Open the [Matemium download page](https://matemium.fargonee.space/download).
+2. Select an available build for your operating system.
+3. Sign in if the early-access download requires an account.
+4. Install the application using your platform’s normal installer flow.
+5. Start Matemium and allow the first-run assets to finish preparing.
+</Steps>
+
+The first launch can take longer than later launches because Matemium may prepare
+the bundled engine, TinyTeX, and optional intelligence assets.
+
+### Linux requirements
+
+- Ubuntu 22.04 or newer on x86_64
+- FFmpeg available to the application
+- Enough free disk space for the engine, TinyTeX, render caches, and project output
+
+If a `.deb` reports an unresolved FFmpeg dependency:
+
+```bash
+sudo apt -f install
+```
+
+## Connect optional AI
+
+Matemium can render without a cloud AI provider. To use external chat or agent
+workflows:
+
+1. Open **Settings**.
+2. Choose an OpenAI-compatible provider.
+3. Connect your account or add your own provider key.
+4. Select a model for the current workflow.
+
+Provider billing and limits belong to the provider you select. Matemium does not
+resell model access.
+
+:::tip[Prefer local control?]
+Use a compatible local model where available. Local models avoid external model
+charges, but capability and hardware requirements vary.
+:::
+
+## Install from source
+
+Use this path for engine development or contribution—not as the normal desktop
+installation.
+
+<Tabs>
+	<TabItem label="Linux / macOS">
+		```bash
+		git clone https://github.com/fargonee/math.git
+		cd math
+		python -m venv .venv
+		source .venv/bin/activate
+		pip install -e ".[dev]"
+		./matemium.sh demo
+		```
+	</TabItem>
+	<TabItem label="Windows PowerShell">
+		```powershell
+		git clone https://github.com/fargonee/math.git
+		cd math
+		py -m venv .venv
+		.venv\Scripts\Activate.ps1
+		pip install -e ".[dev]"
+		python -m matemium demo
+		```
+	</TabItem>
+</Tabs>
+
+Source renders require FFmpeg and a usable LaTeX installation. The packaged
+desktop application prefers its first-run TinyTeX asset.
+
+## Verify an engine checkout
+
+```bash
+./matemium.sh list
+./matemium.sh demo
+```
+
+A successful demo writes output beneath `outputs/demo/`.
+
+## Next
+
+[Create your first project →](/start/first-project/)

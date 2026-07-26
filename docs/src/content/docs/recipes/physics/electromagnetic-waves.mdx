@@ -1,0 +1,141 @@
+---
+title: Explain electromagnetic waves
+description: Combine equations, prose, flex composition, and a 3D visual break in one physics reasoning tape.
+---
+
+<video controls playsinline poster="https://matemium.fargonee.space/media/em-waves.jpg" style="width:min(100%, 24rem); border-radius:1rem; margin-inline:auto">
+	<source src="https://matemium.fargonee.space/media/em-waves.mp4" type="video/mp4" />
+</video>
+
+<span class="docs-path">projects/em_waves/scenes.py</span>
+
+## The question
+
+**How do changing electric and magnetic fields sustain a wave?**
+
+This project demonstrates how a long technical explanation can remain one
+continuous spatial argument instead of becoming disconnected slides.
+
+## Capabilities demonstrated
+
+- Physics notation and Maxwell’s equations
+- Long-form tape structure
+- Flex rows and columns
+- Sectioned explanation
+- Mathematical 3D surface
+- Camera transition between flat and spatial content
+
+## Establish the phenomenon
+
+```python
+builder = CanvasBuilder(title="Electromagnetic Waves")
+tape = builder.add_tape("main")
+
+tape.add_heading(
+    "Electromagnetic waves",
+    style={"align": "center", "margin-bottom": 0.5},
+)
+tape.add_body(
+    "Light, radio, and X-rays are the same phenomenon: "
+    "oscillating electric and magnetic fields that travel "
+    "through space.",
+    style={"margin-bottom": 0.7},
+)
+```
+
+The project begins in plain language before introducing notation.
+
+## Present related quantities together
+
+```python
+tape.add_flex_row(
+    [
+        tape.text_spec(
+            "Electric field E",
+            style={"width": 2.6, "align": "center"},
+        ),
+        tape.text_spec(
+            "⟷ coupled",
+            style={"width": 1.6, "align": "center"},
+        ),
+        tape.text_spec(
+            "Magnetic field B",
+            style={"width": 2.6, "align": "center"},
+        ),
+    ],
+    gap=0.3,
+    justify_content="center",
+)
+```
+
+A row communicates coupling more directly than three unrelated reveals.
+
+## Build the equation group
+
+```python
+tape.add_flex_column(
+    [
+        tape.math_spec(r"\nabla \cdot \vec{E} = 0"),
+        tape.math_spec(r"\nabla \cdot \vec{B} = 0"),
+        tape.math_spec(
+            r"\nabla \times \vec{E}"
+            r" = -\frac{\partial \vec{B}}{\partial t}"
+        ),
+        tape.math_spec(
+            r"\nabla \times \vec{B}"
+            r" = \mu_0 \varepsilon_0"
+            r" \frac{\partial \vec{E}}{\partial t}"
+        ),
+    ],
+    gap=0.35,
+    align_items="center",
+)
+```
+
+The equations remain separate elements even though the flex column groups them
+visually.
+
+## Create a 3D visual break
+
+```python
+builder.add_3d(
+    r"z = \sin(x)\cos(y)",
+    pitch=50,
+    style={
+        "width": 5.2,
+        "align": "center",
+        "margin-bottom": 0.5,
+    },
+)
+
+tape.add_body(
+    "A snapshot of a wave-like surface.",
+    after_3d=True,
+)
+```
+
+The 3D moment should reinforce the spatial idea of a field rather than serve as
+unrelated decoration.
+
+## Long-form organization
+
+The complete project progresses through:
+
+1. Physical intuition
+2. Maxwell’s equations
+3. The wave equation
+4. A plane-wave form
+5. A spatial visual break
+6. The electromagnetic spectrum
+7. Summary
+
+This structure is suitable for a long tape because each section depends on the
+previous one.
+
+## Render
+
+```bash
+./matemium.sh render em_waves -q preview
+```
+
+[View the complete project source](https://github.com/fargonee/math/blob/main/projects/em_waves/scenes.py).

@@ -1,0 +1,90 @@
+---
+title: Core concepts
+description: Learn the vocabulary that connects Matemium’s studio, agent, authoring model, and rendering engine.
+sidebar:
+  order: 4
+---
+
+## Project
+
+A project is the complete workspace for one explanation or closely related
+series. It contains creative decisions, source files, imported media, and output
+history.
+
+## Description
+
+The description states what the project is trying to communicate. It should
+change less often than scene implementation.
+
+## Passport
+
+The passport stores foundational choices such as audience, format, production
+path, and communication identity. Changing these decisions can invalidate later
+work, so Matemium resolves them early.
+
+## Production path
+
+The selected route through production:
+
+- **Visual-first** — produce a finished mute film for your own sound.
+- **Voice synthesis** — write narration, regulate timing, generate speech, and
+  assemble the result.
+- **Custom voice** — begin with an approved external performance and build the
+  visuals against verified audio.
+
+## Roadmap
+
+The roadmap records phases, progress, blockers, and the current production
+decision. It is project state—not a generic checklist shown identically for
+every workflow.
+
+## Scene
+
+A Python class extending `CanvasScene`. A project can contain more than one scene,
+although the desktop normally selects one scene for a render.
+
+## `scenes.py`
+
+The primary authoring file. Humans and the agent edit the same visible Python
+source. Matemium does not use generated JSON as the normal authoring format.
+
+## Builder
+
+`CanvasBuilder` is the recommended declarative authoring API. It collects content,
+layout intent, world objects, and timeline operations before compiling them into
+the internal scene representation.
+
+## Tape
+
+A tape is a structured plane of content inside Matemium’s 3D world. In tape-scroll
+mode it behaves like an infinite document: content flows vertically, reveals
+lazily, and remains addressable after appearing.
+
+Projects can use multiple tapes for comparisons, parallel explanations, notes,
+or alternative perspectives.
+
+## World object
+
+Anything positioned in Matemium’s 3D world, including solids and tape objects.
+A tape can be observed as a plane in 3D or entered in tape-scroll mode.
+
+## Render
+
+A local compilation of a scene through Matemium’s Manim-based engine. Rendering
+produces visual evidence that should be inspected rather than assumed correct.
+
+## Visual repair
+
+The loop of rendering, inspecting, identifying a concrete defect, changing the
+project, and rendering again.
+
+## Output
+
+Generated videos, images, full-sheet exports, and related delivery artifacts.
+Output remains local unless you explicitly publish or move it.
+
+## Continue learning
+
+- [Desktop project lifecycle](/desktop/project-lifecycle/)
+- [Anatomy of `scenes.py`](/authoring/scenes-py/)
+- [The infinite tape](/authoring/tapes/)

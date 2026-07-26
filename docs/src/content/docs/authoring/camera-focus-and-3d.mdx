@@ -1,0 +1,104 @@
+---
+title: Camera, focus, and 3D
+description: Focus tape elements, add world objects, and inspect 3D content without losing the explanation.
+---
+
+Matemium combines a document-like tape camera with a free 3D world. The camera
+should clarify relationships, not become decoration.
+
+## Focus an existing element
+
+```python
+plot_id = tape.add_math(r"y = x^2")
+
+builder.add_camera_focus(
+    plot_id,
+    mode="isolate",
+    zoom=2.0,
+    hold_time=1.2,
+)
+```
+
+The viewport-fit system caps isolate zoom when necessary so the target remains
+inside the frame.
+
+Focus modes:
+
+- `isolate` — move attention to the target itself.
+- `overlay` — present a magnified overlay while retaining wider context.
+
+## Explicit tape movement
+
+```python
+builder.add_camera_move(dy=3.5)
+```
+
+Prefer automatic reveal and focus when they already express the intended motion.
+Use explicit camera movement when the transition itself carries meaning.
+
+## Add a mathematical surface
+
+```python
+builder.add_3d(
+    r"z = \sin(x)\cos(y)",
+    pitch=50,
+    style={
+        "width": 5.2,
+        "align": "center",
+        "margin-bottom": 0.5,
+    },
+)
+```
+
+Flat content remains in sheet view. A 3D moment may tilt the camera, then return
+to tape content.
+
+## Add and inspect a solid
+
+Project helpers can build a subject-specific arrangement from generic solids:
+
+```python
+solid_id = add_inscribed_pair(
+    builder,
+    id="inscribed_pair",
+    cube_side=2.4,
+)
+
+builder.add_solid_lift(solid_id, lift=1.8, run_time=1.3)
+builder.add_camera_inspect(
+    solid_id,
+    path=inscribed_tangency_study_path(builder),
+    curve="linear",
+    return_to_sheet=True,
+)
+```
+
+`add_solid_lift` raises a solid above a tape for inspection. It is not a general
+tape-switching mechanism.
+
+## World coordinates
+
+Matemium’s world uses:
+
+| Axis | Meaning |
+| --- | --- |
+| X | Horizontal placement |
+| Y | Tape scroll direction |
+| Z | Depth above or below a tape |
+
+A tape may itself be transformed in the larger world. Its content layout remains
+local to that tape.
+
+## Camera guidelines
+
+- Establish the object before moving close.
+- Hold long enough for viewers to inspect what the movement reveals.
+- Avoid orbiting without an explanatory purpose.
+- Preserve labels or add camera-facing labels for 3D objects.
+- Return to the reasoning context after an inspection.
+- Validate camera behavior in the final target orientation.
+
+## Related recipes
+
+- [Inscribed-sphere source and showcase](https://matemium.fargonee.space/showcase/inscribed-sphere)
+- [Electromagnetic waves](/recipes/physics/electromagnetic-waves/)

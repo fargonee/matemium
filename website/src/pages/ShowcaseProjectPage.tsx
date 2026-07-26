@@ -103,9 +103,16 @@ export function ShowcaseProjectPage() {
                   ))}
                 </div>
               </div>
-              <a href={project.sourceUrl} target="_blank" rel="noreferrer" className="button-secondary mt-9">
-                View complete source <span aria-hidden>↗</span>
-              </a>
+              <div className="mt-9 flex flex-wrap gap-3">
+                {project.docsUrl ? (
+                  <a href={project.docsUrl} className="button-primary">
+                    Follow the tutorial <span aria-hidden>→</span>
+                  </a>
+                ) : null}
+                <a href={project.sourceUrl} target="_blank" rel="noreferrer" className="button-secondary">
+                  View complete source <span aria-hidden>↗</span>
+                </a>
+              </div>
             </div>
             <div className="source-window">
               <div className="source-window-bar">

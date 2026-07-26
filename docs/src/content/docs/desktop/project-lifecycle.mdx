@@ -1,0 +1,94 @@
+---
+title: Project lifecycle
+description: Understand how a Matemium project moves from an idea to a validated deliverable.
+---
+
+Matemium treats creation as a production journey with explicit decisions and
+artifacts. This makes long or agent-assisted projects easier to understand,
+resume, and repair.
+
+## Shared foundation
+
+Every production path begins with three phases.
+
+### 1. Project creation
+
+The workspace exists, has a stable project identity, and can store source,
+briefs, media, and output.
+
+### 2. Project description
+
+You and the agent settle the rare-changing intent:
+
+- What idea is being explained?
+- Who is it for?
+- What should the viewer understand?
+- What must remain accurate?
+- What visual language fits the subject?
+
+### 3. Passport and production path
+
+The project establishes its production identity and selects visual-first, voice
+synthesis, or custom voice.
+
+## Branch-specific production
+
+After the foundation, the roadmap follows the selected path. A visual-first
+project can move directly through content, orchestration, authoring, rendering,
+repair, and delivery. Audio paths add narration, timing, validation, or
+reconciliation phases.
+
+See [Choose a production path](/production/choose-a-path/) for the complete
+differences.
+
+## Project memory
+
+The desktop does not rely on chat history as the only memory of the work. It
+stores durable artifacts beneath the project:
+
+- Description
+- Passport
+- Roadmap
+- Tape content
+- Orchestration
+- Narration and timing artifacts where relevant
+- `scenes.py` and optional helpers
+
+This matters because conversation is temporary; approved project intent should
+survive model changes, restarts, and later revisions.
+
+## Phase gates
+
+Later phases can depend on earlier decisions. For example:
+
+- Scene authoring should not begin before the intended tape content is understood.
+- TTS generation should not happen before narration and final timing are ready.
+- A production-path change can invalidate downstream work.
+
+The current roadmap state should be treated as the source of truth for what the
+agent is allowed to do next.
+
+## Changing direction
+
+You can revise a project, but foundational changes should be explicit:
+
+1. Update the description or passport.
+2. Identify downstream artifacts affected by the change.
+3. Let the roadmap mark those phases for revision.
+4. Re-approve important content and orchestration.
+5. Render and validate again.
+
+Do not silently edit a foundational decision while continuing as if later work
+were still approved.
+
+## Delivery does not end ownership
+
+Matemium-generated lessons, videos, scripts, images, and other original output
+belong to you. Delivery means that a validated artifact is ready for its intended
+destination; it does not upload or publish by default.
+
+## Next
+
+- [Work with the agent](/desktop/working-with-the-agent/)
+- [Understand project files](/desktop/project-files/)
+- [Render and visually repair](/production/render-and-repair/)

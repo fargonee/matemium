@@ -1,0 +1,108 @@
+---
+title: Project files
+description: Understand the source, brief, media, and output stored in a Matemium workspace.
+---
+
+Matemium separates **creative memory**, **authoring source**, **input media**, and
+**generated output**. The desktop interface presents these as focused views even
+when the underlying workspace contains several files.
+
+```text
+project/
+├── project.json
+├── scenes.py
+├── helpers.py
+├── brief/
+│   ├── description.md
+│   ├── passport.json
+│   ├── roadmap.json
+│   ├── tape.md
+│   ├── narration.md
+│   └── timestamps.json
+├── assets/
+│   ├── images/
+│   ├── video/
+│   └── audio/
+└── output/
+```
+
+Not every production path uses every artifact.
+
+## `scenes.py`
+
+The primary visual authoring file. It defines one or more `CanvasScene` classes
+using `CanvasBuilder`.
+
+Both you and the agent edit this visible Python source. The internal `SheetDSL`
+representation is compiler data, not the normal product authoring format.
+
+## `helpers.py`
+
+Optional project-specific composition functions. Put repeated subject recipes
+here instead of adding topic-specific methods to the generic engine.
+
+Examples:
+
+- Build a comparison row for two graphs
+- Add a labeled circuit component
+- Create a recurring timeline event
+- Produce coordinates for a subject-specific diagram
+
+## Brief artifacts
+
+### `description.md`
+
+The stable explanation goal, audience, and constraints.
+
+### `passport.json`
+
+Rare-changing production identity and selected production path.
+
+### `roadmap.json`
+
+Current phase, progress, blockers, branch, and phase notes.
+
+### `tape.md`
+
+Approved or provisional content intended to appear on the visual reasoning tape.
+
+### Narration and timing files
+
+Used by voice-synthesis and custom-voice paths. Exact artifacts depend on the
+selected workflow.
+
+## Assets
+
+Imported images, video, and audio are grouped by media type. Prefer importing
+through the desktop interface so the project retains stable paths.
+
+Do not reference temporary downloads or files that may disappear from outside
+the workspace.
+
+## Output
+
+Rendered videos and exports belong in output history. They are generated
+artifacts and should not be manually edited as if they were authoring source.
+
+## Section markers
+
+Large `scenes.py` files can use visual section fences:
+
+```python
+# ---DIV: Introduction---
+def part_introduction(tape):
+    ...
+
+# ---DIV: Comparison---
+def part_comparison(tape):
+    ...
+```
+
+The desktop editor can present these as navigable sections without fragmenting
+the project into many source files.
+
+## Backups and version control
+
+Project workspaces are ordinary local data. Back up important projects and use
+version control when appropriate. Generated media can be large, so decide
+separately whether output belongs in your repository.

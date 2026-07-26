@@ -1,0 +1,150 @@
+---
+title: Compare quadratic graphs
+description: Build a portrait explanation that compares coefficients, traces a plot, and focuses the camera.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+<video controls playsinline poster="https://matemium.fargonee.space/media/quadratic-graphs.jpg" style="width:min(100%, 24rem); border-radius:1rem; margin-inline:auto">
+	<source src="https://matemium.fargonee.space/media/quadratic-graphs.mp4" type="video/mp4" />
+</video>
+
+<span class="docs-path">projects/quadratic_graphs/scenes.py</span>
+
+## The question
+
+**How does each coefficient reshape a parabola?**
+
+This project compares graphs side by side, traces a moving point, focuses one
+plot, and moves between a main explanation tape and a secondary notes tape.
+
+## Capabilities demonstrated
+
+- Mathematical notation
+- Side-by-side plot comparison
+- Trace animation
+- Camera focus
+- Multiple tapes
+- A world-space camera keyframe
+
+## Build the foundation
+
+```python
+from canvas import CanvasScene, WorldPoint
+from canvas.builder import CanvasBuilder
+
+from .helpers import add_compare_row, add_plot_trace
+
+
+class QuadraticGraphs(CanvasScene):
+    def __init__(self, **kwargs):
+        builder = CanvasBuilder(title="Quadratic Graphs")
+        tape = builder.add_tape("main")
+
+        tape.add_heading(
+            "Graphs of quadratics",
+            style={"align": "center", "margin-bottom": 0.45},
+        )
+        tape.add_math(
+            r"ax^2 + bx + c = 0",
+            style={"align": "center", "margin-bottom": 0.55},
+        )
+```
+
+The heading and equation establish a stable visual context before any comparison
+begins.
+
+## Add a comparison through a project helper
+
+The project keeps quadratic-specific plot composition in `helpers.py`, not the
+generic builder:
+
+```python
+plot_positive, plot_negative = add_compare_row(
+    tape,
+    builder,
+    (1, -2, 1),
+    (-1, 2, 1),
+    left_id="plot_a_pos",
+    right_id="plot_a_neg",
+    style={"align": "center", "margin-bottom": 0.35},
+    left_kwargs={
+        "x_range": (-1, 3),
+        "x_start": 0,
+        "color": "#5eb3ff",
+    },
+    right_kwargs={
+        "x_range": (-1, 3),
+        "x_start": 0,
+        "color": "#ff8a65",
+    },
+)
+```
+
+This division is important:
+
+- The engine provides layout, plots, camera, and timeline behavior.
+- The project helper expresses the subject-specific comparison.
+
+## Trace and focus
+
+```python
+add_plot_trace(
+    builder,
+    plot_positive,
+    x_from=-0.5,
+    x_to=2.5,
+    run_time=3.2,
+)
+
+builder.add_camera_focus(
+    plot_positive,
+    zoom=2.1,
+    hold_time=1.2,
+)
+```
+
+The trace explains how the graph changes continuously. Focus then gives the
+viewer time to inspect one concrete case.
+
+## Add a secondary tape
+
+```python
+notes = builder.add_tape("graph_notes")
+notes.add_body(
+    "a controls width",
+    style={"align": "center"},
+)
+```
+
+Use the secondary tape for a distinct spatial context, not merely another
+paragraph.
+
+## Finish the scene
+
+```python
+        super().__init__(dsl=builder.build(), **kwargs)
+```
+
+## Render from an engine checkout
+
+```bash
+./matemium.sh render quadratic_graphs
+```
+
+For a faster structural check:
+
+```bash
+./matemium.sh render quadratic_graphs -q preview
+```
+
+## Try these changes
+
+<Steps>
+1. Change the coefficient pairs while preserving the side-by-side structure.
+2. Use the notes tape to summarize the invariant.
+3. Reduce the focus zoom and compare the resulting framing.
+4. Add another section for the effect of `b` or `c`.
+</Steps>
+
+[View the complete project source](https://github.com/fargonee/math/blob/main/projects/quadratic_graphs/scenes.py).

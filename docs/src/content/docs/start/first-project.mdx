@@ -1,0 +1,145 @@
+---
+title: Create your first project
+description: Follow a Matemium project from its initial idea to a local preview.
+sidebar:
+  order: 3
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+This guide follows the intended desktop workflow. You will create a short
+visual-first explanation, resolve its foundational decisions, and render a local
+preview.
+
+## Before you begin
+
+- Install and start Matemium.
+- Wait until the application reports that the engine is connected.
+- AI assistance is optional, but agent-driven authoring requires a configured
+  provider or compatible local model.
+
+## 1. Create the project
+
+<Steps>
+1. Open the **Projects** view.
+2. Choose **New project**.
+3. Give it a durable, descriptive name such as `binary_search`.
+4. Open the newly created workspace.
+</Steps>
+
+Use a project name that can also work as a folder name. Prefer lowercase words
+separated by underscores.
+
+## 2. Describe the intended understanding
+
+Open **Brief → Description** and describe:
+
+- The question the explanation should answer
+- The intended audience
+- What viewers should understand by the end
+- Important visual relationships
+- Any constraints on duration, tone, or format
+
+Example:
+
+```markdown
+# Binary search
+
+Explain why binary search can eliminate half of a sorted list after every
+comparison. The audience understands arrays but has not studied algorithmic
+complexity. Use a portrait visual-first film with eight numbered cells and keep
+discarded regions visible but subdued.
+```
+
+Describe the outcome rather than dictating every animation. The roadmap and
+authoring stages exist to settle implementation details.
+
+## 3. Resolve the project passport
+
+The passport stores rare-changing production decisions. Confirm:
+
+- Audience and communication style
+- Output orientation
+- Production path
+- Narration expectations
+- Any subject-specific constraints
+
+For this first project, choose **Visual-first**. It reaches a render with the
+fewest external dependencies.
+
+## 4. Review the roadmap
+
+Open **Roadmap**. Matemium separates shared foundation work from the selected
+production branch.
+
+Typical visual-first phases include:
+
+1. Project creation
+2. Project description
+3. Passport and production path
+4. Tape content
+5. Orchestration
+6. Scene authoring
+7. Render and visual repair
+8. Delivery
+
+The current phase should explain what decision or artifact is needed next.
+
+## 5. Work with the agent
+
+Ask the agent to continue the current phase. Prefer answers that describe intent:
+
+> Compare the middle value first, then dim the eliminated half without removing
+> it. Keep the target visible above the array.
+
+Review every proposed decision. Use **Decide for me** only when the choice is
+genuinely unimportant to you.
+
+:::note
+The agent edits project artifacts and `scenes.py`; it does not replace your
+responsibility for factual accuracy or the final visual result.
+:::
+
+## 6. Inspect the generated scene
+
+Open `scenes.py`. A healthy project normally has:
+
+- Imports from `canvas`
+- A `CanvasBuilder`
+- One or more tapes
+- Content and timeline operations
+- A `CanvasScene` subclass
+- A final `super().__init__(dsl=builder.build(), **kwargs)`
+
+You do not need to understand every line before producing the first preview.
+
+## 7. Render a preview
+
+1. Select the scene.
+2. Choose a preview or low-quality render where available.
+3. Watch the progress panel.
+4. Open the result in the output viewer.
+
+Inspect:
+
+- Text clipping
+- Overlapping elements
+- Unreadable pacing
+- Camera movement
+- Incorrect or unsupported subject content
+
+## 8. Repair and render again
+
+Report concrete visual evidence to the agent:
+
+> The explanation below the array clips at the right edge after the second
+> comparison. Keep the text within the portrait safe area.
+
+Render again after applying the correction. Visual repair is part of the normal
+production journey, not an exceptional failure.
+
+## Next
+
+- [Understand the project lifecycle](/desktop/project-lifecycle/)
+- [Choose a production path](/production/choose-a-path/)
+- [Learn how `scenes.py` works](/authoring/scenes-py/)

@@ -1,0 +1,115 @@
+---
+title: Anatomy of scenes.py
+description: Learn the stable authoring structure shared by the Matemium desktop app and engine checkout.
+---
+
+`scenes.py` is Matemium’s primary authoring surface. It is ordinary Python that
+you can inspect, edit, version, and run through the local engine.
+
+## Minimal scene
+
+```python
+from canvas import CanvasScene
+from canvas.builder import CanvasBuilder
+
+
+class MyExplanation(CanvasScene):
+    def __init__(self, **kwargs):
+        builder = CanvasBuilder(title="My Explanation")
+        tape = builder.add_tape("main")
+
+        tape.add_heading("A clear question")
+        tape.add_body("Explain the relationship in plain language.")
+        tape.add_math(r"a^2 + b^2 = c^2")
+
+        super().__init__(dsl=builder.build(), **kwargs)
+```
+
+The structure has four parts:
+
+1. Import the scene and builder.
+2. Create a `CanvasBuilder`.
+3. Add tapes, content, and timeline actions.
+4. Build the internal representation and pass it to `CanvasScene`.
+
+## Keep sections readable
+
+For longer work, split the explanation into functions:
+
+```python
+from canvas import CanvasScene
+from canvas.builder import CanvasBuilder
+
+
+# ---DIV: Introduction---
+def part_introduction(tape):
+    tape.add_heading("Binary search")
+    tape.add_body("Each comparison eliminates half of a sorted list.")
+
+
+# ---DIV: First comparison---
+def part_first_comparison(tape):
+    tape.add_body("Compare the target with the middle value.")
+
+
+class BinarySearch(CanvasScene):
+    def __init__(self, **kwargs):
+        builder = CanvasBuilder(title="Binary Search")
+        tape = builder.add_tape("main")
+
+        part_introduction(tape)
+        part_first_comparison(tape)
+
+        super().__init__(dsl=builder.build(), **kwargs)
+```
+
+`# ---DIV: Title---` markers let the desktop editor present one source file as
+navigable sections.
+
+## Put subject recipes in helpers
+
+Keep `CanvasBuilder` generic. A project-specific helper belongs beside the scene:
+
+```text
+my_project/
+├── scenes.py
+└── helpers.py
+```
+
+```python
+# helpers.py
+def add_comparison(tape, left, right):
+    return tape.add_flex_row(
+        [
+            tape.text_spec(left, style={"width": 3.0}),
+            tape.text_spec(right, style={"width": 3.0}),
+        ],
+        gap=0.5,
+    )
+```
+
+This is how Matemium expands across subjects without turning the engine into a
+collection of unrelated topic methods.
+
+## Multiple scenes
+
+A project can define more than one `CanvasScene` subclass. Give each scene a
+descriptive class name. The desktop and CLI can discover available scenes and
+let you select one for rendering.
+
+## What not to author
+
+Do not use these as the normal product format:
+
+- Raw `SheetDSL` JSON
+- Sidecar IPC requests
+- Imperative Manim scene code as the primary approach
+
+Those remain available for engine debugging and lower-level escape hatches, but
+the stable authoring path is visible Python using `CanvasBuilder`.
+
+## Next
+
+- [Use tapes](/authoring/tapes/)
+- [Control layout and style](/authoring/layout-and-style/)
+- [CanvasBuilder reference](/reference/canvasbuilder/)

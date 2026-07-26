@@ -1,0 +1,104 @@
+---
+title: CanvasBuilder reference
+description: A concise map of the stable high-level Matemium authoring API.
+---
+
+`CanvasBuilder` collects content and timeline intent, then produces the internal
+representation consumed by `CanvasScene`.
+
+```python
+builder = CanvasBuilder(title="My Explanation")
+tape = builder.add_tape("main")
+# author content and actions
+super().__init__(dsl=builder.build(), **kwargs)
+```
+
+Most builder methods are chainable and return the builder rather than an element
+identifier. Pass an explicit `id=` when a later action must reference an element.
+
+## Content
+
+| Method | Purpose |
+| --- | --- |
+| `add_text(text, ...)` | General text, including styled inline runs |
+| `add_heading(text, ...)` | Short heading with non-wrapping defaults |
+| `add_body(text, ...)` | Explanatory text with wrapping defaults |
+| `add_observation(text, ...)` | Semantic explanatory alias |
+| `add_math(latex, ...)` | Typeset LaTeX content |
+| `add_3d(equation, ...)` | Mathematical 3D surface |
+| `add_solid(shape, ...)` | Generic volumetric solid |
+| `add_raw(element)` | Low-level escape hatch |
+
+Tape builders expose the corresponding content methods while binding elements
+to their tape.
+
+## Inline runs
+
+```python
+tape.add_text([
+    "The ",
+    builder.run("active region", color="#8d82ff", highlight=True),
+    " remains searchable.",
+])
+```
+
+Run style supports properties such as color, highlight, underline, bold, italic,
+font size, and opacity.
+
+## Layout
+
+| Method | Purpose |
+| --- | --- |
+| `add_tape(name)` | Create and return a `TapeBuilder` |
+| `add_flex_row(items, ...)` | Lay independently addressable items in a row |
+| `add_flex_column(items, ...)` | Lay independently addressable items in a column |
+| `text_spec(...)` | Text item specification for flex |
+| `math_spec(...)` | Math item specification for flex |
+| `element_spec(...)` | Custom element specification for flex |
+| `last_flex_ids` | IDs produced by the most recent flex container |
+
+## Camera and observation
+
+| Method | Purpose |
+| --- | --- |
+| `add_camera_focus(id, ...)` | Isolate or overlay-focus an existing element |
+| `add_camera_move(dy, ...)` | Legacy explicit tape movement |
+| `add_camera_keyframe(target=..., ...)` | General 3D observation keyframe |
+| `scroll_tape(local_y, ...)` | Enter tape-scroll mode explicitly |
+| `observe_object(target, ...)` | Observe a world object |
+| `add_camera_inspect(id, path=..., ...)` | Inspect a 3D object along a path |
+
+## 3D objects
+
+| Method | Purpose |
+| --- | --- |
+| `add_object(kind, ...)` | Register a generic world object |
+| `add_solid(shape, ...)` | Place a built-in volumetric solid |
+| `add_solid_lift(id, ...)` | Raise a solid above its tape |
+| `solid_label(...)` | Create a camera-facing label specification |
+| `add_3d(equation, ...)` | Place a mathematical surface in tape flow |
+
+## Focus example
+
+```python
+tape.add_math(r"E = mc^2", id="energy")
+
+builder.add_camera_focus(
+    "energy",
+    mode="isolate",
+    zoom=2.0,
+    dim_opacity=0.1,
+    run_time=1.1,
+    hold_time=1.2,
+    reset_zoom=True,
+)
+```
+
+## Internal API boundary
+
+`SheetDSL`, raw canvas elements, and JSON loading are intended for engine tests,
+debugging, and specialized escape hatches. New product authoring should remain
+reachable through `CanvasBuilder`.
+
+For exact signatures in the current source, see
+[`canvas/builder.py`](https://github.com/fargonee/math/blob/main/canvas/builder.py).

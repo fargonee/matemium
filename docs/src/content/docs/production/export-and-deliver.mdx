@@ -1,0 +1,79 @@
+---
+title: Export and deliver
+description: Choose portrait, landscape, static-sheet, and reel outputs from a validated Matemium project.
+---
+
+Delivery begins after the scene has been visually validated.
+
+## Portrait video
+
+Matemium’s default video shape is 9:16, suitable for:
+
+- YouTube Shorts
+- TikTok
+- Instagram Reels
+- Mobile-first lessons
+
+Keep important text and labels away from platform interface overlays.
+
+## Landscape video
+
+Use 16:9 for:
+
+- Standard YouTube lessons
+- Classroom projection
+- Presentations
+- Embedded course videos
+
+Changing orientation can affect layout and camera composition. Validate a
+landscape render independently instead of assuming the portrait composition will
+translate automatically.
+
+## Full-sheet export
+
+Export the entire reasoning tape as PNG or PDF when viewers need:
+
+- A study sheet
+- A printable derivation
+- A complete reference
+- An accessible static companion to the video
+
+The full sheet uses its natural length rather than forcing the content into a
+video frame.
+
+From an engine checkout:
+
+```python
+scene = builder.to_scene()
+scene.export_full_sheet(
+    "my_explanation",
+    full_tape=True,
+    format="png",
+)
+```
+
+## Reel cutting
+
+Long-form projects can be divided into vertical segments around meaningful
+chapter boundaries. Review every cut:
+
+- Do not begin a segment in the middle of an unresolved statement.
+- Reintroduce context when earlier content is no longer visible.
+- Keep titles and conclusions inside each deliverable segment.
+
+## Audio assembly
+
+Voice-synthesis and custom-voice projects should attach only approved audio.
+Avoid unnecessary video re-encoding during final assembly when the workflow can
+reuse the validated video stream.
+
+## Publishing
+
+Publishing is an explicit action. Local output is not automatically uploaded.
+Before publishing:
+
+1. Verify subject accuracy.
+2. Confirm rights to imported media and audio.
+3. Watch the final assembled file.
+4. Add captions or a transcript where appropriate.
+5. Retain the project source needed for later corrections.

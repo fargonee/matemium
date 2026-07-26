@@ -1,0 +1,121 @@
+---
+title: Architecture overview
+description: Understand Matemium’s strict desktop, engine, server, website, and documentation boundaries.
+---
+
+Matemium is a monorepo with independently deployed products and a local engine.
+
+```text
+Desktop UI (TypeScript)
+        │ Tauri invoke
+        ▼
+Rust shell
+        │ NDJSON stdin/stdout
+        ▼
+Python sidecar + Canvas engine
+
+Desktop ── HTTPS ──► Optional cloud API
+```
+
+## Engine
+
+Locations:
+
+```text
+canvas/
+matemium/
+projects/
+```
+
+Responsibilities:
+
+- Declarative scene model
+- Layout and measurement
+- Timeline compilation
+- Camera and focus
+- 2D and 3D rendering
+- Project discovery and CLI
+- Sidecar project commands
+
+The engine must not import the server or desktop application.
+
+## Desktop
+
+Location:
+
+```text
+desktop/
+├── app/
+├── src-tauri/
+├── packaging/
+└── scripts/
+```
+
+The TypeScript interface never imports Python. Rust owns the sidecar process and
+the invoke bridge.
+
+## Cloud API
+
+Location:
+
+```text
+server/
+```
+
+The cloud can provide authentication, profile data, and user-selected AI
+routing helpers. It does not render projects or receive the complete workspace
+as a normal rendering operation.
+
+## Marketing website
+
+Location:
+
+```text
+website/
+```
+
+The website introduces Matemium, presents real output, explains support, and
+links into these task-oriented docs.
+
+## Documentation
+
+Location:
+
+```text
+docs/
+```
+
+The Astro/Starlight build is independently deployed to
+`docs.matemium.fargonee.space`.
+
+## Authoring boundary
+
+Product authors edit `scenes.py` through `CanvasBuilder`. `SheetDSL` is internal
+compiler data and a debugging interface—not the normal authoring format.
+
+## Project versus engine behavior
+
+Generic capabilities belong in `canvas/`:
+
+- Layout
+- Camera
+- Focus
+- Timeline behavior
+- General solids and surfaces
+
+Subject recipes belong in `projects/<name>/helpers.py`:
+
+- A specific circuit
+- A quadratic comparison
+- A molecular arrangement
+- A historical timeline composition
+
+This boundary allows Matemium to expand across subjects without forcing every
+topic into its core API.
+
+## Deeper engineering records
+
+- [Product architecture](https://github.com/fargonee/math/blob/main/desktop-architecture.md)
+- [Agent architecture](https://github.com/fargonee/math/blob/main/ai-agent-architecture.md)
+- [Engine architecture](https://github.com/fargonee/math/blob/main/architecture.md)
+- [Repository structure](https://github.com/fargonee/math/blob/main/STRUCTURE.md)

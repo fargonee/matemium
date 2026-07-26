@@ -38,6 +38,7 @@ export interface ShowcaseProject {
   capabilities: string[];
   sourcePath: string;
   sourceUrl: string;
+  docsUrl?: string;
   sourceExcerpt: string;
   featured?: boolean;
 }
@@ -150,6 +151,7 @@ export const SHOWCASE_PROJECTS: ShowcaseProject[] = [
     capabilities: ["Plot comparison", "Trace animation", "Camera focus", "Multiple tapes"],
     sourcePath: "projects/quadratic_graphs/scenes.py",
     sourceUrl: "https://github.com/fargonee/math/blob/main/projects/quadratic_graphs/scenes.py",
+    docsUrl: "https://docs.matemium.fargonee.space/recipes/mathematics/quadratic-graphs/",
     sourceExcerpt: `builder = CanvasBuilder(title="Quadratic Graphs")
 tape = builder.add_tape("main")
 
@@ -214,6 +216,7 @@ tape.add_math(r"x^2 - 5x + 6 = (x - 2)(x - 3)")`,
     capabilities: ["Physics notation", "3D surface", "Sectioned lesson", "Spatial camera"],
     sourcePath: "projects/em_waves/scenes.py",
     sourceUrl: "https://github.com/fargonee/math/blob/main/projects/em_waves/scenes.py",
+    docsUrl: "https://docs.matemium.fargonee.space/recipes/physics/electromagnetic-waves/",
     sourceExcerpt: `builder = CanvasBuilder(title="Electromagnetic Waves")
 tape = builder.add_tape("main")
 

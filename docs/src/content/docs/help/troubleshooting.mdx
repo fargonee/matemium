@@ -1,0 +1,133 @@
+---
+title: Troubleshooting
+description: Diagnose installation, engine, LaTeX, rendering, media, and AI-provider problems.
+---
+
+Start with the smallest failing boundary: application readiness, project syntax,
+scene import, layout/rendering, encoding, or external AI.
+
+## The engine is not connected
+
+1. Wait for first-run asset preparation to finish.
+2. Restart the desktop application.
+3. Check whether security software quarantined the bundled sidecar.
+4. Confirm there is enough disk space for extracted assets.
+5. On Linux, verify the application can execute its bundled binary.
+
+For an engine checkout:
+
+```bash
+echo '{"type":"request","id":"1","command":"ping","params":{}}' \
+  | python -m matemium.sidecar
+```
+
+## FFmpeg is missing
+
+Symptoms include failure during final video encoding or assembly.
+
+On Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install ffmpeg
+ffmpeg -version
+```
+
+Restart Matemium after installing a system dependency.
+
+## LaTeX fails
+
+Matemium uses LaTeX for mathematical notation. Packaged releases prefer the
+TinyTeX asset prepared by the application.
+
+Check:
+
+- First-run assets completed
+- The equation contains valid LaTeX
+- Required commands belong to an available package
+- A system LaTeX installation is not unexpectedly shadowing TinyTeX
+
+Reduce the problem to one equation before changing the entire scene.
+
+## Python syntax or import error
+
+Common causes:
+
+- Missing closing bracket or quote
+- Incorrect indentation
+- Importing a helper that does not exist
+- Renaming a scene without updating references
+- Using an API method from a different revision
+
+From a source checkout:
+
+```bash
+python -m py_compile projects/my_project/scenes.py
+```
+
+Then render with preview quality to expose scene-import errors.
+
+## Text clips or overlaps
+
+Try these in order:
+
+1. Shorten the text.
+2. Use `add_body()` for explanatory prose.
+3. Enable wrapping.
+4. Reduce the requested width.
+5. Add intentional margins.
+6. Reconsider the flex structure.
+
+Do not immediately compensate with camera zoom.
+
+## Camera focus crops the target
+
+Use isolate focus with a moderate requested zoom. The viewport-fit system should
+cap unsafe zoom, but an excessively wide base layout may still be unreadable.
+
+Check the final output orientation independently.
+
+## A media file disappears
+
+Import media into the project rather than referencing a temporary path outside
+the workspace. Confirm the asset still appears in the media library and that
+the project source uses its stable project path.
+
+## The agent cannot edit or continue
+
+Check:
+
+- A provider or local model is selected
+- Provider authentication is valid
+- The current roadmap phase permits the requested work
+- The project has no unresolved decision blocking the phase
+- The request is concrete enough to evaluate
+
+Provider rate limits and billing errors must be resolved with the provider.
+
+## A render succeeds but is wrong
+
+This is a visual-repair problem, not an engine-readiness problem.
+
+Record:
+
+- Timestamp
+- Visible defect
+- Affected element
+- Expected invariant
+
+Then make the smallest useful source change and render again.
+
+## Ask for help
+
+When reporting a problem, include:
+
+- Operating system and Matemium version
+- Whether you use the packaged desktop or a source checkout
+- Project and scene name
+- Exact error text
+- Minimal source needed to reproduce
+- Screenshot or short recording for visual defects
+
+Open an issue in the
+[Matemium repository](https://github.com/fargonee/math/issues).

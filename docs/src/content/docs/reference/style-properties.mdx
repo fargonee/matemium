@@ -1,0 +1,90 @@
+---
+title: Style properties
+description: Reference the CSS-like layout properties accepted by Matemium content methods.
+---
+
+Pass layout intent through a `style` dictionary:
+
+```python
+tape.add_body(
+    "Readable explanatory text.",
+    style={
+        "width": 5.8,
+        "align": "left",
+        "margin": "0.2 0.4",
+        "wrap": True,
+    },
+)
+```
+
+## Properties
+
+| Property | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `width` | number or omitted | measured | Requested content width |
+| `height` | number or omitted | measured | Requested content height |
+| `align` | `left`, `center`, `right` | `center` | Horizontal block alignment |
+| `text-align` | alignment string | — | Alias used when `align` is omitted |
+| `wrap` | boolean or omitted | content-specific | Allow text wrapping |
+| `margin` | number or spacing string | `0` | Margin shorthand |
+| `margin-top` | number | shorthand value | Top margin |
+| `margin-right` | number | shorthand value | Right margin |
+| `margin-bottom` | number | shorthand value | Bottom margin |
+| `margin-left` | number | shorthand value | Left margin |
+
+## Margin shorthand
+
+One value applies to every edge:
+
+```python
+style={"margin": 0.4}
+```
+
+Two values mean vertical and horizontal:
+
+```python
+style={"margin": "0.4 0.2"}
+```
+
+Four values follow top, right, bottom, left:
+
+```python
+style={"margin": "0.2 0.3 0.6 0.3"}
+```
+
+An explicit edge property overrides the shorthand:
+
+```python
+style={
+    "margin": 0.3,
+    "margin-bottom": 0.8,
+}
+```
+
+## Width and safe framing
+
+Width uses Matemium’s scene units rather than CSS pixels. Use a consistent
+content width across related blocks and validate the result in the target
+orientation.
+
+Very wide content can still become unreadable even if it technically fits.
+
+## Wrapping defaults
+
+- `add_heading()` does not wrap by default.
+- `add_body()` wraps by default.
+- General text can set `wrap` explicitly.
+
+If a heading is too long, rewrite it before forcing a dense multiline title.
+
+## Flex container arguments
+
+Rows and columns also accept:
+
+- `gap`
+- `justify_content`
+- `align_items`
+- Container `style`
+
+Flex-item styles control the individual measured item. Container style controls
+the group’s placement in tape flow.

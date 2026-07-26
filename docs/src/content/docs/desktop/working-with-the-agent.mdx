@@ -1,0 +1,102 @@
+---
+title: Working with the agent
+description: Give useful direction, review agent decisions, and preserve control of a Matemium project.
+---
+
+Matemium’s agent is a production collaborator. It can inspect project files,
+propose edits, work through roadmap phases, compile scenes, and respond to
+render evidence. It should not be treated as an unquestionable source of facts.
+
+## Give intent, not vague approval
+
+Useful direction describes the viewer’s experience:
+
+> Keep eliminated values visible but subdued so the viewer can see why the
+> search space shrinks.
+
+Weak direction gives no evaluable goal:
+
+> Make it better.
+
+When answering a project question, explain the reason behind a preference when
+that reason should influence later decisions.
+
+## Use project questions
+
+The agent may offer:
+
+- A recommended choice
+- Alternative production choices
+- A custom response
+- **Decide for me**
+
+Choose **Decide for me** only when the decision does not express important
+subject knowledge, tone, or creative intent.
+
+## Review edits
+
+Agent-generated code and prose remain your responsibility. Before accepting a
+substantial change:
+
+1. Read the explanation of what changed.
+2. Inspect the relevant artifact or source diff.
+3. Check whether the change respects the current roadmap phase.
+4. Render when the change affects visuals.
+5. Verify factual and subject-matter accuracy yourself.
+
+## Report visual evidence precisely
+
+Good repair requests identify:
+
+- The visible object
+- The moment or phase
+- The observed defect
+- The intended result
+
+Example:
+
+> During the first camera focus, the right comparison plot clips against the
+> portrait boundary. Reduce the focus zoom enough to keep the entire plot and
+> border visible.
+
+Avoid requesting a large rewrite before confirming the actual cause.
+
+## Provider choice
+
+External AI uses your selected provider account. Different models vary in:
+
+- Code-editing reliability
+- Long-context planning
+- Visual reasoning
+- Cost and speed
+- Tool-use behavior
+
+Use a capable model for roadmap decisions and nontrivial repair. A smaller or
+local model may be sufficient for short edits and explanations.
+
+## Sensitive material
+
+When you invoke cloud AI, the relevant prompt and project excerpts can be sent
+to the provider you selected. Do not include secrets or material you are not
+authorized to process.
+
+Rendering and full media files remain local. The cloud agent does not need your
+rendered video uploaded as a normal part of rendering.
+
+## When to work manually
+
+Edit `scenes.py` directly when:
+
+- The change is small and obvious
+- You know the exact API call
+- You want deterministic control
+- The agent repeatedly misunderstands a visual requirement
+
+Agent and manual edits use the same project source; they are not separate modes
+of authorship.
+
+## Related guides
+
+- [Project lifecycle](/desktop/project-lifecycle/)
+- [Anatomy of `scenes.py`](/authoring/scenes-py/)
+- [Render and repair](/production/render-and-repair/)

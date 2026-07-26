@@ -1,0 +1,87 @@
+---
+title: Infinite tapes
+description: Compose explanations on one or more tapes and understand tape-scroll behavior.
+---
+
+A tape is a structured plane inside Matemium’s 3D world. In tape-scroll mode it
+behaves like an infinite document: content flows vertically, reveals as the
+camera reaches it, and remains addressable after appearing.
+
+## Create the main tape
+
+```python
+builder = CanvasBuilder(title="Supply and Demand")
+tape = builder.add_tape("main")
+
+tape.add_heading("A market moves toward equilibrium")
+tape.add_body("Demand falls as price rises.")
+tape.add_body("Supply rises as price rises.")
+```
+
+Content added through the tape is laid out relative to other content on that
+tape.
+
+## Why elements persist
+
+Revealed elements are stored in a registry. Later timeline operations can focus,
+transform, or revisit them without rebuilding the object.
+
+Assign an explicit identifier when you need to reference an element later:
+
+```python
+tape.add_math(r"Q_d = Q_s", id="equilibrium")
+builder.add_camera_focus("equilibrium", zoom=1.8, hold_time=1.0)
+```
+
+## Multiple tapes
+
+Use multiple tapes when an explanation has parallel spatial contexts:
+
+```python
+left = builder.add_tape("claim")
+right = builder.add_tape("objection")
+
+left.add_heading("Claim")
+left.add_body("Knowledge requires certainty.")
+
+right.add_heading("Objection")
+right.add_body("Fallible beliefs can still be justified.")
+```
+
+When timeline content switches between tapes, Matemium manages the active
+tape-scroll context. Do not manually imitate tape switching by dragging or
+stacking text objects.
+
+## Tape view and world view
+
+A tape has two useful interpretations:
+
+- **Tape-scroll view** — document layout, local scrolling, lazy reveal, and focus.
+- **World view** — the tape is a plane that can be positioned and observed in 3D.
+
+Free 3D objects do not inherit tape layout behavior. Only tape content flows
+through the tape’s internal layout system.
+
+## After a 3D moment
+
+Content that follows certain 3D elements may need to declare that relationship:
+
+```python
+builder.add_3d(r"z = \sin(x)\cos(y)", pitch=50)
+tape.add_body(
+    "Return to the explanation after inspecting the surface.",
+    after_3d=True,
+)
+```
+
+## Good uses for multiple tapes
+
+- Compare two models
+- Claim and objection
+- Source code and execution state
+- Cause and consequence
+- Two languages or sentence transformations
+- Diagram and notes
+
+Use a new tape for a meaningful spatial context, not merely because the source
+file has another paragraph.

@@ -1,0 +1,104 @@
+---
+title: Layout and style
+description: Control spacing, width, alignment, wrapping, and flex composition without manual coordinates.
+---
+
+Matemium uses declarative, CSS-like layout intent. Prefer styles and flex
+composition over manually calculating positions.
+
+## Style a content block
+
+```python
+tape.add_body(
+    "A longer explanation that should remain readable in portrait output.",
+    style={
+        "width": 5.8,
+        "align": "center",
+        "margin-top": 0.2,
+        "margin-bottom": 0.7,
+        "wrap": True,
+    },
+)
+```
+
+Common style properties include:
+
+| Property | Purpose |
+| --- | --- |
+| `width` | Intended layout width |
+| `align` | Align content within its available space |
+| `margin-top` | Space before the block |
+| `margin-bottom` | Space after the block |
+| `wrap` | Allow long text to wrap |
+
+See the [style property reference](/reference/style-properties/) for guidance.
+
+## Use semantic text methods
+
+```python
+tape.add_heading("The central idea")
+tape.add_body("A readable explanatory paragraph.")
+tape.add_observation("Notice what changes and what remains fixed.")
+```
+
+Semantic helpers have safer defaults than treating every string as an
+undifferentiated text object.
+
+## Compose a row
+
+```python
+tape.add_flex_row(
+    [
+        tape.text_spec(
+            "Cause",
+            style={"width": 2.6, "align": "center"},
+        ),
+        tape.text_spec(
+            "Consequence",
+            style={"width": 2.6, "align": "center"},
+        ),
+    ],
+    gap=0.5,
+    justify_content="center",
+    align_items="center",
+)
+```
+
+Each flex item becomes its own timeline element. It can be referenced and
+focused independently.
+
+## Compose a column
+
+```python
+tape.add_flex_column(
+    [
+        tape.text_spec("Input", style={"width": 4.0}),
+        tape.text_spec("Transformation", style={"width": 4.0}),
+        tape.text_spec("Output", style={"width": 4.0}),
+    ],
+    gap=0.35,
+    align_items="center",
+)
+```
+
+## Inline emphasis
+
+Use runs when part of a sentence needs its own color or highlight:
+
+```python
+tape.add_text([
+    "The ",
+    builder.run("middle value", color="#8d82ff", highlight=True),
+    " determines which half remains.",
+])
+```
+
+## Avoid these mistakes
+
+- Guessing absolute Y positions for ordinary flowing content
+- Giving every element a different arbitrary width
+- Using very large focus zoom to compensate for unreadable base layout
+- Placing subject-specific layout behavior in `canvas/builder.py`
+- Assuming a portrait composition is automatically valid in landscape
+
+Render and inspect both the spacing and the camera result.

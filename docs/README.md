@@ -1,49 +1,37 @@
-# Starlight Starter Kit: Basics
+# Matemium documentation
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+The source for [docs.matemium.fargonee.space](https://docs.matemium.fargonee.space).
+It is an Astro site built with Starlight and lives beside the engine, desktop app,
+example projects, and public website so the documentation can stay aligned with the
+software.
 
-```
-pnpm create astro@latest -- --template starlight
-```
+## Work locally
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+From this directory:
 
-## 🚀 Project Structure
-
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```bash
+pnpm install
+pnpm dev
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+Before publishing:
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+```bash
+pnpm build
+```
 
-Static assets, like favicons, can be placed in the `public/` directory.
+The generated site is written to `dist/`. Search, the sitemap, internal routes, and
+optimized assets are produced as part of the build.
 
-## 🧞 Commands
+## Write documentation
 
-All commands are run from the root of the project, from a terminal:
+Documentation pages live in `src/content/docs/`. Navigation is deliberately curated
+in `astro.config.mjs`; when adding a page, place it in the right section there as well.
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `pnpm install`             | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
+Keep examples tied to real APIs and real projects in this repository. If behavior
+changes, update the relevant guide, reference page, and recipe in the same change.
 
-## 👀 Want to learn more?
+## Publishing
 
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+This project is already connected to the documentation deployment. Pushing the
+intended changes publishes them at the domain above.

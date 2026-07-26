@@ -1,0 +1,98 @@
+---
+title: Render and visual repair
+description: Render Matemium scenes locally, inspect the evidence, and correct visual defects.
+---
+
+A successful Python import does not prove that an explanation is visually correct.
+Rendering is the evidence-gathering stage of Matemium production.
+
+## Before rendering
+
+Confirm:
+
+- The current roadmap phase permits authoring or repair
+- `scenes.py` is saved
+- The intended scene is selected
+- The engine reports ready
+- Required media files still exist
+
+Use a preview-quality render while structure is still changing. Reserve full
+quality for validated work.
+
+## Inspect the result
+
+Watch the entire render and check:
+
+### Content
+
+- Facts, equations, labels, and relationships are correct
+- The explanation answers its intended question
+- Earlier statements remain consistent with later ones
+
+### Layout
+
+- Text does not clip or overflow
+- Related elements align intentionally
+- Spacing communicates grouping
+- Portrait and landscape safe areas are respected
+
+### Camera
+
+- Focus does not crop the target
+- Transitions do not disorient the viewer
+- 3D inspection returns to the intended context
+- The active tape is clear
+
+### Timing
+
+- The viewer has time to read
+- Movement does not race ahead of the explanation
+- Holds and transitions feel deliberate
+- Narration remains synchronized where applicable
+
+## Report evidence
+
+Describe a defect as an observation:
+
+> At 00:14, the denominator overlaps the paragraph below it after the equation
+> reveal.
+
+Then state the intended invariant:
+
+> Keep at least one body-text line of vertical space between the equation and
+> the paragraph.
+
+This is more actionable than asking the agent to “fix the layout.”
+
+## Repair in the smallest useful scope
+
+Prefer:
+
+- Adjusting one style or width
+- Fixing one camera target
+- Changing one run time
+- Reordering one reveal
+- Correcting one helper
+
+Avoid rewriting an entire scene when the defect is local.
+
+## Repeat
+
+```text
+Render → Inspect → Describe evidence → Edit → Render again
+```
+
+The loop ends when the output is validated for its intended destination—not
+merely when the engine exits successfully.
+
+## Common failure classes
+
+- Python syntax or import error
+- Missing LaTeX command or package
+- Missing media path
+- Layout overflow
+- Unsupported 3D expression
+- Invalid camera target
+- FFmpeg encoding failure
+
+See [Troubleshooting](/help/troubleshooting/) for diagnosis.

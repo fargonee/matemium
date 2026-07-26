@@ -1,0 +1,103 @@
+---
+title: CLI reference
+description: Use the Matemium engine CLI for project scaffolding, discovery, and local rendering.
+---
+
+The CLI is primarily for engine checkouts, development, and project authors who
+prefer a terminal. The desktop application communicates with the sidecar
+directly instead of shelling out to these commands.
+
+From the repository root, use either:
+
+```bash
+./matemium.sh <command>
+```
+
+or:
+
+```bash
+python -m matemium <command>
+```
+
+after activating the environment where Matemium is installed.
+
+## `demo`
+
+Render a built-in demonstration:
+
+```bash
+./matemium.sh demo
+./matemium.sh demo landscape
+./matemium.sh demo tictactoe
+```
+
+Available aliases include portrait/reels, landscape/youtube, builder, and
+tictactoe/tutorial/flex.
+
+Options:
+
+```text
+-q, --quality     preview | draft | low | medium | high | final
+-o, --output      custom output name
+-r, --resolution  WIDTH,HEIGHT or native
+```
+
+## `list`
+
+List projects, discovered scene classes, and output paths:
+
+```bash
+./matemium.sh list
+```
+
+## `new`
+
+Create a project from the template:
+
+```bash
+./matemium.sh new binary_search
+```
+
+This creates `projects/binary_search/`. Edit its `scenes.py`.
+
+## `render`
+
+Render the default scene in a project:
+
+```bash
+./matemium.sh render binary_search
+```
+
+Render a named scene:
+
+```bash
+./matemium.sh render binary_search BinarySearch
+```
+
+Render a quick preview:
+
+```bash
+./matemium.sh render binary_search -q preview
+```
+
+Use an explicit resolution:
+
+```bash
+./matemium.sh render binary_search -r 1080,1920
+```
+
+## Version
+
+```bash
+./matemium.sh --version
+```
+
+## Output
+
+Project renders are isolated beneath:
+
+```text
+outputs/<project>/media/
+```
+
+Generated output is normally excluded from version control.

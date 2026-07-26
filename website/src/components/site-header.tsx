@@ -37,6 +37,12 @@ export function SiteHeader() {
               {label}
             </NavLink>
           ))}
+          <a
+            href="https://docs.matemium.fargonee.space"
+            className="nav-link"
+          >
+            Docs
+          </a>
         </div>
 
         <div className="hidden items-center gap-3 lg:flex">
@@ -69,6 +75,7 @@ export function SiteHeader() {
               {label}
             </NavLink>
           ))}
+          <a href="https://docs.matemium.fargonee.space" onClick={close}>Docs</a>
           <Link to={user ? "/dashboard" : "/login"} onClick={close}>{user ? "Dashboard" : "Sign in"}</Link>
           <Link to="/download" onClick={close} className="button-primary mt-3">Get Matemium <span>→</span></Link>
         </div>

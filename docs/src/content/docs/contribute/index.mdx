@@ -1,0 +1,108 @@
+---
+title: Contribute to Matemium
+description: Set up the repository, understand contribution boundaries, and submit focused improvements.
+slug: contribute
+---
+
+Matemium welcomes code, documentation, testing, example projects, translations,
+bug reports, and carefully described visual failures.
+
+## Before contributing
+
+Read:
+
+- [Architecture overview](/contribute/architecture/)
+- [Source-available license](https://matemium.fargonee.space/license)
+- [Repository contribution guide](https://github.com/fargonee/math/blob/main/CONTRIBUTING.md)
+
+The license permits forks made to prepare contributions to the official project.
+It does not grant unrestricted redistribution of derivative applications.
+
+## Sustain the project
+
+Matemium is a non-commercial project without product income. Financial
+contributions help cover distribution infrastructure, development tools, testing,
+and the work required to keep the engine and desktop application available.
+
+The engine can render locally without paid AI. The most agentic authoring
+experiences and deeper automation, however, require model inference and supporting
+AI resources that the project’s independent maintainer cannot currently fund alone.
+Support helps Matemium develop and test those experiences without turning the
+project into a commercial product.
+
+[Support Matemium →](https://matemium.fargonee.space/support)
+
+You can also contribute meaningfully without money: report defects, improve
+documentation, test releases, create cross-subject examples, or submit focused
+code changes.
+
+## Development setup
+
+```bash
+git clone https://github.com/fargonee/math.git
+cd math
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+Install FFmpeg and LaTeX for render tests.
+
+## Run tests
+
+```bash
+pytest
+```
+
+Optional render tests:
+
+```bash
+pytest -m slow
+```
+
+## Contribution boundaries
+
+1. Keep the engine generic.
+2. Put subject-specific composition in project helpers.
+3. Make new engine features reachable through `CanvasBuilder`.
+4. Preserve the desktop → Rust → sidecar boundary.
+5. Do not make the server import the rendering engine.
+6. Include tests for new public behavior where practical.
+7. Document public API changes.
+
+## Contribute a project recipe
+
+A strong example project:
+
+- Answers a clear conceptual question
+- Demonstrates a capability intentionally
+- Uses generic engine primitives
+- Keeps subject-specific helpers beside the project
+- Renders in a supported quality
+- Includes accurate content
+- Provides a useful poster frame and short public preview
+
+Cross-subject projects are especially valuable because they test whether the
+visual reasoning model generalizes beyond its mathematical foundation.
+
+## Report a visual defect
+
+Attach:
+
+- Minimal project source
+- Render timestamp
+- Screenshot or short recording
+- Expected result
+- Platform and engine version
+
+Visual evidence is more useful than “the animation looks wrong.”
+
+## Commit style
+
+Use clear, imperative subjects:
+
+- `Add viewport-safe zoom cap`
+- `Document multiple-tape authoring`
+- `Fix labels during solid inspection`
+
+For substantial design changes, open an issue before building a large solution.

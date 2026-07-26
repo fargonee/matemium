@@ -7,7 +7,7 @@ const GROUPS = [
   },
   {
     title: "Project",
-    links: [["Source & license", "/source"], ["GitHub", "https://github.com/fargonee/math"], ["Contributing", "https://github.com/fargonee/math/blob/main/CONTRIBUTING.md"], ["Sign in", "/login"]],
+    links: [["Documentation", "https://docs.matemium.fargonee.space"], ["Source & license", "/source"], ["GitHub", "https://github.com/fargonee/math"], ["Contributing", "https://github.com/fargonee/math/blob/main/CONTRIBUTING.md"], ["Sign in", "/login"]],
   },
   {
     title: "Legal",

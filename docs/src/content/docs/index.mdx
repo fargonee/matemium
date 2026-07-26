@@ -1,40 +1,82 @@
 ---
-title: Welcome to Starlight
-description: Get started building your docs site with Starlight.
-template: splash # Remove or comment out this line to display the site sidebar on this page.
+title: Matemium documentation
+description: Learn to turn complex ideas into structured visual stories with the Matemium desktop studio and local rendering engine.
+template: splash
 hero:
-  tagline: Congrats on setting up a new Starlight project!
+  tagline: Turn complex ideas into structured visual stories with an agentic desktop studio and a local rendering engine.
   image:
-    file: ../../assets/houston.webp
+    file: ../../assets/matemium-logo.png
   actions:
-    - text: Example Guide
-      link: /guides/example/
+    - text: Create your first project
+      link: /start/first-project/
       icon: right-arrow
-    - text: Read the Starlight docs
-      link: https://starlight.astro.build
-      icon: external
+    - text: Understand Matemium
+      link: /start/what-is-matemium/
+      icon: open-book
       variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
 
-## Next steps
+<p class="matemium-kicker">Built first for mathematics. Designed for complex ideas.</p>
+
+Matemium begins with the structure of an explanation—not a conventional video
+timeline and not a single prompt. Describe the idea, choose a production path,
+shape it with the agent, render locally, inspect the evidence, and deliver the result.
 
 <CardGrid stagger>
-	<Card title="Update content" icon="pencil">
-		Edit `src/content/docs/index.mdx` to see this page change.
+	<Card title="Use the desktop studio" icon="setting">
+		Install Matemium, create a project, work through its roadmap, render, repair,
+		and export without learning the engine internals first.
+
+		[Start with the desktop →](/start/install/)
 	</Card>
-	<Card title="Change page layout" icon="document">
-		Delete `template: splash` in `src/content/docs/index.mdx` to display a
-		sidebar on this page.
-	</Card>
-	<Card title="Add new content" icon="add-document">
-		Add Markdown or MDX files to `src/content/docs` to create new pages.
-	</Card>
-	<Card title="Configure your site" icon="setting">
-		Edit your `sidebar` and other config in `astro.config.mjs`.
-	</Card>
-	<Card title="Read the docs" icon="open-book">
-		Learn more in [the Starlight Docs](https://starlight.astro.build/).
+	<Card title="Author visual scenes" icon="pencil">
+		Learn `scenes.py`, `CanvasBuilder`, infinite tapes, layout, camera movement,
+		and the 3D world model.
+
+		[Start authoring →](/authoring/scenes-py/)
 	</Card>
 </CardGrid>
+
+## Follow the complete production journey
+
+<CardGrid>
+	<Card title="1 · Describe" icon="comment">
+		Establish the subject, audience, purpose, and intended understanding.
+	</Card>
+	<Card title="2 · Choose a path" icon="random">
+		Create a visual-first film, synthesize narration, or work around a custom voice.
+	</Card>
+	<Card title="3 · Shape with the agent" icon="robot">
+		Resolve meaningful creative decisions before scene generation begins.
+	</Card>
+	<Card title="4 · Render and repair" icon="rocket">
+		Render on your machine, inspect visual evidence, and correct problems in context.
+	</Card>
+	<Card title="5 · Deliver" icon="approve-check">
+		Export portrait reels, landscape lessons, or complete static reasoning sheets.
+	</Card>
+</CardGrid>
+
+## Learn from real projects
+
+The recipe library explains projects that actually render in Matemium. Each recipe
+connects the finished result to its real authoring source.
+
+- [Compare quadratic graphs](/recipes/mathematics/quadratic-graphs/)
+- [Explain electromagnetic waves](/recipes/physics/electromagnetic-waves/)
+
+More recipes are being developed across chemistry, computing, engineering, economics,
+biology, history, philosophy, language learning, and general education.
+
+:::note[Early-access documentation]
+These docs track the current Matemium early-access codebase. Pages distinguish
+available functionality from work that is still in development.
+:::
+
+<div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:2rem">
+	<LinkButton href="https://matemium.fargonee.space/download" icon="external">Get Matemium</LinkButton>
+	<LinkButton href="https://github.com/fargonee/math" icon="github" variant="secondary">Browse source</LinkButton>
+	<LinkButton href="https://matemium.fargonee.space/support" icon="external" variant="secondary">Support the project</LinkButton>
+</div>
