@@ -34,12 +34,26 @@ pytest -m slow            # optional full Manim smoke render
 ## Architecture rules
 
 1. **Engine stays generic** — no lesson-specific APIs on `CanvasBuilder`. Put topic helpers in `projects/<name>/helpers.py`.
-2. **Sheet model** — content on the XY plane at `z=0`; camera scrolls on Y.
+2. **World + tape model** — flowing content lives in a `TapeObject`; the root
+   tape preserves the XY-at-`z=0` experience, while explicit world observation
+   and 3D objects remain available.
 3. **Test scenes validate abstractions** — demo projects should exercise engine features, not patch core for one lesson.
 4. **Desktop authoring is code** — AI edits `scenes.py`, not Sheet DSL JSON. New engine features must be reachable via `CanvasBuilder`.
 5. **Section fences** — prefer `# ---DIV: Title---` + `part_*` functions in templates and examples.
+6. **Generic process visuals** — use `DataPath`, `DataPlot`, `Diagram`,
+   `StateTransition`, and `ElementMorph` before proposing a new subject-shaped
+   primitive.
+7. **Validation is part of the contract** — new registered kinds provide pure
+   content validation and semantic-part declarations where applicable.
 
 See [`desktop-architecture.md`](desktop-architecture.md) (product boundaries), [`architecture.md`](architecture.md) (engine + §8 desktop rules), and [`project-spec.md`](project-spec.md) before large changes.
+The current authoring signatures and schemas are in
+[`AUTHORING_API.md`](AUTHORING_API.md).
+
+When real projects expose engine limitations, follow
+[`REAL_PROJECT_ENGINE_WORKFLOW_PROMPT.md`](REAL_PROJECT_ENGINE_WORKFLOW_PROMPT.md). It defines the
+project/core promotion boundary, evidence ladder, capability issue record, and truthful readiness
+rules for AI-assisted authoring and engine maintenance.
 
 **Desktop boundary rule:** TypeScript UI ↔ Rust (Tauri) ↔ Python sidecar only. No cross-language imports across layers. Internal `SheetDSL` must remain JSON-serializable for debugging; it is not the product authoring format.
 
@@ -49,6 +63,8 @@ See [`desktop-architecture.md`](desktop-architecture.md) (product boundaries), [
 
 - [ ] Tests pass locally (`pytest`)
 - [ ] New engine features include unit tests where practical
+- [ ] New public authoring behavior is documented in `AUTHORING_API.md`, the
+      relevant docs-site guide/reference, and the scene-authoring prompt
 - [ ] Public API changes are noted in `CHANGELOG.md`
 - [ ] Lesson-only logic is not added to `canvas/`
 

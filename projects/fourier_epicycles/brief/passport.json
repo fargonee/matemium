@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "project_slug": "fourier_epicycles",
+  "title": "Fourier Series: Drawing With Rotating Circles",
+  "production_path": "mute_video",
+  "production_path_basis": "The showcase library is explicitly mute for this production cycle.",
+  "audience": "Curious general learners with graph and basic trigonometry familiarity",
+  "assumed_knowledge": [
+    "coordinates on a graph",
+    "basic sine-wave recognition"
+  ],
+  "central_message": "A periodic signal can be reconstructed by adding simple rotating components whose frequency, amplitude, and phase have distinct roles.",
+  "takeaway": "The spectrum is a recipe, and each harmonic has the same identity across geometry, formula, and plotted signal.",
+  "platform": "website showcase and bundled desktop example",
+  "orientation": "landscape",
+  "aspect_ratio": "16:9",
+  "resolution_master": "1920x1080",
+  "duration_target_seconds": {
+    "minimum": 90,
+    "maximum": 110
+  },
+  "language": "English",
+  "mathematical_depth": "conceptual introduction with one canonical square-wave series",
+  "visual_direction": "dark editorial canvas, luminous harmonic palette, persistent cross-view color identity",
+  "tone": "precise, curious, modern",
+  "pacing": "purposeful visual beats with short readable statements and repeated state changes",
+  "audio": {
+    "final_track": "none",
+    "must_remain_understandable_without_sound": true
+  },
+  "constraints": [
+    "offline and deterministic",
+    "no external media",
+    "no Fourier-transform detour",
+    "no claim of uniform convergence at a discontinuity",
+    "no decorative representation without explanatory purpose"
+  ],
+  "success_criteria": [
+    "rotation-to-sinusoid connection is visible",
+    "stable harmonic colors span all representations",
+    "at least three partial sums are compared",
+    "Gibbs behavior is accurately distinguished from simple disappearance",
+    "preview render is visually inspected at representative timestamps"
+  ],
+  "readiness": {
+    "status": "ready",
+    "missing_fields": []
+  },
+  "last_updated": "2026-07-27"
+}

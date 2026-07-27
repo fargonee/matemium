@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "project_slug": "orbital_mechanics",
+  "title": "Why an Orbit Is a Continuous Fall",
+  "production_path": "mute_video",
+  "production_path_basis": "The flagship showcase cycle requires explanations that work without narration or music.",
+  "audience": "General science learners with an intuitive understanding of speed and gravity",
+  "assumed_knowledge": [
+    "objects fall toward Earth",
+    "velocity has a direction"
+  ],
+  "central_message": "An orbit is continuous free fall: gravity bends a sideways-moving body's path around Earth.",
+  "takeaway": "Gravity supplies the inward acceleration while tangent velocity keeps the satellite missing the ground.",
+  "platform": "website showcase and bundled desktop example",
+  "orientation": "landscape",
+  "aspect_ratio": "16:9",
+  "resolution_master": "1920x1080",
+  "duration_target_seconds": {
+    "minimum": 50,
+    "maximum": 70
+  },
+  "language": "English",
+  "scientific_depth": "conceptual two-body introduction with low-Earth-orbit reference values",
+  "visual_direction": "dark editorial canvas, normalized trajectory plots, stable regime colors, semantic vector freeze-frame",
+  "tone": "precise, surprising, modern",
+  "pacing": "short readable claims followed by inspectable trajectory and vector state changes",
+  "audio": {
+    "final_track": "none",
+    "must_remain_understandable_without_sound": true
+  },
+  "constraints": [
+    "offline and deterministic",
+    "no external media",
+    "disclose exaggerated altitude and omitted drag",
+    "do not present centripetal force as a second force",
+    "do not label a path escape unless its specific orbital energy is positive"
+  ],
+  "success_criteria": [
+    "gravity at 400 km is quantified relative to surface gravity",
+    "three speeds produce re-entry, circular orbit, and positive-energy escape",
+    "velocity and acceleration directions are visually distinct",
+    "the circular-speed equation follows its geometric referents",
+    "preview render is inspected at representative timestamps"
+  ],
+  "readiness": {
+    "status": "ready",
+    "missing_fields": []
+  },
+  "last_updated": "2026-07-27"
+}

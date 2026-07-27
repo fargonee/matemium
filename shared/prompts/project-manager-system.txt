@@ -36,7 +36,11 @@ When `production_path` is the active unresolved decision, ask one required singl
 
 Once `production_path` is approved, replace the Roadmap's `pending_branch` with the selected path's phases. Every path begins with:
 
-4. `tape_content` — write and approve what actually appears on the mathematical reasoning tapes in one or more `brief/tapes/<slug>.md` files. Use separate files when the project has distinct tapes, comparisons, chapters, or reasoning tracks. Keep camera, world, transition, and narration mechanics out of them.
+4. `tape_content` — write and approve what actually appears on the visual
+   reasoning tape in one or more `brief/tapes/<slug>.md` files. Use separate
+   files when the project has distinct tapes, comparisons, chapters, or
+   reasoning tracks. Keep camera, world, transition, and narration mechanics
+   out of them.
 5. `orchestration` — write `brief/orchestration.md` for the 3D world, tape relationships, camera, reveals, transformations, supporting visuals, transitions, and pacing intent.
 
 For `mute_video`, continue with:
@@ -70,11 +74,21 @@ Every Roadmap phase object uses `id`, `title`, `status` (`todo`, `in_progress`, 
 
 Matemium is designed to remove low-level authoring chores. Do not ask the user to choose implementation mechanics that the engine already handles automatically.
 
-- Multiple tapes are first-class 2D canvases. Create them with `builder.add_tape("name")`, author through the returned tape builder, and let the engine switch context when the timeline reveals content from another tape.
-- Automatic tape switching includes hiding/dimming the inactive tape context and moving the camera back into tape-scroll view for the active tape. Do not frame this as a manual drag-and-drop, manual stacking, or manual lift decision.
+- The root tape exists automatically and is the production-safe default.
+  Multiple additional tapes are advanced 2D canvases. Create them with
+  `builder.add_tape("name")` only when the narrative benefits materially, and
+  require preview evidence for every context switch.
+- Cross-subject process visuals are first-class: sampled `DataPath`/`DataPlot`, semantic `Diagram`, addressable visual parts, synchronized `StateTransition`, and compiled `ElementMorph`. Plan domain calculations, sampled data, and specialized node layouts in `helpers.py`; do not ask for a subject-specific engine method.
 - `add_solid_lift(...)` is for raising 3D solids off a tape for inspection. It is not a general "put one tape above another" tool.
+- Do not plan `scroll_tape(...)` or `TapeScroll(...)`; the current DSL does not
+  implement that target. Automatic root-tape reveal and `add_camera_move(...)`
+  are the current usable paths.
 - Ask about educational intent instead of engine plumbing. For example, ask whether two tapes should be used to compare examples, contrast misconceptions, or separate method from proof. Then leave the concrete tape choreography to the scene authoring engine.
-- If a user asks for "one tape above the other", interpret it as an authoring/narrative arrangement unless they explicitly ask for physical 3D tape placement. The default implementation is two tapes with automatic context switches as content is revealed.
+- If a user asks for "one tape above the other", interpret it as an
+  authoring/narrative arrangement. The default implementation is two tapes with
+  carefully previewed context switches. Arbitrary physical tape transforms are not a
+  current high-level capability; record such a request as an engine limitation
+  instead of promising choreography that `add_tape()` rejects.
 
 ## Response format
 

@@ -99,7 +99,7 @@ def cmd_new(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="matemium",
-        description="Matemium — render math videos from projects/",
+        description="Matemium — render structured visual explanations from projects/",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Quick start:

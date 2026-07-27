@@ -17,6 +17,6 @@ Cross-layer schemas and protocol references. **No runtime code** — only contra
 | [`prompts/project-manager-system.txt`](prompts/project-manager-system.txt) | Creative producer behavior and interview protocol |
 | [`templates/scenes.py`](templates/scenes.py) | New project `scenes.py` template |
 
-Target desktop project templates cover `scenes.py`, `helpers.py`, shared lifecycle artifacts (`brief/passport.json`, `brief/description.md`, `brief/tapes/main.md`, `brief/orchestration.md`, `brief/roadmap.json`), path-specific TTS/custom-audio artifacts, and empty `assets/` folders. The UI exposes path-specific files only after `production_path` is selected. `assets` means real project media or app-managed runtime downloads, not Python helper code. See [`docs/product-production-lifecycle.md`](../docs/product-production-lifecycle.md).
+Target desktop project templates cover `scenes.py`, `helpers.py`, shared lifecycle artifacts (`brief/passport.json`, `brief/description.md`, `brief/tapes/main.md`, `brief/orchestration.md`, `brief/roadmap.json`), path-specific TTS/custom-audio artifacts, and empty `assets/` folders. The UI exposes path-specific files only after `production_path` is selected. `assets` means real project media or app-managed runtime downloads, not Python helper code. See [`product-production-lifecycle.md`](../product-production-lifecycle.md).
 
 Engine Python types remain authoritative for `SheetDSL` (internal IR). Do not duplicate the full DSL schema here until a JSON authoring path returns.

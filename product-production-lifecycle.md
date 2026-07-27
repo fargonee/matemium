@@ -183,6 +183,6 @@ Possessing `scenes.py`, obtaining a successful compile, generating an audio file
 
 ## 11. Authority and related specifications
 
-This document is authoritative for the product lifecycle and phase ordering. [`project-manager-architecture.md`](../project-manager-architecture.md) defines the manager's questioning and ownership behavior. [`agentic_ai_goal.md`](../agentic_ai_goal.md) defines runtime execution and verification guarantees. [`ai-agent-architecture.md`](../ai-agent-architecture.md) defines tool and workspace boundaries. [`desktop-architecture.md`](../desktop-architecture.md) defines how the lifecycle and artifacts appear in the desktop product.
+This document is authoritative for the product lifecycle and phase ordering. [`project-manager-architecture.md`](project-manager-architecture.md) defines the manager's questioning and ownership behavior. [`agentic_ai_goal.md`](agentic_ai_goal.md) defines runtime execution and verification guarantees. [`ai-agent-architecture.md`](ai-agent-architecture.md) defines tool and workspace boundaries. [`desktop-architecture.md`](desktop-architecture.md) defines how the lifecycle and artifacts appear in the desktop product.
 
 If an older template, prompt, allow-list, schema, or three-phase Roadmap conflicts with this lifecycle, that component is legacy and must be migrated; it does not override this specification.

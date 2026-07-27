@@ -42,6 +42,20 @@ Options:
 -r, --resolution  WIDTH,HEIGHT or native
 ```
 
+Quality profiles preserve the scene aspect ratio:
+
+| Profile | Pixel scale | Frame rate |
+| --- | ---: | ---: |
+| `preview` | 50% | 15 fps |
+| `draft` | 75% | 30 fps |
+| `low` | 100% | 30 fps |
+| `medium` | 100% | 30 fps |
+| `high` | 100% | 60 fps |
+| `final` | 100% | 60 fps |
+
+The explicit resolution option overrides the pixel dimensions but does not
+recompose the scene’s logical layout.
+
 ## `list`
 
 List projects, discovered scene classes, and output paths:

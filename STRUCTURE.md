@@ -1,6 +1,6 @@
 # Matemium Monorepo Structure
 
-**Status:** Authoritative (2026-06-26)
+**Status:** Authoritative (2026-07-27)
 
 Three deployable products + one engine share one repository with **strict publish isolation**.
 
@@ -51,7 +51,10 @@ math/  (repository root)
 │       ├── packaging/          PyInstaller spec
 │       └── scripts/            Build helpers
 │
-├── SHARED — contracts (no runtime code)
+├── DOCS — public Astro/Starlight documentation
+│   └── docs/
+│
+├── SHARED — contracts, templates, and agent prompts (no product runtime code)
 │   └── shared/
 │
 ├── .dockerignore               Critical: keeps each Docker context lean
@@ -60,7 +63,8 @@ math/  (repository root)
 ├── fixtures/ / tests/          Engine only
 ├── outputs/                    Local renders (gitignored)
 │
-└── docs/ (root-level markdown)
+└── root-level specifications and guides
+    ├── AUTHORING_API.md        Current public authoring contract and schemas
     ├── INTRODUCTION.md         Project overview (start here)
     ├── STRUCTURE.md            This file
     ├── desktop-architecture.md Product goals & boundaries
@@ -141,4 +145,6 @@ See [`desktop/targets/README.md`](desktop/targets/README.md) for cross-compilati
 - Latest product & intelligence decisions: [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md)
 - How to apply them: [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md) (phases 0-10 complete)
 - Engine spec: [`architecture.md`](architecture.md)
+- Current authoring API: [`AUTHORING_API.md`](AUTHORING_API.md)
+- Public documentation source: [`docs/README.md`](docs/README.md)
 - Status tracker: [`project-spec.md`](project-spec.md)

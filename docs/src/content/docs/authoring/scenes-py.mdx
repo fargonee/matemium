@@ -16,11 +16,9 @@ from canvas.builder import CanvasBuilder
 class MyExplanation(CanvasScene):
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="My Explanation")
-        tape = builder.add_tape("main")
-
-        tape.add_heading("A clear question")
-        tape.add_body("Explain the relationship in plain language.")
-        tape.add_math(r"a^2 + b^2 = c^2")
+        builder.add_heading("A clear question")
+        builder.add_body("Explain the relationship in plain language.")
+        builder.add_math(r"a^2 + b^2 = c^2")
 
         super().__init__(dsl=builder.build(), **kwargs)
 ```
@@ -29,7 +27,8 @@ The structure has four parts:
 
 1. Import the scene and builder.
 2. Create a `CanvasBuilder`.
-3. Add tapes, content, and timeline actions.
+3. Add root-tape content and timeline actions; create extra tapes only when
+   they carry a separate spatial context.
 4. Build the internal representation and pass it to `CanvasScene`.
 
 ## Keep sections readable
@@ -42,23 +41,21 @@ from canvas.builder import CanvasBuilder
 
 
 # ---DIV: Introduction---
-def part_introduction(tape):
-    tape.add_heading("Binary search")
-    tape.add_body("Each comparison eliminates half of a sorted list.")
+def part_introduction(builder):
+    builder.add_heading("Binary search")
+    builder.add_body("Each comparison eliminates half of a sorted list.")
 
 
 # ---DIV: First comparison---
-def part_first_comparison(tape):
-    tape.add_body("Compare the target with the middle value.")
+def part_first_comparison(builder):
+    builder.add_body("Compare the target with the middle value.")
 
 
 class BinarySearch(CanvasScene):
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Binary Search")
-        tape = builder.add_tape("main")
-
-        part_introduction(tape)
-        part_first_comparison(tape)
+        part_introduction(builder)
+        part_first_comparison(builder)
 
         super().__init__(dsl=builder.build(), **kwargs)
 ```
@@ -91,6 +88,23 @@ def add_comparison(tape, left, right):
 This is how Matemium expands across subjects without turning the engine into a
 collection of unrelated topic methods.
 
+## Build from structured project data
+
+For diagrams, plots, trajectories, stateful processes, and transformations,
+compute subject data in `helpers.py` and pass it to the generic authoring
+methods:
+
+```python
+path_id = builder.add_data_path(points, id="trajectory", smooth=True)
+plot_id = builder.add_data_plot(series, markers=markers, id="response")
+graph_id = builder.add_diagram(nodes, edges, id="system")
+```
+
+These methods return stable IDs for later state transitions and morphs. Their
+data remains serializable and is validated before render.
+
+See [Data visuals and transitions](/authoring/data-visuals-and-transitions/).
+
 ## Multiple scenes
 
 A project can define more than one `CanvasScene` subclass. Give each scene a
@@ -112,4 +126,5 @@ the stable authoring path is visible Python using `CanvasBuilder`.
 
 - [Use tapes](/authoring/tapes/)
 - [Control layout and style](/authoring/layout-and-style/)
+- [Use data visuals and transitions](/authoring/data-visuals-and-transitions/)
 - [CanvasBuilder reference](/reference/canvasbuilder/)

@@ -20,7 +20,7 @@ Private modifications are permitted. Redistribution, publication of derivative b
 
 Full product architecture: [`desktop-architecture.md`](desktop-architecture.md). Agent upgrade: [`ai-agent-architecture.md`](ai-agent-architecture.md). Engine rules: [`architecture.md`](architecture.md) (incl. §8).
 
-**Normative AI-led production lifecycle:** [`docs/product-production-lifecycle.md`](docs/product-production-lifecycle.md). Matemium treats the user as the idea owner and the AI as the production coworker. Project creation, Description, Passport/path selection, tape content, orchestration, path-specific audio work, authoring, rendering/repair, and final assembly are distinct gated phases; mute, TTS, and custom-audio projects follow different routes.
+**Normative AI-led production lifecycle:** [`product-production-lifecycle.md`](product-production-lifecycle.md). Matemium treats the user as the idea owner and the AI as the production coworker. Project creation, Description, Passport/path selection, tape content, orchestration, path-specific audio work, authoring, rendering/repair, and final assembly are distinct gated phases; mute, TTS, and custom-audio projects follow different routes.
 
 **Latest decisions** on vector/RAG, user-owned AI providers, OpenRouter OAuth, lazy sidecar, first-run downloads, local model options, UX gating, and YouTube publishing: [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
@@ -100,6 +100,7 @@ See `architecture.md` §6 for the abstraction layer model (engine + projects —
 | `dsl.py` | Sheet specification + `LayoutBox` on each element |
 | `layout.py` | `LayoutEngine` — border-box flow, flex rows/columns |
 | `rich_text.py` | Inline text runs — letter/word/phrase color and highlight |
+| `generic_visuals.py` | Validated sampled paths, plots, diagrams, and semantic parts |
 | `measure.py` | Unified measure + mobject build (single source of truth) |
 | `builder.py` | High-level `CanvasBuilder` — fluent authoring API |
 | `scene.py` | `CanvasScene` engine — lazy element reveal, camera-driven timeline |
@@ -192,7 +193,7 @@ cutter.cut(
 )
 ```
 
-## Current status (2026-06-26)
+## Current engine status (2026-07-27)
 
 - [x] DSL (JSON + Python builder)
 - [x] Registry + persistent elements
@@ -208,10 +209,20 @@ cutter.cut(
 - [x] Camera focus tool (`add_camera_focus` — isolate / overlay)
 - [x] 3D solids on the tape (`add_solid`, `add_solid_lift`, multi-part groups)
 - [x] Camera inspect paths (`add_camera_inspect` — keyframe orbit tours)
+- [x] Cross-subject `DataPath`, `DataPlot`, and `Diagram` authoring
+- [x] Stable semantic-part addressing for compound visuals
+- [x] Batched allowlisted `StateTransition` actions
+- [x] Registered-pipeline `ElementMorph` actions
+- [x] Strict pre-render DSL validation + structured workspace diagnostics
 - [x] Matemium CLI (`matemium demo|render|list|new`) with per-project isolated outputs
-- [x] Lesson projects: `quadratic_factoring`, `em_waves`, `quadratic_graphs`, `inscribed_sphere`
+- [x] Eleven deterministic cross-subject flagship project foundations
+- [x] Fourier epicycles authored and visually accepted at preview quality
+- [ ] Visually accept the remaining ten flagship previews
 - [ ] Move leaked domain APIs off `CanvasBuilder` into owning `projects/*/helpers.py`
-- [ ] Generic curve trace timeline action (replace quadratic-only `PlotTrace`)
+- [ ] Reauthor, domain-review, render, and visually accept the remaining ten flagships
+- [ ] Implement or remove the dangling `scroll_tape()` API (`TapeScroll` is
+  absent from the current DSL)
+- [ ] Generic timed traversal action for `DataPath` / `DataPlot` (replace quadratic-only `PlotTrace`)
 - [ ] Full production-quality mobject support for every Manim primitive
 - [ ] Sophisticated idle behaviors beyond rotation
 - [ ] SolutionTape integration (embed tapes as canvas elements)
@@ -280,7 +291,7 @@ See [`desktop-architecture.md`](desktop-architecture.md) §6 for full detail. (L
 | P3 — Tauri scaffold | **done** | `src-tauri/`, sidecar spawn, `invoke` bridge |
 | P4 — Rust shell | **done** | sidecar IPC, project CRUD, `cloud_chat` |
 | P5 — UI shell | **done** | Vite + React + Monaco (editor, chat, preview, sections; project-structure sidebar/brief UI is the next layout target) |
-| P6 — Cloud client + auth | **done** | `auth_login`, Supabase/Google, `cloud_chat` → [`server/`](../server/) |
+| P6 — Cloud client + auth | **done** | `auth_login`, Supabase/Google, `cloud_chat` → [`server/`](server/) |
 | P7 — Linux ship | **done** | `build-linux.sh` → `.deb` / `.AppImage`; CI in [`.github/workflows/build-linux.yml`](.github/workflows/build-linux.yml) |
 | P8 — CI matrix (Win/Mac) | pending | Windows + macOS GitHub Actions workflows (Linux done) |
 

@@ -1,6 +1,6 @@
 ---
 title: Compare quadratic graphs
-description: Build a portrait explanation that compares coefficients, traces a plot, and focuses the camera.
+description: Build a portrait explanation with sampled series, semantic emphasis, and camera focus.
 ---
 
 import { Steps } from '@astrojs/starlight/components';
@@ -9,43 +9,42 @@ import { Steps } from '@astrojs/starlight/components';
 	<source src="https://matemium.fargonee.space/media/quadratic-graphs.mp4" type="video/mp4" />
 </video>
 
-<span class="docs-path">projects/quadratic_graphs/scenes.py</span>
+This recipe uses the current generic data-plot API. The older
+`projects/quadratic_graphs` source remains a compatibility example for the
+quadratic-specific plot/trace methods and should not be copied into new work.
 
 ## The question
 
 **How does each coefficient reshape a parabola?**
 
-This project compares graphs side by side, traces a moving point, focuses one
-plot, and moves between a main explanation tape and a secondary notes tape.
+This project compares named sampled series, emphasizes one curve, focuses the
+plot on the automatic root tape.
 
 ## Capabilities demonstrated
 
 - Mathematical notation
-- Side-by-side plot comparison
-- Trace animation
+- Generic sampled plot comparison
+- Semantic series state
 - Camera focus
-- Multiple tapes
-- A world-space camera keyframe
 
 ## Build the foundation
 
 ```python
-from canvas import CanvasScene, WorldPoint
+from canvas import CanvasScene
 from canvas.builder import CanvasBuilder
 
-from .helpers import add_compare_row, add_plot_trace
+from .helpers import sample_quadratic
 
 
 class QuadraticGraphs(CanvasScene):
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="Quadratic Graphs")
-        tape = builder.add_tape("main")
 
-        tape.add_heading(
+        builder.add_heading(
             "Graphs of quadratics",
             style={"align": "center", "margin-bottom": 0.45},
         )
-        tape.add_math(
+        builder.add_math(
             r"ax^2 + bx + c = 0",
             style={"align": "center", "margin-bottom": 0.55},
         )
@@ -54,71 +53,69 @@ class QuadraticGraphs(CanvasScene):
 The heading and equation establish a stable visual context before any comparison
 begins.
 
-## Add a comparison through a project helper
+## Add sampled series through a project helper
 
-The project keeps quadratic-specific plot composition in `helpers.py`, not the
-generic builder:
+The project keeps coefficient evaluation and sampling in `helpers.py`. The
+engine receives only named point data:
 
 ```python
-plot_positive, plot_negative = add_compare_row(
-    tape,
-    builder,
-    (1, -2, 1),
-    (-1, 2, 1),
-    left_id="plot_a_pos",
-    right_id="plot_a_neg",
-    style={"align": "center", "margin-bottom": 0.35},
-    left_kwargs={
-        "x_range": (-1, 3),
-        "x_start": 0,
-        "color": "#5eb3ff",
-    },
-    right_kwargs={
-        "x_range": (-1, 3),
-        "x_start": 0,
-        "color": "#ff8a65",
-    },
+# helpers.py
+def sample_quadratic(a, b, c, *, x_min, x_max, steps=41):
+    dx = (x_max - x_min) / (steps - 1)
+    return [
+        [x := x_min + index * dx, a * x * x + b * x + c]
+        for index in range(steps)
+    ]
+```
+
+```python
+plot_id = builder.add_data_plot(
+    [
+        {
+            "id": "opens_up",
+            "points": sample_quadratic(1, -2, 1, x_min=-1, x_max=3),
+            "color": "#5eb3ff",
+        },
+        {
+            "id": "opens_down",
+            "points": sample_quadratic(-1, 2, 1, x_min=-1, x_max=3),
+            "color": "#ff8a65",
+        },
+    ],
+    id="quadratic_comparison",
+    x_range=[-1, 3, 1],
+    style={"width": 6.8, "margin-bottom": 0.5},
 )
 ```
 
 This division is important:
 
-- The engine provides layout, plots, camera, and timeline behavior.
-- The project helper expresses the subject-specific comparison.
+- The engine provides axes, curves, semantic parts, layout, state, and camera.
+- The project helper expresses the subject-specific function and samples.
 
-## Trace and focus
+## Emphasize and focus
 
 ```python
-add_plot_trace(
-    builder,
-    plot_positive,
-    x_from=-0.5,
-    x_to=2.5,
-    run_time=3.2,
-)
+builder.add_state_transition([
+    {
+        "target_id": f"{plot_id}::series:opens_up",
+        "changes": {"stroke_width": 7},
+    },
+    {
+        "target_id": f"{plot_id}::series:opens_down",
+        "changes": {"stroke_opacity": 0.25},
+    },
+])
 
 builder.add_camera_focus(
-    plot_positive,
+    plot_id,
     zoom=2.1,
     hold_time=1.2,
 )
 ```
 
-The trace explains how the graph changes continuously. Focus then gives the
-viewer time to inspect one concrete case.
-
-## Add a secondary tape
-
-```python
-notes = builder.add_tape("graph_notes")
-notes.add_body(
-    "a controls width",
-    style={"align": "center"},
-)
-```
-
-Use the secondary tape for a distinct spatial context, not merely another
-paragraph.
+Semantic state distinguishes the current comparison without rebuilding either
+curve. Focus gives the viewer time to inspect the complete axes.
 
 ## Finish the scene
 
@@ -141,10 +138,11 @@ For a faster structural check:
 ## Try these changes
 
 <Steps>
-1. Change the coefficient pairs while preserving the side-by-side structure.
+1. Change the coefficient pairs while preserving the shared axes.
 2. Use the notes tape to summarize the invariant.
 3. Reduce the focus zoom and compare the resulting framing.
-4. Add another section for the effect of `b` or `c`.
+4. Add a named marker at each vertex.
 </Steps>
 
-[View the complete project source](https://github.com/fargonee/math/blob/main/projects/quadratic_graphs/scenes.py).
+See [Data visuals and transitions](/authoring/data-visuals-and-transitions/) for
+the complete `DataPlot` schema.

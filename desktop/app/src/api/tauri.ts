@@ -1,6 +1,8 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 
 import type {
+  BundledExampleOpen,
+  BundledExampleSummary,
   CacheKind,
   ChatCompletionResponse,
   ChatMessage,
@@ -34,6 +36,18 @@ export function runningInTauri(): boolean {
 
 export async function projectList(): Promise<ProjectSummary[]> {
   return invoke<ProjectSummary[]>("project_list");
+}
+
+export async function exampleList(): Promise<BundledExampleSummary[]> {
+  return invoke<BundledExampleSummary[]>("example_list");
+}
+
+export async function exampleOpenSource(exampleId: string): Promise<BundledExampleOpen> {
+  return invoke<BundledExampleOpen>("example_open_source", { params: { exampleId } });
+}
+
+export async function exampleCreateCopy(exampleId: string): Promise<ProjectOpen> {
+  return invoke<ProjectOpen>("example_create_copy", { params: { exampleId } });
 }
 
 export async function projectCreate(name: string): Promise<ProjectOpen> {
@@ -82,6 +96,14 @@ export async function projectDeleteMedia(projectId: string, category: string, na
 
 export async function projectDelete(projectId: string): Promise<void> {
   return invoke("project_delete", { params: { projectId } });
+}
+
+export async function projectExportArchive(projectId: string, destination: string): Promise<string> {
+  return invoke<string>("project_export_archive", { params: { projectId, destination } });
+}
+
+export async function projectImportArchive(source: string): Promise<ProjectOpen> {
+  return invoke<ProjectOpen>("project_import_archive", { params: { source } });
 }
 
 export async function sidecarPing(): Promise<Record<string, unknown>> {

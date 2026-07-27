@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "project_slug": "fourier_epicycles",
+  "production_path": "mute_video",
+  "current_phase": "mute_delivery",
+  "phases": [
+    {
+      "id": "description",
+      "label": "Creative description",
+      "status": "complete",
+      "evidence": [
+        "brief/description.md"
+      ]
+    },
+    {
+      "id": "passport",
+      "label": "Passport and mute path",
+      "status": "complete",
+      "evidence": [
+        "brief/passport.json"
+      ]
+    },
+    {
+      "id": "tape_content",
+      "label": "Visible content",
+      "status": "complete",
+      "evidence": [
+        "brief/tapes/main.md"
+      ]
+    },
+    {
+      "id": "orchestration",
+      "label": "Visual orchestration",
+      "status": "complete",
+      "evidence": [
+        "brief/orchestration.md"
+      ]
+    },
+    {
+      "id": "authoring",
+      "label": "Scene and helper authoring",
+      "status": "complete",
+      "evidence": [
+        "scenes.py",
+        "helpers.py",
+        "successful check_project with 77 timeline items and no diagnostics"
+      ]
+    },
+    {
+      "id": "render_repair",
+      "label": "Preview render and visual repair",
+      "status": "complete",
+      "evidence": [
+        "first 960x540 preview rendered 97.265 seconds",
+        "contact-sheet review found and repaired formula overflow, dense legend, section spacing, and final typography",
+        "third 960x540 preview rendered 96.797 seconds with 107 animations",
+        "8-second contact sheet and 90-second final frame visually inspected",
+        "final MP4 contains no audio stream"
+      ]
+    },
+    {
+      "id": "mute_delivery",
+      "label": "Validated mute-video delivery",
+      "status": "pending",
+      "evidence": [
+        "authoring-stage preview accepted",
+        "final-quality 1920x1080 master remains required before public showcase delivery"
+      ]
+    }
+  ],
+  "invalidated_phases": [],
+  "blockers": [],
+  "next_action": "Render and inspect the 1920x1080 final-quality master when the showcase export cycle begins.",
+  "last_updated": "2026-07-27"
+}

@@ -4,7 +4,7 @@
 
 **Control-plane owner:** Desktop/Tauri
 
-Phase 1 implements the LLM-independent run foundation specified by [`agentic_ai_goal.md`](../../agentic_ai_goal.md) and ADR-001.
+Phase 1 implements the LLM-independent run foundation specified by [`agentic_ai_goal.md`](../agentic_ai_goal.md) and ADR-001.
 
 ## Delivered contracts
 

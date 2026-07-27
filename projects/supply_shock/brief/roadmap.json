@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "project_slug": "supply_shock",
+  "production_path": "mute_video",
+  "current_phase": "mute_delivery",
+  "phases": [
+    {"id": "description", "label": "Creative description", "status": "complete", "evidence": ["brief/description.md"]},
+    {"id": "passport", "label": "Passport and mute path", "status": "complete", "evidence": ["brief/passport.json"]},
+    {"id": "tape_content", "label": "Visible content", "status": "complete", "evidence": ["brief/tapes/main.md"]},
+    {"id": "orchestration", "label": "Visual orchestration", "status": "complete", "evidence": ["brief/orchestration.md"]},
+    {"id": "authoring", "label": "Scene and helper authoring", "status": "complete", "evidence": ["scenes.py", "helpers.py", "check_project: 33 timeline items, no diagnostics"]},
+    {"id": "render_repair", "label": "Preview render and visual repair", "status": "complete", "evidence": ["three 960x540 preview iterations", "repaired causal arrows, equilibrium equation, model-boundary safe area, and finale", "accepted duration 48.198 seconds; 54 animations; silent H.264"]},
+    {"id": "mute_delivery", "label": "Validated mute-video delivery", "status": "pending", "evidence": ["preview accepted", "final 1920x1080 master pending"]}
+  ],
+  "invalidated_phases": [],
+  "blockers": [],
+  "next_action": "Render and inspect the 1920x1080 final-quality master during the showcase export cycle.",
+  "last_updated": "2026-07-27"
+}

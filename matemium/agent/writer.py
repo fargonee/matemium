@@ -330,56 +330,19 @@ def build_scenes_patches(
     if import_search in template:
         patches.append(PatchBlock(search=import_search, replace=import_replace))
 
-    parts_search = (
-        "# ---DIV: Scene parts---\n"
-        "def part_intro(b: CanvasBuilder) -> None:\n"
-        '    b.add_heading("Your title here")\n'
-        '    b.add_body("Start your mathematical reasoning...")\n'
-        '    b.add_math(r"x^2 - 5x + 6 = 0")\n'
-        '    b.add_observation("We look for two numbers that multiply to 6 and add to -5.")\n'
-        "\n"
-        "\n"
-        "def part_conclusion(b: CanvasBuilder) -> None:\n"
-        '    b.add_math(r"x^2 - 5x + 6 = (x-2)(x-3)")\n'
-        '    # 3D world example using clarified model:\n'
-        '    # - set_tape_pose makes the tape a 3D object\n'
-        '    # - observe_object for normal 3D view of tape or solids\n'
-        '    # - scroll_tape to enter classic tape-scroll-mode (internal reveal/scroll)\n'
-        '    b.set_tape_pose(rotation=(30, 0, 0))\n'
-        '    b.add_3d("z = x^2 - y^2")\n'
-        '    b.observe_object("solid1")  # normal 3D cinematic on the solid\n'
-        '    b.add_text("Conclusion: x = 2 or x = 3")\n'
-        '    # Free 3D object\n'
-        '    from canvas.dsl import WorldObject, WorldTransform, Vector3, CanvasElement\n'
-        '    solid = CanvasElement(id="solid1", type="Solid3D", content={"shape": "cube"})\n'
-        '    wo = WorldObject(id="wo1", element=solid, transform=WorldTransform(position=Vector3(5, 0, 5)))\n'
-        '    b.add_world_object(wo)\n'
-        '    # Scroll the (possibly angled) tape using its internal logic\n'
-        '    b.scroll_tape(local_y=5.0)\n'
-    )
-    if parts_search not in template:
+    parts_marker = "# ---DIV: Scene parts---"
+    scene_marker = "# ---DIV: Main scene---"
+    parts_start = template.find(parts_marker)
+    scene_start = template.find(scene_marker)
+    if parts_start < 0 or scene_start <= parts_start:
         raise PatchError("scenes.py template changed; parts SEARCH anchor missing")
+    parts_search = template[parts_start:scene_start]
     patches.append(
         PatchBlock(search=parts_search, replace=emit_scenes_parts_replace(script, blueprint))
     )
 
-    scene_search = (
-        "# ---DIV: Main scene---\n"
-        "class MyScene(CanvasScene):\n"
-        '    """Main scene for this project."""\n'
-        "\n"
-        "    def __init__(self, **kwargs):\n"
-        "        # Default: portrait 9:16 (Reels / Shorts). For YouTube 16:9 use:\n"
-        "        # CanvasBuilder(title=\"My Scene\", canvas_settings=CanvasSettings.for_youtube())\n"
-        "        builder = CanvasBuilder(\n"
-        '            title="My Scene",\n'
-        '            canvas_settings=CanvasSettings.for_reels(title="My Scene"),\n'
-        "        )\n"
-        "        part_intro(builder)\n"
-        "        part_conclusion(builder)\n"
-        "        super().__init__(dsl=builder.build(), **kwargs)"
-    )
-    if scene_search not in template:
+    scene_search = template[scene_start:].rstrip("\n")
+    if not scene_search.startswith(scene_marker):
         raise PatchError("scenes.py template changed; main scene SEARCH anchor missing")
     patches.append(
         PatchBlock(

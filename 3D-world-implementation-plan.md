@@ -1,5 +1,12 @@
 # 3D World Unification Implementation Plan
 
+> **Status — historical/forward implementation plan (reviewed 2026-07-27).**
+> Phase labels in this file are not proof of current public behavior. The
+> implemented high-level contract is documented in
+> [`AUTHORING_API.md`](AUTHORING_API.md). In particular, transformed physical
+> tapes and unified world-camera observation remain unfinished.
+> `TapeScroll` below is a planned type, not a current class in `canvas.dsl`.
+
 **Goal:** Evolve the Matemium engine from a sheet-first system (with bolted-on 3D) into a true infinite 3D space where the current "infinite tape/sheet" is simply one special kind of object (`TapeObject`). 
 
 **Clarified observation model (2026-07):**

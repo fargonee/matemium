@@ -2,7 +2,11 @@
 # SYSTEM PROMPT & ARCHITECTURE SPECIFICATION: PROJECT MATEMIUM
 
 ## 1. Project Vision
-"Matemium" is a proprietary layout-to-animation compiler built on top of the Manim Community Edition (Python). It shifts the Manim paradigm from a "code-driven sequence of scenes" to an "infinite, vertically scrollable learning sheet." The output engine splits a single long-form canvas into micro-dose 9:16 vertical chunks suitable for social media short-form reels.
+"Matemium" is a source-available layout-to-animation compiler built on top of
+Manim Community Edition (Python). It shifts the Manim paradigm from a
+code-driven sequence of scenes to a structured, vertically scrollable reasoning
+tape. The same generic visual system supports mathematics and other subjects.
+Output can target 9:16 short-form video or 16:9 long-form explanation.
 
 ## 2. Core Architectural Paradigm
 
@@ -16,14 +20,22 @@ The root is one **infinite 3D space** (XZ ground, Y up by convention). The legac
 
 **Canonical model (clarified model — see `3D-WORLD-DESCRIPTION.md`):**
 
+The following is the target architecture. As of 2026-07-27, the public
+high-level contract is narrower: tapes are isolated 2D layout contexts,
+`add_tape()` rejects physical transforms, and arbitrary transformed-tape
+observation is not production-supported. Free world objects are experimental,
+and the source-level `scroll_tape()` method is unusable because `TapeScroll` is
+not defined in the current DSL. See `AUTHORING_API.md`.
+
 The root is one **infinite 3D space** (XZ ground / Y up). The legacy "tape/sheet" is a special `TapeObject` inside the world.
 
-**Clarified observation model:**
+**Target observation model (not current API):**
 - Every object (tapes included) is observed by default with normal cinematic 3D behavior (look-at, orbit, follow transforms).
 - Free 3D objects do not get tape-like features.
-- `TapeScroll` target (tape-scroll-mode) is the only way to activate a tape's internal 2D mechanisms: local-coordinate scroll, lazy reveal driven by local progress, sheet focus/layout logic.
+- A future `TapeScroll` target would explicitly activate a tape's internal 2D mechanisms.
 - The outer camera always respects a tape's `world_transform`, even in scroll mode.
-- Classic tape videos continue to work identically when authored the old way (they use tape-scroll-mode under the hood on the default root tape).
+- Current classic/root-tape videos use automatic reveal and legacy
+  `CameraMove`; they do not require `TapeScroll`.
 
 See `3D-WORLD-DESCRIPTION.md` and `canvas/3D-model.md` for the full model, terminology, and current status. Architecture and camera implementation still need work to fully realize the separation between normal 3D observation and tape-scroll-mode.
 
@@ -102,7 +114,10 @@ A script that maps the length of the long-form sheet and automatically calculate
 
 ## 6. Abstraction Layers (authoritative)
 
-Matemium is a **layout-to-animation compiler**, not a collection of lesson scenes. The product is the **tool** — reusable primitives, layout, camera, timeline, and styling — that can compose any math video later.
+Matemium is a **layout-to-animation compiler**, not a collection of lesson
+scenes. The product is the **tool**—reusable primitives, layout, camera,
+timeline, semantic state, and styling—that can compose structured visual
+explanations across subjects.
 
 ### 6.1 Two layers — no `canvas/extensions/`
 
@@ -136,9 +151,11 @@ Authors express layout and presentation through **`style={...}` dicts** (parsed 
 
 Core methods stay **structural and generic**:
 
-- `add_text`, `add_math`, `add_3d` — content + style
+- `add_text`, `add_math`, `add_3d` — text/math/surface content + style
+- `add_data_path`, `add_data_plot`, `add_diagram` — validated sampled visuals
 - `add_flex_row`, `add_flex_column` — composition via specs (`text_spec`, `math_spec`, …)
 - `add_camera_focus` — viewport tool (isolate / overlay)
+- `add_state_transition`, `add_element_morph` — generic timeline state/content changes
 - `add_raw` — escape hatch to `CanvasElement`
 
 Semantic typography (`add_heading`, `add_body`, `add_observation`) are **thin style presets** on `add_text` — acceptable in core because they encode layout intent, not a math topic.
@@ -189,6 +206,8 @@ Implementation: `canvas/rich_text.py` composes Manim `Text` per run (with option
 - `CameraMove` — explicit scroll
 - `TransformElement` — re-animate existing registry entry
 - `CameraFocus` — isolate-zoom or overlay magnifier (`focus.py`)
+- `StateTransition` — synchronized, allowlisted property patches on elements or semantic subparts
+- `ElementMorph` — rebuild and morph one registered element through the normal compiler pipeline
 
 **Topic-coupled timeline actions** (should become generic or live only in project helpers):
 
@@ -200,6 +219,24 @@ Implementation: `canvas/rich_text.py` composes Manim `Text` per run (with option
 
 `MathTex`, `Text`, `ThreeDGraph`, `Surface`, `Axes`, `NumberPlane`, `ParametricFunction`, `VGroup`, `Dot`, `Arrow`, `Image`, `SVG`
 
+Generic compound kinds promoted from cross-domain flagship evidence:
+
+- `DataPath` — sampled trajectories, contours, routes, and vectors;
+- `DataPlot` — axes plus named sampled series and markers;
+- `Diagram` — named nodes and directed/undirected edges with explicit project-controlled positions.
+
+Compound kinds expose stable semantic parts addressed as `element_id::part_id`; timeline state remains
+generic while domain events stay in project helpers. See `ENGINE_ABSTRACTION_PLAN.md`.
+
+Current part contracts are:
+
+- `DataPath`: `path`
+- `DataPlot`: `axes`, `series:<id>`, `marker:<id>`
+- `Diagram`: `node:<id>`, `edge:<id>`, and `edge-label:<id>` for labeled edges
+
+The corresponding registered kind supplies build, measure, validation, and
+semantic-parts functions. Exact schemas are in `AUTHORING_API.md`.
+
 **Topic-specific element types** (added during test-scene work — technical debt in DSL):
 
 `GridBoard`, `GridMark`, `QuadraticPlot`, `QuadraticPlotPair`
@@ -210,7 +247,9 @@ Render support for these may remain in `measure.py` temporarily. **Authoring** m
 
 1. **Stress-test** with real projects under `projects/` (quadratic graphs, EM waves, tic-tac-toe).
 2. **Extract** repeated patterns into project `helpers.py`, or into `projects/_lib/` if two unrelated lessons need the same code.
-3. **Promote to core** only when a pattern is truly generic (e.g. `add_axes_plot(fn, x_range)` — not `add_quadratic_plot(a,b,c)`).
+3. **Promote to core** only when a pattern is truly generic. Prefer sampled,
+   serializable data such as `add_data_plot(series)` over runtime domain
+   callables or `add_quadratic_plot(a,b,c)`.
 4. **Never** merge lesson-specific logic into `CanvasScene.construct()` or `CanvasBuilder` for convenience.
 5. **Prefer** `style={}` + flex composition over new `add_*` methods.
 6. Test scenes are **disposable**; the engine abstractions are **durable**.

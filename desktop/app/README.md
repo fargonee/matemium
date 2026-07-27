@@ -42,7 +42,7 @@ Current Project
     └── History
 ```
 
-The exact branch and gate ordering are normative in [the AI-led production lifecycle](../../docs/product-production-lifecycle.md). The Roadmap records the current phase and evidence. Ordinary users can work through AI chat and approval controls; raw Markdown, JSON, timestamps, and Python remain available as advanced surfaces.
+The exact branch and gate ordering are normative in [the AI-led production lifecycle](../../product-production-lifecycle.md). The Roadmap records the current phase and evidence. Ordinary users can work through AI chat and approval controls; raw Markdown, JSON, timestamps, and Python remain available as advanced surfaces.
 
 ## Dev
 

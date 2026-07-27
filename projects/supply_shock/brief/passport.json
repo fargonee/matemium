@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "project_slug": "supply_shock",
+  "title": "How a Supply Shock Moves Through a Market",
+  "production_path": "mute_video",
+  "production_path_basis": "The flagship explanation must remain complete without narration, music, or live data.",
+  "audience": "General learners and introductory economics students",
+  "assumed_knowledge": ["graphs encode relationships", "price and quantity can change", "a model holds some conditions fixed"],
+  "central_message": "A loss of productive capacity shifts supply; with demand initially fixed, the model selects a higher price and lower quantity.",
+  "takeaway": "A supply-and-demand graph is conditional causal accounting, not an instant forecast or a complete description of an economy.",
+  "platform": "website showcase and bundled desktop example",
+  "orientation": "landscape",
+  "aspect_ratio": "16:9",
+  "resolution_master": "1920x1080",
+  "duration_target_seconds": {"minimum": 45, "maximum": 60},
+  "language": "English",
+  "scientific_depth": "introductory partial-equilibrium supply, demand, curve shifts, equilibrium, adjustment scenarios, and model boundaries",
+  "visual_direction": "dark analytical dashboard with stable colors for demand, supply, shock, equilibrium, and adjustment paths",
+  "tone": "causal, conditional, transparent",
+  "pacing": "physical hook, baseline model, supply shift, scenario paths, assumptions, synthesis",
+  "audio": {"final_track": "none", "must_remain_understandable_without_sound": true},
+  "constraints": [
+    "offline and deterministic",
+    "use fictional teaching quantities",
+    "distinguish a curve shift from movement along a curve",
+    "do not equate one product's price change with economy-wide inflation",
+    "make omitted variables and non-instant adjustment visible"
+  ],
+  "success_criteria": [
+    "baseline equilibrium is P=60 and Q=40",
+    "shock equilibrium is P=70 and Q=30",
+    "three adjustment paths remain visually distinguishable",
+    "assumptions are part of the narrative",
+    "all parameters and sampled paths remain editable source"
+  ],
+  "readiness": {"status": "ready", "missing_fields": []},
+  "last_updated": "2026-07-27"
+}

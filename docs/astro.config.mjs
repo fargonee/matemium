@@ -52,6 +52,7 @@ export default defineConfig({
 						{ slug: 'authoring/scenes-py' },
 						{ slug: 'authoring/tapes' },
 						{ slug: 'authoring/layout-and-style' },
+						{ slug: 'authoring/data-visuals-and-transitions' },
 						{ slug: 'authoring/camera-focus-and-3d' },
 					],
 				},
@@ -66,6 +67,7 @@ export default defineConfig({
 					label: 'Reference',
 					collapsed: true,
 					items: [
+						{ slug: 'reference/engine-capabilities' },
 						{ slug: 'reference/canvasbuilder' },
 						{ slug: 'reference/style-properties' },
 						{ slug: 'reference/cli' },

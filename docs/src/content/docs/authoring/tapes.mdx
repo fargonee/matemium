@@ -1,25 +1,24 @@
 ---
 title: Infinite tapes
-description: Compose explanations on one or more tapes and understand tape-scroll behavior.
+description: Use the automatic root tape and understand the maturity of additional tape contexts.
 ---
 
-A tape is a structured plane inside Matemium’s 3D world. In tape-scroll mode it
-behaves like an infinite document: content flows vertically, reveals as the
-camera reaches it, and remains addressable after appearing.
+A tape is a structured 2D layout context in Matemium’s scene model. In
+tape-scroll mode it behaves like an infinite document: content flows
+vertically, reveals as the camera reaches it, and remains addressable after
+appearing.
 
-## Create the main tape
+## Use the automatic root tape
 
 ```python
 builder = CanvasBuilder(title="Supply and Demand")
-tape = builder.add_tape("main")
-
-tape.add_heading("A market moves toward equilibrium")
-tape.add_body("Demand falls as price rises.")
-tape.add_body("Supply rises as price rises.")
+builder.add_heading("A market moves toward equilibrium")
+builder.add_body("Demand falls as price rises.")
+builder.add_body("Supply rises as price rises.")
 ```
 
-Content added through the tape is laid out relative to other content on that
-tape.
+The root tape is created automatically. Ordinary `builder.add_*` calls are laid
+out relative to other root-tape content.
 
 ## Why elements persist
 
@@ -29,7 +28,7 @@ transform, or revisit them without rebuilding the object.
 Assign an explicit identifier when you need to reference an element later:
 
 ```python
-tape.add_math(r"Q_d = Q_s", id="equilibrium")
+builder.add_math(r"Q_d = Q_s", id="equilibrium")
 builder.add_camera_focus("equilibrium", zoom=1.8, hold_time=1.0)
 ```
 
@@ -48,19 +47,31 @@ right.add_heading("Objection")
 right.add_body("Fallible beliefs can still be justified.")
 ```
 
-When timeline content switches between tapes, Matemium manages the active
-tape-scroll context. Do not manually imitate tape switching by dragging or
-stacking text objects.
+The renderer contains automatic context-switch behavior when timeline content
+moves between additional tapes. Treat this as an advanced feature and verify
+every switch in a real preview; root-tape authoring is the production-safe
+default.
 
 ## Tape view and world view
 
-A tape has two useful interpretations:
+A tape currently provides:
 
-- **Tape-scroll view** — document layout, local scrolling, lazy reveal, and focus.
-- **World view** — the tape is a plane that can be positioned and observed in 3D.
+- **Root-tape view** — document layout, automatic local scrolling, lazy reveal,
+  and focus.
+- **Additional tape contexts** — separate layouts with automatic switching that
+  still require project-level preview evidence.
 
 Free 3D objects do not inherit tape layout behavior. Only tape content flows
 through the tape’s internal layout system.
+
+The architecture contains a broader model in which tapes may eventually be
+observed as transformed world planes. Arbitrary physical tape placement is not
+a current high-level authoring contract: `add_tape()` intentionally rejects
+`position`, `rotation`, and `scale`.
+
+The source-level `scroll_tape()` sugar is also unavailable in the current DSL
+because `TapeScroll` is not implemented. Normal root-tape reveal does not need
+it.
 
 ## After a 3D moment
 
@@ -68,7 +79,7 @@ Content that follows certain 3D elements may need to declare that relationship:
 
 ```python
 builder.add_3d(r"z = \sin(x)\cos(y)", pitch=50)
-tape.add_body(
+builder.add_body(
     "Return to the explanation after inspecting the surface.",
     after_3d=True,
 )

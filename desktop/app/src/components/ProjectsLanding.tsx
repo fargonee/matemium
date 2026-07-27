@@ -1,17 +1,26 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import * as api from "../api/tauri";
-import type { ProjectSummary } from "../api/types";
+import type {
+  BundledExampleOpen,
+  BundledExampleSummary,
+  ProjectSummary,
+} from "../api/types";
 import { formatRelativeTime } from "../utils/formatDate";
 import { videoAssetSrc } from "../utils/videoAsset";
 
 interface ProjectsLandingProps {
+  examples: BundledExampleSummary[];
   projects: ProjectSummary[];
   newName: string;
   busy: boolean;
   onNewNameChange: (value: string) => void;
   onCreate: () => void;
+  onCreateExample: (exampleId: string) => void;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
+  onExportArchive: (projectId: string, destination: string) => Promise<void>;
+  onImportArchive: (source: string) => Promise<void>;
   readinessMessage?: string;
 }
 
@@ -70,14 +79,28 @@ function ProjectThumbnail({ previewVideo, sceneClass }: { previewVideo?: string 
   );
 }
 
+function archiveFileName(project: ProjectSummary) {
+  const base = project.name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return `${base || "matemium-project"}.matemium.zip`;
+}
+
 export function ProjectsLanding({
+  examples,
   projects,
   newName,
   busy,
   onNewNameChange,
   onCreate,
+  onCreateExample,
   onOpen,
   onDelete,
+  onExportArchive,
+  onImportArchive,
   readinessMessage,
 }: ProjectsLandingProps) {
   // Gallery and basic states
@@ -85,9 +108,16 @@ export function ProjectsLanding({
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<GalleryItem | null>(null);
+  const [selectedExampleSource, setSelectedExampleSource] = useState<BundledExampleOpen | null>(null);
+  const [exampleSourceFile, setExampleSourceFile] = useState("scenes");
+  const [exampleSourceLoading, setExampleSourceLoading] = useState<string | null>(null);
+  const [exampleSourceError, setExampleSourceError] = useState<string | null>(null);
+  const [showExampleLibrary, setShowExampleLibrary] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<{id: string, name: string} | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState<string | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   // Collections state
   const [collections, setCollections] = useState<Collection[]>(() => {
@@ -105,6 +135,20 @@ export function ProjectsLanding({
   
   // Naming Modal Collection Target
   const [targetCollectionId, setTargetCollectionId] = useState<string | null>(null);
+
+  const inspectExample = async (exampleId: string) => {
+    setExampleSourceLoading(exampleId);
+    setExampleSourceError(null);
+    try {
+      const source = await api.exampleOpenSource(exampleId);
+      setSelectedExampleSource(source);
+      setExampleSourceFile("scenes");
+    } catch (sourceError) {
+      setExampleSourceError(String(sourceError));
+    } finally {
+      setExampleSourceLoading(null);
+    }
+  };
 
   // Helper to save collections
   const saveCollections = useCallback((updated: Collection[]) => {
@@ -160,6 +204,43 @@ export function ProjectsLanding({
     },
     [collections, saveCollections],
   );
+
+  const handleExportArchive = async (project: ProjectSummary) => {
+    setArchiveError(null);
+    const destination = await save({
+      defaultPath: archiveFileName(project),
+      filters: [{ name: "Matemium project archive", extensions: ["zip"] }],
+    });
+    if (!destination) return;
+
+    setArchiveBusy(`export:${project.id}`);
+    try {
+      await onExportArchive(project.id, destination);
+    } catch (exportError) {
+      setArchiveError(String(exportError));
+    } finally {
+      setArchiveBusy(null);
+    }
+  };
+
+  const handleImportArchive = async () => {
+    setArchiveError(null);
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: "Matemium project archive", extensions: ["zip"] }],
+    });
+    if (!selected || Array.isArray(selected)) return;
+
+    setArchiveBusy("import");
+    try {
+      await onImportArchive(selected);
+    } catch (importError) {
+      setArchiveError(String(importError));
+    } finally {
+      setArchiveBusy(null);
+    }
+  };
 
   // Auto-associate newly created project with the selected target collection
   const projectsRef = useRef<string[]>(projects.map((p) => p.id));
@@ -264,16 +345,44 @@ export function ProjectsLanding({
 
   return (
     <div className="projects-landing-page-modern" onClick={() => setManagingProjectId(null)}>
-      {/* 1. Stunning Hero Section */}
+      {/* 1. Product promise */}
       <div className="projects-landing-hero-modern-unified">
-        <p className="projects-landing-eyebrow-modern">Professional Math Animation Studio</p>
-        <h2 className="projects-landing-heading-modern">Transform mathematical equations into stunning motion.</h2>
+        <p className="projects-landing-eyebrow-modern">Agentic visual reasoning studio</p>
+        <h2 className="projects-landing-heading-modern">Turn complex ideas into structured visual stories.</h2>
         <p className="projects-landing-lead-modern">
-          Empower your teaching, presentations, and social feeds with professional-grade math visuals. AI-assisted scripting, real-time previews, and zero setup.
+          Build staged explanations for mathematics, science, computing, engineering, and any subject that benefits from diagrams, motion, and spatial reasoning.
         </p>
       </div>
 
-      {/* 2. Dual-Pane Layout */}
+      {/* 2. Compact launcher for bundled, source-only examples */}
+      <section className="example-library-modern">
+        <button
+          type="button"
+          className="example-library-launch-modern"
+          onClick={() => setShowExampleLibrary(true)}
+          aria-haspopup="dialog"
+        >
+          <span className="example-library-launch-icon-modern" aria-hidden>✦</span>
+          <span className="example-library-launch-copy-modern">
+            <span className="example-library-kicker-modern">
+              {examples.length} subjects · source only
+            </span>
+            <strong>Explore the Bundled Example Library</strong>
+            <small>Flagship briefs and clean authoring templates, ready to open as editable copies.</small>
+          </span>
+          <span className="example-library-symbols-modern" aria-hidden>
+            {examples.slice(0, 5).map((example) => (
+              <span key={example.id}>{example.symbol}</span>
+            ))}
+            {examples.length > 5 && <span>+{examples.length - 5}</span>}
+          </span>
+          <span className="example-library-open-modern">
+            Open library <span aria-hidden>↗</span>
+          </span>
+        </button>
+      </section>
+
+      {/* 3. Dual-Pane Layout */}
       <div className="dashboard-layout-grid-modern">
         {/* Left Column: Your Projects Workspace */}
         <section className="workspace-pane-modern">
@@ -282,7 +391,21 @@ export function ProjectsLanding({
               <h3 className="pane-title-modern">Your Projects</h3>
               <span className="count-badge-modern">{filteredProjects.length}</span>
             </div>
+            <button
+              type="button"
+              className="btn btn-secondary project-import-archive-modern"
+              disabled={archiveBusy !== null}
+              onClick={() => void handleImportArchive()}
+            >
+              {archiveBusy === "import" ? "Importing..." : "Import Project"}
+            </button>
           </div>
+
+          {archiveError && (
+            <div className="project-archive-error-modern">
+              {archiveError}
+            </div>
+          )}
 
           {/* Collections filter row */}
           <div className="collections-filter-row-modern" onClick={(e) => e.stopPropagation()}>
@@ -335,7 +458,7 @@ export function ProjectsLanding({
                 setTargetCollectionId(activeCollectionId);
                 setShowCreateModal(true);
               }}
-              title="Click to start a new mathematical project"
+              title="Click to start a new visual project"
             >
               <div className="project-card-thumb-container-modern create-new-thumb-container-modern">
                 <div className="create-new-plus-modern">+</div>
@@ -385,6 +508,19 @@ export function ProjectsLanding({
                   title="Manage collections"
                 >
                   📁
+                </button>
+
+                <button
+                  type="button"
+                  className="project-card-export-modern"
+                  title="Export project archive"
+                  disabled={archiveBusy !== null}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleExportArchive(project);
+                  }}
+                >
+                  {archiveBusy === `export:${project.id}` ? "…" : "⇩"}
                 </button>
 
                 {/* Collection membership toggle popover */}
@@ -441,7 +577,7 @@ export function ProjectsLanding({
             </div>
             <input
               type="text"
-              placeholder="Search equations, tags..."
+              placeholder="Search topics, creators, tags..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="inspiration-search-input-modern"
@@ -525,7 +661,7 @@ export function ProjectsLanding({
                       key={item.id}
                       className="inspiration-card-modern"
                       onClick={() => setSelectedVideo(item)}
-                      title="Click to watch this community math creation"
+                      title="Click to watch this community creation"
                     >
                       <div className="inspiration-thumb-container-modern">
                         {yt && (
@@ -570,7 +706,7 @@ export function ProjectsLanding({
                 })}
                 {filteredGallery.length === 0 && (
                   <div className="inspiration-empty-modern">
-                    No matches for "{searchQuery}". Try searching for calculus, algebra, geometry or physics.
+                    No matches for "{searchQuery}". Try physics, algorithms, biology, history, or algebra.
                   </div>
                 )}
               </div>
@@ -579,18 +715,115 @@ export function ProjectsLanding({
         </section>
       </div>
 
-      {/* 3. Small Modal to Input Project Name */}
+      {/* Bundled Example Library */}
+      {showExampleLibrary && (
+        <div
+          className="gallery-modal example-library-overlay-modern"
+          onClick={() => setShowExampleLibrary(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="example-library-title"
+        >
+          <div
+            className="modal-content example-library-modal-modern"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setShowExampleLibrary(false)}
+              aria-label="Close example library"
+            >
+              ✕
+            </button>
+            <div className="example-library-header-modern">
+              <div>
+                <p className="example-library-kicker-modern">
+                  Eleven flagship projects · authoring begins here
+                </p>
+                <h3 id="example-library-title">Bundled Example Library</h3>
+                <p>
+                  Every project includes its full expectations and a clean source template.
+                  Inspect the brief or open an independent authoring copy.
+                </p>
+              </div>
+              <span className="example-library-count-modern">
+                SOURCE ONLY · {examples.length}
+              </span>
+            </div>
+
+            {exampleSourceError && (
+              <div className="example-library-error-modern">{exampleSourceError}</div>
+            )}
+
+            <div className="example-library-grid-modern">
+              {examples.map((example) => (
+                <article
+                  className={`example-card-modern example-${example.subject}`}
+                  key={example.id}
+                >
+                  <div className="example-card-top-modern">
+                    <span className="example-symbol-modern" aria-hidden>{example.symbol}</span>
+                    <div>
+                      <span className="example-subject-modern">{example.subjectLabel}</span>
+                      <h4>{example.title}</h4>
+                    </div>
+                    <span className="example-stage-modern">
+                      {example.stage === "brief-ready" ? "Brief ready" : example.stage}
+                    </span>
+                  </div>
+                  <p className="example-question-modern">{example.question}</p>
+                  <p className="example-description-modern">{example.description}</p>
+                  <div className="example-capabilities-modern">
+                    {example.capabilities.slice(0, 4).map((capability) => (
+                      <span key={capability}>{capability}</span>
+                    ))}
+                  </div>
+                  <div className="example-card-actions-modern">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={busy || !!readinessMessage}
+                      onClick={() => onCreateExample(example.id)}
+                    >
+                      {example.stage === "brief-ready"
+                        ? "Open authoring copy"
+                        : "Create editable copy"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={exampleSourceLoading === example.id}
+                      onClick={() => void inspectExample(example.id)}
+                    >
+                      {exampleSourceLoading === example.id ? "Opening…" : "Inspect source"}
+                    </button>
+                  </div>
+                  <div className="example-card-footnote-modern">
+                    {example.stage === "brief-ready"
+                      ? "Full brief + empty template"
+                      : "Source only"}
+                    {" · "}{(example.sourceBytes / 1024).toFixed(0)} KB · No video bundled
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Small Modal to Input Project Name */}
       {showCreateModal && (
         <div className="gallery-modal" onClick={() => setShowCreateModal(false)}>
           <div className="modal-content create-modal-content-modern" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
             <h3 className="create-modal-title-modern">Initialize Your Project</h3>
-            <p className="create-modal-subtitle-modern">Give your math scene/visual a descriptive name to start your editing workspace.</p>
+            <p className="create-modal-subtitle-modern">Give your visual explanation a descriptive name to start your editing workspace.</p>
             
             <div className="create-modal-input-group-modern">
               <input
                 value={newName}
-                placeholder="e.g., Fourier Series Epicycles, Inscribed Sphere..."
+                placeholder="e.g., Orbital Motion, Sorting Algorithms, Cell Division..."
                 onChange={(e) => onNewNameChange(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && newName.trim() && !busy && !readinessMessage) {
@@ -662,12 +895,12 @@ export function ProjectsLanding({
           <div className="modal-content create-modal-content-modern" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setShowNewCollectionModal(false)}>✕</button>
             <h3 className="create-modal-title-modern">Create New Collection</h3>
-            <p className="create-modal-subtitle-modern">Group and organize your mathematical projects (e.g. Calculus, Physics, Waves proofs).</p>
+            <p className="create-modal-subtitle-modern">Group and organize projects by course, subject, audience, or series.</p>
             
             <div className="create-modal-input-group-modern">
               <input
                 value={newCollectionName}
-                placeholder="e.g., Linear Algebra, Calculus..."
+                placeholder="e.g., Mechanics, Algorithms, Biology..."
                 onChange={(e) => setNewCollectionName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && newCollectionName.trim()) {
@@ -700,7 +933,54 @@ export function ProjectsLanding({
         </div>
       )}
 
-      {/* 4. Video Lightbox Modal */}
+      {/* Example source inspector */}
+      {selectedExampleSource && (
+        <div className="gallery-modal" onClick={() => setSelectedExampleSource(null)}>
+          <div
+            className="modal-content example-source-modal-modern"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button className="modal-close" onClick={() => setSelectedExampleSource(null)}>✕</button>
+            <span className="example-subject-modern">
+              {selectedExampleSource.summary.subjectLabel} · Source preview
+            </span>
+            <h3 className="modal-video-title-modern">{selectedExampleSource.summary.title}</h3>
+            <p className="example-source-question-modern">
+              {selectedExampleSource.summary.question}
+            </p>
+            <div className="example-source-tabs-modern">
+              {Object.keys(selectedExampleSource.files).map((file) => (
+                <button
+                  type="button"
+                  className={exampleSourceFile === file ? "active" : ""}
+                  key={file}
+                  onClick={() => setExampleSourceFile(file)}
+                >
+                  {file === "description" ? "description.md" : `${file}.py`}
+                </button>
+              ))}
+            </div>
+            <pre className="example-source-code-modern">
+              <code>{selectedExampleSource.files[exampleSourceFile] ?? ""}</code>
+            </pre>
+            <div className="example-source-actions-modern">
+              <span>This opens a new copy. The bundled source remains unchanged.</span>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={busy || !!readinessMessage}
+                onClick={() => onCreateExample(selectedExampleSource.summary.id)}
+              >
+                {selectedExampleSource.summary.stage === "brief-ready"
+                  ? "Open authoring copy"
+                  : "Create editable copy"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Video Lightbox Modal */}
       {selectedVideo && (
         <div className="gallery-modal" onClick={() => setSelectedVideo(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>

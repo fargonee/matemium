@@ -67,6 +67,23 @@ python -m py_compile projects/my_project/scenes.py
 
 Then render with preview quality to expose scene-import errors.
 
+## The project check reports a DSL error
+
+The engine validates registered visual data and timeline references before
+render. Common causes include:
+
+- A `DataPath` or series with fewer than two points
+- A non-finite coordinate
+- Duplicate series, marker, node, or edge IDs
+- A diagram edge that references a missing node
+- An unknown `element::semantic-part` target
+- A state property outside the allowlist
+- An unknown or malformed morph target
+- Calling `scroll_tape()` in the current revision (`TapeScroll` is not defined)
+
+Fix the project data or target ID. Do not disable strict validation to force a
+production render.
+
 ## Text clips or overlaps
 
 Try these in order:
@@ -117,6 +134,10 @@ Record:
 - Expected invariant
 
 Then make the smallest useful source change and render again.
+
+Structural validation and a successful render do not establish visual or
+domain correctness. Inspect actual frames/video and review subject claims
+separately.
 
 ## Ask for help
 

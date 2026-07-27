@@ -1,7 +1,7 @@
 # Matemium Sidecar IPC Protocol
 
-**Version:** 1.0  
-**Last updated:** 2026-06-26 (reflects current sidecar commands + events)  
+**Version:** 1.0
+**Last updated:** 2026-07-27 (reflects current sidecar commands + engine actions)
 **Transport:** newline-delimited JSON on stdin (requests) and stdout (responses + events)
 
 The Tauri Rust shell spawns `matemium-sidecar` as a child process. All engine work flows through this protocol — the TypeScript UI never talks to Python directly.
@@ -56,6 +56,11 @@ Events may arrive **between** the request write and the matching response line. 
 
 Optional: `path` — alternate scenes file relative to workspace (default `scenes.py`).
 
+`check_project` imports a scene without runtime raising so it can return
+structured `SheetDSL.validate()` diagnostics. Production construction and
+rendering remain strict by default. Diagnostics include registered content
+schemas, semantic-part targets, state patches, and morph targets.
+
 `workspace` is the project root containing `scenes.py`, optional `helpers.py`, and `brief/`. Sidecar sets `MATEMIUM_ROOT` to this path while importing. In PyInstaller builds, `MATEMIUM_ROOT` is the **user project workspace**, not the frozen executable directory — see path detection in [`ai-agent-architecture.md`](../../ai-agent-architecture.md) §8.C.
 
 **Events:** `lint_started`, `lint_complete`, `check_complete`, plus render events on `render_project`.
@@ -81,6 +86,11 @@ Optional: `path` — alternate scenes file relative to workspace (default `scene
 | `job_id` | render, export, preview | Fallback id under `outputs/desktop/<id>/` |
 | `quality` | render, preview, export | `preview` \| `draft` \| `low` \| `medium` \| `high` \| `final` |
 | `strict` | `validate_dsl` | Reject legacy dev-only timeline types (default `true`) |
+
+Current inline DSL recognizes `DataPath`, `DataPlot`, and `Diagram` elements,
+plus `StateTransition` and `ElementMorph` timeline actions. They round-trip
+through normal DSL dictionaries/JSON. Product authors should still create them
+through `CanvasBuilder` in `scenes.py`.
 
 ## Event types
 

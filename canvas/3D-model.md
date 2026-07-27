@@ -1,12 +1,23 @@
 # 3D World Model — Transition Plan & Current Audit
 
-**Status:** Core 3D world structures (WorldTransform, TapeObject, WorldObject, root graph, CameraKeyframes) are in place and basic mixed placement works. 
+> **Status — architecture and migration record (reviewed 2026-07-27).**
+> Some types and structural tests described here exist, but transformed-tape
+> authoring is not a current public contract. `add_tape()` creates a 2D layout
+> context and rejects position/rotation/scale; old `set_tape_pose` examples are
+> stale. Use [`../AUTHORING_API.md`](../AUTHORING_API.md) for implemented APIs.
+> `TapeScroll` references below describe the intended design; the current DSL
+> does not define that type.
 
-**Important (2026-07 clarification):** The tape is one special object. By **default** it is observed like any other 3D object (cinematic). Only an explicit `TapeScroll` target activates "tape-scroll-mode", at which point the tape's internal 2D sheet mechanisms (local scroll, lazy reveal, focus, layout) fully apply. Free 3D objects do not get tape features. Old tape behavior must be reproduced exactly via the new model.
+**Status:** Core 3D world structures (WorldTransform, TapeObject, WorldObject, root graph, CameraKeyframes) are in place and basic mixed placement works.
+
+**Important (2026-07 clarification):** The target model treats the tape as one
+special object and proposes an explicit `TapeScroll` target for its internal
+mode. That target is not implemented in the current DSL.
 
 Full differentiated camera observation (especially tape-scroll-mode on angled tapes) is still partial. See `3D-WORLD-DESCRIPTION.md` and the updated implementation plan for the target model.
 
-Legacy sheet behavior is preserved when using classic authoring + TapeScroll on a default root tape.
+Legacy sheet behavior is preserved through automatic root-tape reveal and
+`CameraMove`, not through `TapeScroll`.
 
 See also:
 - `../3D-world-implementation-plan.md` (in math-preview)

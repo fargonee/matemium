@@ -3,7 +3,7 @@
 **Status:** Core desktop model (2026-06-26). **Latest product decisions** (lazy sidecar, first-run downloads, UX gating, YouTube publishing, vector intelligence) are in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).  
 **Audience:** All contributors — engine, desktop shell, cloud middleware, and AI integration authors.
 
-**Phase 10 status:** Packaging/CI/cross-platform + docs refresh implemented. See [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](../PRODUCT-ARCHITECTURE-IMPLEMENTATION.md) §11 and phased roadmap.
+**Phase 10 status:** Packaging/CI/cross-platform + docs refresh implemented. See [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md) §11 and phased roadmap.
 
 This document records the **strategic pivot** to a **free, source-available desktop application** where users author animations as **Python project code** assisted by **user-owned AI provider access** — not as cloud-generated JSON specs or platform-resold model credits.
 
@@ -145,7 +145,7 @@ Each user project maps to a directory on disk (app data dir, not the dev repo):
 | `helpers.py` | Human + AI | Computations, LaTeX helpers, geometry/data builders | Secondary code editor |
 | `brief/passport.json` | Human + AI | Topic, audience, difficulty, style, duration, language, constraints, learning goals | Form editor with JSON fallback |
 | `brief/description.md` | Human + AI | Freeform project brief and intent | Markdown editor |
-| `brief/tapes/*.md` | Human + AI | The exact mathematical/reasoning content shown on one or more tapes, separate from staging | Markdown editor with tape/beat navigation |
+| `brief/tapes/*.md` | Human + AI | The exact subject/reasoning content shown on one or more tapes, separate from staging | Markdown editor with tape/beat navigation |
 | `brief/orchestration.md` | Human + AI | 3D-world staging, tape relationships, camera, reveals, transformations, transitions, and pacing intent | Markdown editor with beat references |
 | `brief/roadmap.json` | AI-owned, human-readable | Phases, completion, current working point, blockers | Read-only production route; users steer changes through AI |
 | `brief/tts-narration.md` and optional `brief/tts-narration-style.md` | Human + AI | TTS script, delivery, pronunciation, holds, and timing | Markdown/script editor; TTS path only |
@@ -155,7 +155,7 @@ Each user project maps to a directory on disk (app data dir, not the dev repo):
 
 The `brief/` files are not rendered directly. They are persistent project memory for the user, the UI, and the AI agent. `scenes.py` is still the only required render entrypoint.
 
-The workspace is phase- and production-path-aware. It may pre-provision dormant path-specific templates for reliable local editing, but the UI and AI expose or use them only when the selected path requires them. See the normative lifecycle in [`docs/product-production-lifecycle.md`](docs/product-production-lifecycle.md). The older single `brief/tape.md`/`brief/narration.md` shape is migrated for compatibility and must not force tape content, orchestration, narration, and timing back into one document.
+The workspace is phase- and production-path-aware. It may pre-provision dormant path-specific templates for reliable local editing, but the UI and AI expose or use them only when the selected path requires them. See the normative lifecycle in [`product-production-lifecycle.md`](product-production-lifecycle.md). The older single `brief/tape.md`/`brief/narration.md` shape is migrated for compatibility and must not force tape content, orchestration, narration, and timing back into one document.
 
 **Dev repo equivalent:**
 

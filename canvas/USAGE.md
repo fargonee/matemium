@@ -1,6 +1,10 @@
 # Using Matemium
 
-Write **plain, short Python** in `scenes.py` and get correctly laid-out math animation videos plus full-sheet study exports. In the **desktop app**, AI chat edits this same file on your behalf — it does not emit Sheet DSL JSON.
+Write **plain, short Python** in `scenes.py` and get correctly laid-out
+structured visual explanations plus full-tape study exports. Matemium began with
+mathematics but the same public API supports any subject built from staged text,
+math, paths, plots, diagrams, state, morphs, and spatial reasoning. In the
+**desktop app**, AI edits this same source — it does not emit Sheet DSL JSON.
 
 ## Philosophy: tool first, scenes second
 
@@ -13,7 +17,9 @@ Matemium is a **compiler** (layout + timeline + camera + styling), not a bag of 
 3. `add_camera_focus` for isolate-zoom or overlay magnifier
 4. Topic-specific patterns → plain functions in `projects/<name>/helpers.py` (or `projects/_lib/` if shared)
 
-There is **no** `canvas/extensions/` package. Only `canvas/USAGE.md` (this file) documents the engine API that AIs and authors should memorize.
+There is **no** `canvas/extensions/` package. This extended guide and the
+source-aligned [`../AUTHORING_API.md`](../AUTHORING_API.md) define the public
+authoring contract. Exact signatures remain authoritative in `builder.py`.
 
 See `architecture.md` §6 and `project-spec.md` for the full layer model.
 
@@ -69,6 +75,49 @@ Run it:
 - `add_3d("z = x^2 - y^2")`
 - `add_heading("...")` / `add_body("...")` — typography presets (wrap defaults); also accept run lists
 - `add_observation("...")` / `add_concept(title, explanation, formula?)` — thin aliases
+- `add_data_path(points, ...)` — sampled trajectory, contour, route, or vector
+- `add_data_plot(series, markers=..., ...)` — arbitrary named sampled series
+- `add_diagram(nodes, edges, ...)` — semantic node-edge diagrams with explicit local positions
+
+**State and morphing**
+
+- `add_state_transition(patches, ...)` — change several elements or semantic parts in one beat
+- `add_element_morph(element_id, target, ...)` — replace geometry/content through the normal compiler
+- Address compound parts as `element_id::node:id`, `::edge:id`, `::series:id`,
+  `::marker:id`, or `::path`.
+
+```python
+graph = tape.add_diagram(
+    nodes=[
+        {"id": "source", "label": "Source", "position": [-3, 0]},
+        {"id": "sink", "label": "Sink", "position": [3, 0]},
+    ],
+    edges=[{"id": "flow", "from": "source", "to": "sink", "label": "signal"}],
+    id="system",
+)
+builder.add_state_transition([
+    {"target_id": f"{graph}::node:source", "changes": {"color": "#ffdd66"}},
+    {"target_id": f"{graph}::edge:flow", "changes": {"stroke_width": 7}},
+])
+```
+
+Generic visuals use sampled JSON-compatible data. Domain calculations and layout algorithms remain in
+project helpers; the engine compiles their output deterministically.
+
+Required contracts:
+
+- `DataPath.points`: at least two finite 2D/3D points. Options include
+  `smooth`, `closed`, `arrow`, `color`, and `stroke_width`.
+- Every `DataPlot` series has a unique `id` and at least two finite `points`.
+  Markers have unique IDs and finite points.
+- Every `Diagram` node and edge has a unique ID; edge endpoints name existing
+  nodes. Node positions are explicit and specialized layout remains a helper.
+- Semantic parts include `path`, `axes`, `series:<id>`, `marker:<id>`,
+  `node:<id>`, `edge:<id>`, and `edge-label:<id>`.
+- State changes are limited to color, fill/stroke color and opacity,
+  `stroke_width`, `opacity`, `scale`, `shift`, and `position`.
+- `ElementMorph` accepts a target `CanvasElement`; its kind/content are
+  validated and its semantic parts replace the previous part map.
 
 **Layout & composition**
 
@@ -81,7 +130,9 @@ Run it:
 - `element_spec(CanvasElement(...))` — any custom element in a flex row (topic code uses this from project `helpers.py`)
 - `text_spec`, `math_spec`, `observation_spec` — flex item dicts
 
-Multiple tapes do not require manual scene choreography. When the timeline reveals an element from a different tape, `CanvasScene` automatically switches the active tape context: inactive tape content is hidden/dimmed and the camera returns to tape-scroll view for the active tape. Use this for compare/contrast lessons instead of hand-authored drag/drop, stacking, or lift animations.
+The root tape exists automatically and is the production-safe default.
+Additional tapes have automatic context-switch machinery, but that path is
+experimental and every switch must be inspected in an actual preview.
 
 **Camera & focus**
 
@@ -91,34 +142,48 @@ Multiple tapes do not require manual scene choreography. When the timeline revea
 - 3D graphs optionally **tilt** the camera; flat content does not force a “2D mode” switch each time
 - `add_camera_move(dy=...)` / `auto_camera()` — explicit scroll when needed
 
-**3D world model (Clarified)**
+**Tape and 3D world model**
 
-The "sheet" is a `TapeObject` — one special object inside the infinite 3D world. 
+The current public tape API creates isolated 2D layout contexts. Root-tape
+reveal activates local scroll, lazy reveal, focus, and flex behavior
+automatically.
+`add_tape()` rejects `position`, `rotation`, and `scale`; old
+`set_tape_pose()` examples are not current API.
 
-**Default behavior:** Any object, including a TapeObject, can be observed with normal cinematic 3D (via `ObjectAnchor`). The tape acts like a movable/rotatable plane in 3D space. Free 3D objects do **not** get internal tape features.
+`scroll_tape()` remains in the builder source but is not usable in the current
+runtime because the `TapeScroll` DSL target is absent. Do not generate it.
 
-**Tape-scroll-mode:** Only a `TapeScroll(...)` target activates the tape's classic internal behaviors (local scroll using its internal measurements, lazy reveal, focus, flex, etc.). The outer camera still uses the tape's world transform.
-
-Old pure-tape videos continue to work exactly as before (they implicitly use tape-scroll-mode on the root tape).
+Free 3D objects use `add_object()` / `add_world_object()` and explicit
+observation. The architecture records a broader future model for transformed
+tapes, but arbitrary physical tape observation remains experimental and must
+not be advertised from structural types alone.
 
 Authoring examples:
 - `add_object("Solid3D", position=(x,y,z), ...)`
 - `left = add_tape("left")`; `right = add_tape("right")`; then author with `left.add_body(...)` / `right.add_body(...)`
-- reveal content from `left`, then `right`, then `left` again; the engine handles the visible tape switch automatically
-- `add_camera_keyframe(target=ObjectAnchor("my_tape"))`          # 3D view of the tape plane, when available
-- `add_camera_keyframe(target=TapeScroll("root_tape", local_y=5))` # enter classic tape scroll + reveal
+- reveal content from `left`, then `right`, then `left` again only when the
+  resulting context switches will be preview-tested
 
 `add_solid_lift(...)` is specifically for raising 3D solids above a tape for orbit/inspection. Do not use it as a tape switching or tape stacking mechanism.
 
-See `3D-WORLD-DESCRIPTION.md` for the mental model.
-
-See 3D-model.md for full details.
+See `3D-WORLD-DESCRIPTION.md` and `3D-model.md` as design records, not as a
+guarantee that every described world-camera behavior is implemented.
 
 **Escape hatch**
 
 - `add_raw(CanvasElement(...))` — full DSL control
 
-All methods are chainable.
+Most ordinary content/layout/action methods are chainable. Return values are
+intentionally mixed:
+
+- `add_data_path`, `add_data_plot`, `add_diagram`, `add_object`, and
+  `add_relative` return stable ID strings;
+- `add_tape` returns a `TapeBuilder`;
+- `run` and `*_spec` helpers return dictionaries;
+- text, flex, camera, state, morph, and solid actions return the builder.
+
+`add_solid()` is therefore chainable rather than ID-returning. Give it an
+explicit `id=` if later actions need a target.
 
 ### Project helpers (topic code — not engine API)
 
@@ -200,6 +265,17 @@ Author videos in `projects/<name>/scenes.py`. Outputs go to `outputs/<name>/medi
 ### JSON / raw DSL (internal & debugging only)
 
 `SheetDSL.from_file("path/to/sheet.json")` and inline-`dsl` sidecar IPC are for **tests, fixtures, and engine debugging**. Product authoring (desktop and dev) uses **`CanvasBuilder` in `scenes.py`**.
+
+### Strict structural validation
+
+`CanvasScene(dsl)` validates before Manim setup and raises on structural errors
+by default. Desktop `check_project` returns the same class of DSL issues as
+structured diagnostics. Registered visual schemas, semantic targets, state
+properties, and morph targets are checked before render.
+
+`strict_validation=False` is a checker/debugging escape hatch only. A clean
+structural check does not replace preview rendering, visual inspection, or
+domain review.
 
 ### Layout foundation
 

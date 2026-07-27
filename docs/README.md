@@ -30,6 +30,11 @@ in `astro.config.mjs`; when adding a page, place it in the right section there a
 
 Keep examples tied to real APIs and real projects in this repository. If behavior
 changes, update the relevant guide, reference page, and recipe in the same change.
+The repository-level [`../AUTHORING_API.md`](../AUTHORING_API.md) is the
+source-aligned contract for current builder methods, data schemas, semantic
+parts, return values, and validation behavior.
+The public [engine-capability matrix](src/content/docs/reference/engine-capabilities.mdx)
+separates production, specialized, experimental, and unavailable behavior.
 
 ## Publishing
 

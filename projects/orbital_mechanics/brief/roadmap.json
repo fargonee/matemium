@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "project_slug": "orbital_mechanics",
+  "production_path": "mute_video",
+  "current_phase": "mute_delivery",
+  "phases": [
+    {
+      "id": "description",
+      "label": "Creative description",
+      "status": "complete",
+      "evidence": [
+        "brief/description.md"
+      ]
+    },
+    {
+      "id": "passport",
+      "label": "Passport and mute path",
+      "status": "complete",
+      "evidence": [
+        "brief/passport.json"
+      ]
+    },
+    {
+      "id": "tape_content",
+      "label": "Visible content",
+      "status": "complete",
+      "evidence": [
+        "brief/tapes/main.md"
+      ]
+    },
+    {
+      "id": "orchestration",
+      "label": "Visual orchestration",
+      "status": "complete",
+      "evidence": [
+        "brief/orchestration.md"
+      ]
+    },
+    {
+      "id": "authoring",
+      "label": "Scene and helper authoring",
+      "status": "complete",
+      "evidence": [
+        "scenes.py",
+        "helpers.py",
+        "successful check_project with 45 authored timeline items and no diagnostics"
+      ]
+    },
+    {
+      "id": "render_repair",
+      "label": "Preview render and visual repair",
+      "status": "complete",
+      "evidence": [
+        "four preview iterations rendered at 960x540",
+        "contact sheets and full-resolution frames exposed and repaired plot overflow, vector label collision, formula footprint, rich-text boundary collisions, and final synthesis spacing",
+        "accepted preview duration 54.798 seconds with 60 rendered animations",
+        "accepted MP4 contains one H.264 video stream and no audio stream"
+      ]
+    },
+    {
+      "id": "mute_delivery",
+      "label": "Validated mute-video delivery",
+      "status": "pending",
+      "evidence": [
+        "authoring-stage preview accepted",
+        "final-quality 1920x1080 master remains required before public showcase delivery"
+      ]
+    }
+  ],
+  "invalidated_phases": [],
+  "blockers": [],
+  "next_action": "Render and inspect the 1920x1080 final-quality master when the showcase export cycle begins.",
+  "last_updated": "2026-07-27"
+}

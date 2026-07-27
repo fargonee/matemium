@@ -106,3 +106,30 @@ def test_check_project_unknown_scene(demo_workspace: Path):
     result = check_project(demo_workspace, scene="NotAScene")
     assert result["ok"] is False
     assert result["errors"]
+
+
+def test_check_project_reports_dsl_validation_errors(tmp_path: Path):
+    workspace = tmp_path / "invalid_dsl"
+    workspace.mkdir()
+    (workspace / "scenes.py").write_text(
+        "\n".join(
+            [
+                "from canvas import CanvasElement, CanvasScene, SheetDSL, StatePatch, StateTransition",
+                "",
+                "class InvalidScene(CanvasScene):",
+                "    def __init__(self, **kwargs):",
+                "        dsl = SheetDSL(timeline=[",
+                "            CanvasElement(id='label', type='Text', content='hello'),",
+                "            StateTransition(id='bad', patches=[",
+                "                StatePatch(target_id='missing', changes={'opacity': 0.5})",
+                "            ]),",
+                "        ])",
+                "        super().__init__(dsl=dsl, **kwargs)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    result = check_project(workspace, scene="InvalidScene")
+    assert result["ok"] is False
+    assert result["errors"][0]["source"] == "dsl"
+    assert result["errors"][0]["code"] == "unknown_target_element_id"

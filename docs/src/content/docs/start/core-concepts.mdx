@@ -54,19 +54,41 @@ source. Matemium does not use generated JSON as the normal authoring format.
 layout intent, world objects, and timeline operations before compiling them into
 the internal scene representation.
 
+## Generic data visual
+
+`DataPath`, `DataPlot`, and `Diagram` turn sampled project data into reusable
+visual structures. Their named semantic parts can be changed later without
+introducing subject-specific engine methods.
+
+## Semantic part
+
+A stable address inside a compound visual, such as
+`control_loop::node:sensor`, `response::series:measured`, or
+`trajectory::path`.
+
+## State transition and morph
+
+A state transition changes allowlisted visual properties on one or more
+elements or semantic parts in a synchronized beat. A morph recompiles target
+content and replaces the existing registered visual while preserving its
+timeline identity.
+
 ## Tape
 
-A tape is a structured plane of content inside Matemium’s 3D world. In tape-scroll
-mode it behaves like an infinite document: content flows vertically, reveals
-lazily, and remains addressable after appearing.
+A tape is a structured 2D content context. The automatic root tape behaves like
+an infinite document: content flows vertically, reveals lazily, and remains
+addressable after appearing.
 
-Projects can use multiple tapes for comparisons, parallel explanations, notes,
-or alternative perspectives.
+Projects can use additional tapes for comparisons or parallel explanations,
+but current multi-tape switching is an advanced feature that needs preview
+evidence.
 
 ## World object
 
-Anything positioned in Matemium’s 3D world, including solids and tape objects.
-A tape can be observed as a plane in 3D or entered in tape-scroll mode.
+Anything positioned in Matemium’s experimental 3D world path, such as a
+registered solid or other free object. Tape-local solids and inspection are the
+more mature production method. Arbitrary physical tape placement remains an
+unfinished architecture seam.
 
 ## Render
 
@@ -88,3 +110,4 @@ Output remains local unless you explicitly publish or move it.
 - [Desktop project lifecycle](/desktop/project-lifecycle/)
 - [Anatomy of `scenes.py`](/authoring/scenes-py/)
 - [The infinite tape](/authoring/tapes/)
+- [Data visuals and transitions](/authoring/data-visuals-and-transitions/)

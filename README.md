@@ -1,10 +1,12 @@
 # Matemium
 
-A **layout-to-animation compiler** for math education videos, built on [Manim Community Edition](https://www.manim.community/). Instead of writing imperative scene scripts, you describe content on an **infinite vertical learning sheet**; the engine handles layout, camera scroll, entry animations, and persistent element state.
+A **layout-to-animation compiler and agentic desktop studio** for structured visual explanations, built on [Manim Community Edition](https://www.manim.community/). Matemium began with mathematics, but its generic paths, plots, diagrams, state transitions, morphs, tapes, and 3D world can express any subject that benefits from staged visual reasoning. Instead of writing imperative scene scripts, you describe content on an **infinite vertical learning tape**; the engine handles layout, camera movement, entry animations, persistent element state, and reusable transitions.
 
 Output targets **9:16 portrait reels** (TikTok / Shorts) by default, with landscape YouTube support. Long-form sheets can be exported as static study materials or auto-chunked into short clips.
 
-**PAD Phase 10 complete:** Packaging, CI, cross-platform builds, and docs refresh per [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md). Full product architecture (lazy sidecar, first-run assets, RAG/MCP, strict gating, thin publishing) integrated.
+**Documentation baseline (2026-07-27):** author-facing claims are aligned to
+the current source and tests. Historical phase plans describe intent and do not
+override the current contract in [`AUTHORING_API.md`](AUTHORING_API.md).
 
 ## Product direction
 
@@ -74,7 +76,8 @@ The core compiler. Authors describe a lesson via **`CanvasBuilder` in `scenes.py
 | `layout.py` | CSS-like `Style`, flex rows/columns, border-box flow |
 | `rich_text.py` | Inline text runs — per-letter/word color and highlight |
 | `measure.py` | Unified measure + mobject build (single source of truth) |
-| `scene.py` | Timeline compiler — lazy reveal, auto-focus, transforms |
+| `generic_visuals.py` | Validated `DataPath`, `DataPlot`, and `Diagram` renderers + semantic parts |
+| `scene.py` | Timeline compiler — lazy reveal, auto-focus, state transitions, morphs |
 | `registry.py` | Persistent `MobjectRegistry` for re-animation |
 | `coords.py` | Sheet plane conventions — XY at `z=0`, Z for depth |
 | `camera.py` | Sheet-view pan/zoom; optional tilt for 3D surfaces |
@@ -105,18 +108,20 @@ Entry points: `./matemium.sh` or `python -m matemium`.
 
 Renders are isolated per project under `outputs/<project>/media/` (gitignored).
 
-### 3. Video projects (`projects/`)
+### 3. Visual explanation projects (`projects/`)
 
 Each folder is one video. A project has `scenes.py` (required; **the desktop app's single authoring file**) and optional `helpers.py` for topic-specific composition functions in the dev repo. The desktop v1 product uses **one `scenes.py`** with `# ---DIV: ...---` section markers for navigable editing.
 
-| Project | Scene | What it demonstrates |
-|---------|-------|---------------------|
-| `demo` | `PortraitDemo`, `LandscapeDemo`, `BuilderDemo`, `TicTacToeTutorial` | Engine smoke tests — portrait/landscape, flex layout, grid boards |
-| `quadratic_factoring` | `QuadraticFactoring` | Core-only lesson — factoring \(x^2 - 5x + 6\) with flex rows and inline runs |
-| `em_waves` | `EmWaves` | Multi-section physics — Maxwell's equations, wave propagation, 3D surfaces |
-| `quadratic_graphs` | `QuadraticGraphs` | Side-by-side parabola comparison, plot traces, camera focus (uses `helpers.py`) |
-| `inscribed_sphere` | `InscribedSphere` | 3D solids on the tape — cube + inscribed sphere, lift, camera orbit inspect |
-| `olmoshlar` | (various) | Additional lesson content |
+The bundled flagship library currently contains projects across
+eleven subjects: Fourier epicycles, orbital mechanics, an SN2 reaction,
+Dijkstra’s algorithm, feedback control, a supply shock, DNA-to-protein,
+the July Crisis, the Ship of Theseus, cross-language sentence structure, and
+municipal clean-water systems. Fourier epicycles has an accepted preview;
+the remaining projects are reauthoring inputs and engine evidence, not yet
+accepted showcase renders.
+
+See [`projects/flagship_library.md`](projects/flagship_library.md) for the index
+and evidence status.
 
 The `projects/_template/` folder scaffolds new projects. `projects/_lib/` is reserved for helpers shared across multiple lessons (explicit import only).
 
@@ -147,11 +152,24 @@ Save as `projects/my_lesson/scenes.py`, then `./matemium.sh render my_lesson`.
 - **Block styling** — `style={"margin-bottom": 1.0, "width": 5.0, "wrap": True}` on any `add_*` call
 - **Inline runs** — `builder.add_text([builder.run("x", color="#5eb3ff", highlight=True), " = 2"])`
 - **Flex layout** — `add_flex_row` / `add_flex_column` with `text_spec`, `math_spec`, etc.
+- **Sampled paths** — `add_data_path(points, ...)` for trajectories, routes, contours, and vectors
+- **Sampled plots** — `add_data_plot(series, markers=...)` with named semantic series/markers
+- **Semantic diagrams** — `add_diagram(nodes, edges, ...)` for flows, maps, graphs, and argument structures
+- **State transitions** — `add_state_transition(...)` targets whole elements or `element::semantic-part`
+- **Element morphs** — `add_element_morph(...)` recompiles changed content/geometry
 - **Camera focus** — `add_camera_focus(element_id, mode="isolate", zoom=2.0)`
 - **3D solids** — `add_solid(shape="cube", ...)`, `add_solid_lift(id, lift=1.8)`, `add_camera_inspect(id, path=[...])`
 - **Escape hatch** — `add_raw(CanvasElement(...))` for full DSL control
 
-Topic-specific patterns belong in `projects/<name>/helpers.py`, not in the engine. See `canvas/USAGE.md` for the full API.
+The production-safe default is the automatic root tape. Additional tapes and
+free-world object/camera composition are experimental and require render
+evidence. `scroll_tape()` is not currently usable because the DSL does not yet
+define its `TapeScroll` target. See the capability-maturity table in
+[`AUTHORING_API.md`](AUTHORING_API.md).
+
+Topic-specific calculations and recipes belong in `projects/<name>/helpers.py`,
+not in the engine. See [`AUTHORING_API.md`](AUTHORING_API.md) for the current
+contract and [`canvas/USAGE.md`](canvas/USAGE.md) for the extended guide.
 
 ## Architecture
 
@@ -208,6 +226,10 @@ cutter.cut(input_video=..., output_dir=..., manifest=manifest)
 - Persistent element registry + re-animation
 - Sheet camera (pan/zoom on `z=0`) + optional 3D tilt
 - Entry animations, transforms, idle rotation
+- Validated `DataPath`, `DataPlot`, and `Diagram` compound visuals
+- Stable semantic-part addressing for paths, axes, series, markers, nodes, edges, and edge labels
+- Synchronized allowlisted state transitions + compiled element morphs
+- Strict pre-render DSL validation and structured project-check diagnostics
 - Real 3D surfaces (`z = f(x,y)`)
 - 3D solids (cube/sphere), lift, camera inspect paths
 - Camera focus (isolate / overlay) with viewport-fit zoom capping
@@ -215,7 +237,7 @@ cutter.cut(input_video=..., output_dir=..., manifest=manifest)
 - Full static canvas export (PNG/PDF)
 - Reel cutter + manifest generator
 - CLI tool with project scaffolding and isolated outputs
-- Multiple lesson projects (demo, quadratic_*, em_waves, inscribed_sphere, olmoshlar) + demo suite
+- Eleven cross-subject first-pass flagship projects + development demos
 
 **Desktop** ([`desktop/`](desktop/)):
 - [x] Monorepo layout (`desktop/app`, `desktop/src-tauri`, `desktop/packaging`, `desktop/targets`)
@@ -237,7 +259,13 @@ cutter.cut(input_video=..., output_dir=..., manifest=manifest)
 
 **Engine (in progress / planned):**
 - Move legacy grid/quadratic builder methods into project helpers
-- Generic parametric curve trace (replace quadratic-only `PlotTrace`)
+- Reauthor and visually validate the flagship projects with the current generic primitives
+- Generic timed traversal/trace over `DataPath` or `DataPlot` (the old `PlotTrace` remains quadratic-specific)
+- Restore or redesign a real `TapeScroll` DSL target before documenting
+  `scroll_tape()` as usable
+- Harden additional-tape and free-world camera composition before treating it
+  as a flagship-safe default
+- Dedicated future work for unfinished world-camera seams and timed media/audio
 - SolutionTape integration as canvas elements
 - Reel cutting polish (audio, titles, padding)
 - Element-type plugin registry to avoid unbounded `if type ==` growth

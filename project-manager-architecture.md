@@ -1,6 +1,6 @@
 # AI Project Manager Architecture
 
-The normative idea-to-product phase order, three production paths, and artifact dependencies are defined in [`docs/product-production-lifecycle.md`](docs/product-production-lifecycle.md). This document defines manager behavior within that lifecycle; it must not collapse the lifecycle into a generic concept/production/review checklist.
+The normative idea-to-product phase order, three production paths, and artifact dependencies are defined in [`product-production-lifecycle.md`](product-production-lifecycle.md). This document defines manager behavior within that lifecycle; it must not collapse the lifecycle into a generic concept/production/review checklist.
 
 ## Product role
 

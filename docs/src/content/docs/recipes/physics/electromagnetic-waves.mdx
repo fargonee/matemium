@@ -29,13 +29,12 @@ continuous spatial argument instead of becoming disconnected slides.
 
 ```python
 builder = CanvasBuilder(title="Electromagnetic Waves")
-tape = builder.add_tape("main")
 
-tape.add_heading(
+builder.add_heading(
     "Electromagnetic waves",
     style={"align": "center", "margin-bottom": 0.5},
 )
-tape.add_body(
+builder.add_body(
     "Light, radio, and X-rays are the same phenomenon: "
     "oscillating electric and magnetic fields that travel "
     "through space.",
@@ -48,17 +47,17 @@ The project begins in plain language before introducing notation.
 ## Present related quantities together
 
 ```python
-tape.add_flex_row(
+builder.add_flex_row(
     [
-        tape.text_spec(
+        builder.text_spec(
             "Electric field E",
             style={"width": 2.6, "align": "center"},
         ),
-        tape.text_spec(
+        builder.text_spec(
             "⟷ coupled",
             style={"width": 1.6, "align": "center"},
         ),
-        tape.text_spec(
+        builder.text_spec(
             "Magnetic field B",
             style={"width": 2.6, "align": "center"},
         ),
@@ -73,15 +72,15 @@ A row communicates coupling more directly than three unrelated reveals.
 ## Build the equation group
 
 ```python
-tape.add_flex_column(
+builder.add_flex_column(
     [
-        tape.math_spec(r"\nabla \cdot \vec{E} = 0"),
-        tape.math_spec(r"\nabla \cdot \vec{B} = 0"),
-        tape.math_spec(
+        builder.math_spec(r"\nabla \cdot \vec{E} = 0"),
+        builder.math_spec(r"\nabla \cdot \vec{B} = 0"),
+        builder.math_spec(
             r"\nabla \times \vec{E}"
             r" = -\frac{\partial \vec{B}}{\partial t}"
         ),
-        tape.math_spec(
+        builder.math_spec(
             r"\nabla \times \vec{B}"
             r" = \mu_0 \varepsilon_0"
             r" \frac{\partial \vec{E}}{\partial t}"
@@ -108,7 +107,7 @@ builder.add_3d(
     },
 )
 
-tape.add_body(
+builder.add_body(
     "A snapshot of a wave-like surface.",
     after_3d=True,
 )

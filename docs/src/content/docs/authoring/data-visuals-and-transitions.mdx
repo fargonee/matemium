@@ -1,0 +1,208 @@
+---
+title: Data visuals and transitions
+description: Author cross-subject paths, plots, diagrams, semantic state changes, and visual morphs.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Matemium’s generic data visuals turn deterministic project data into
+addressable animation objects. They are useful across mathematics, physics,
+chemistry, computing, engineering, economics, biology, history, philosophy,
+language learning, and general education.
+
+Keep domain calculations in `helpers.py`. Pass their sampled, JSON-compatible
+results to `CanvasBuilder`.
+
+## Sampled paths
+
+Use `add_data_path()` for trajectories, contours, flow routes, boundaries, and
+vectors:
+
+```python
+path_id = builder.add_data_path(
+    [[0, 0], [1, 1.3], [2.1, 0.5], [3, 1.7]],
+    id="trajectory",
+    smooth=True,
+    arrow=True,
+    color="#5eb3ff",
+    stroke_width=5,
+    style={"width": 6.5},
+)
+```
+
+At least two finite 2D or 3D points are required. Options include `smooth`,
+`closed`, `arrow`, `color`, and `stroke_width`.
+
+The method returns the element ID. Its addressable semantic part is:
+
+```text
+trajectory::path
+```
+
+## Sampled plots
+
+Use `add_data_plot()` for one or more named series:
+
+```python
+plot_id = builder.add_data_plot(
+    [
+        {
+            "id": "observed",
+            "points": [[0, 0], [1, 1.8], [2, 1.2], [3, 2.5]],
+            "color": "#5eb3ff",
+        },
+        {
+            "id": "reference",
+            "points": [[0, 0.4], [1, 1.0], [2, 1.6], [3, 2.2]],
+            "color": "#ff8a65",
+        },
+    ],
+    id="response",
+    markers=[
+        {"id": "current", "point": [2, 1.2], "color": "#ffdd66"}
+    ],
+    x_range=[0, 3, 1],
+    y_range=[0, 3, 1],
+)
+```
+
+Each series requires a unique ID and at least two finite points. Markers require
+a unique ID and point. The engine derives padded axis ranges when `x_range` or
+`y_range` is omitted.
+
+Addressable parts:
+
+```text
+response::axes
+response::series:observed
+response::series:reference
+response::marker:current
+```
+
+## Semantic diagrams
+
+Use `add_diagram()` for process flows, argument maps, dependency graphs, causal
+networks, block diagrams, and other explicit node-edge structures:
+
+```python
+diagram_id = builder.add_diagram(
+    nodes=[
+        {"id": "sensor", "label": "Sensor", "position": [-2.5, 0]},
+        {"id": "controller", "label": "Controller", "position": [2.5, 0]},
+    ],
+    edges=[
+        {
+            "id": "measurement",
+            "from": "sensor",
+            "to": "controller",
+            "label": "measurement",
+        }
+    ],
+    id="control_loop",
+)
+```
+
+Node IDs and edge IDs must be unique. Every edge endpoint must name an existing
+node. Node positions are explicit by design; calculate specialized layouts in
+`helpers.py`.
+
+Node options include `label`, `shape`, `width`, `height`, `color`,
+`fill_color`, `fill_opacity`, and `font_size`. Edge options include `label`,
+`directed`, `buff`, `color`, `stroke_width`, and `font_size`.
+
+Addressable parts:
+
+```text
+control_loop::node:sensor
+control_loop::edge:measurement
+control_loop::edge-label:measurement
+```
+
+The edge-label part exists only when the edge has a label.
+
+## Change visual state
+
+Use `add_state_transition()` to update several whole elements or semantic
+subparts in one beat:
+
+```python
+builder.add_state_transition(
+    [
+        {
+            "target_id": f"{diagram_id}::node:sensor",
+            "changes": {
+                "fill_color": "#ffdd66",
+                "fill_opacity": 0.35,
+                "scale": 1.08,
+            },
+        },
+        {
+            "target_id": f"{diagram_id}::edge:measurement",
+            "changes": {
+                "stroke_color": "#ffdd66",
+                "stroke_width": 7,
+            },
+        },
+    ],
+    run_time=0.8,
+    lag_ratio=0.08,
+)
+```
+
+Allowed properties are:
+
+- `color`, `fill_color`, `stroke_color`
+- `fill_opacity`, `stroke_opacity`, `opacity`
+- `stroke_width`, `scale`
+- `shift`, `position`
+
+`shift` and `position` accept two or three finite numbers. Unknown properties,
+targets, and semantic parts fail validation.
+
+## Morph compiled content
+
+Use `add_element_morph()` when the content or geometry must be rebuilt:
+
+```python
+from canvas import CanvasElement
+
+builder.add_element_morph(
+    path_id,
+    CanvasElement(
+        id="trajectory_target",
+        type="DataPath",
+        content={
+            "points": [[0, 0], [1, 0.4], [2, 1.7], [3, 1.0]],
+            "smooth": True,
+            "color": "#81c784",
+        },
+    ),
+    run_time=1.1,
+)
+```
+
+The target uses the same registered build pipeline as a normal element. After
+the morph, the original ID still addresses the resulting object, while the
+target’s semantic parts become authoritative.
+
+<Aside type="caution" title="State transition or morph?">
+	Use a state transition for emphasis, opacity, color, stroke, scale, and
+	movement. Use a morph when sampled geometry, labels, nodes, or the compiled
+	visual kind must change.
+</Aside>
+
+## Validation is pre-render
+
+`CanvasScene` validates its DSL strictly by default. The desktop project checker
+also reports structured errors before a full render. It catches malformed data,
+non-finite coordinates, missing edge endpoints, invalid semantic parts, unknown
+state properties, and invalid morph targets.
+
+A clean structural check is only the first gate. Render and inspect the result
+for layout, timing, camera, domain accuracy, and visual quality.
+
+## Continue
+
+- [CanvasBuilder reference](/reference/canvasbuilder/)
+- [Layout and style](/authoring/layout-and-style/)
+- [Render and repair](/production/render-and-repair/)

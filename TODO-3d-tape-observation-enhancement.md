@@ -1,5 +1,14 @@
 # TODO: 3D World + Tape Observation Enhancement
 
+> **Status correction (2026-07-27):** This checklist records an earlier
+> implementation attempt and contains completed boxes for APIs that are not in
+> the current builder. In particular, `add_tape(position=..., rotation=...,
+> scale=...)` is rejected and `set_tape_pose()` is absent. Treat those entries
+> as historical evidence, not current capability. See
+> [`AUTHORING_API.md`](AUTHORING_API.md).
+> The checklist also marked `TapeScroll` work complete, but no such type exists
+> in the current DSL; those boxes are superseded and must not drive docs.
+
 **Date:** 2026-07-01
 **Goal:** Bring the engine in line with the clarified 3D world model described in `3D-WORLD-DESCRIPTION.md`.
 

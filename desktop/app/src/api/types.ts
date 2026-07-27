@@ -19,6 +19,28 @@ export interface ProjectOpen {
   renders_dir: string;
 }
 
+export interface BundledExampleSummary {
+  id: string;
+  version: number;
+  title: string;
+  subject: string;
+  subjectLabel: string;
+  symbol: string;
+  question: string;
+  description: string;
+  sceneClass: string;
+  orientation: string;
+  productionPath: string;
+  stage: string;
+  capabilities: string[];
+  sourceBytes: number;
+}
+
+export interface BundledExampleOpen {
+  summary: BundledExampleSummary;
+  files: Record<string, string>;
+}
+
 export interface ProjectMediaEntry {
   name: string;
   path: string;

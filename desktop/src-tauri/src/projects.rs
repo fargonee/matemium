@@ -1,11 +1,13 @@
 use std::collections::BTreeMap;
-use std::fs;
+use std::fs::{self, File};
 use std::path::{Component, Path, PathBuf};
 use std::time::SystemTime;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 use crate::workspace::{read_json_file, write_json, AppPaths};
 
@@ -53,6 +55,15 @@ pub struct ProjectMeta {
     pub orientation: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<ProjectOrigin>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectOrigin {
+    pub kind: String,
+    pub example_id: String,
+    pub example_version: u32,
 }
 
 fn default_scene_class() -> String {
@@ -78,6 +89,304 @@ pub struct ProjectMediaEntry {
     pub name: String,
     pub path: String,
     pub bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BundledExampleSummary {
+    pub id: String,
+    pub version: u32,
+    pub title: String,
+    pub subject: String,
+    pub subject_label: String,
+    pub symbol: String,
+    pub question: String,
+    pub description: String,
+    pub scene_class: String,
+    pub orientation: String,
+    pub production_path: String,
+    pub stage: String,
+    pub capabilities: Vec<String>,
+    pub source_bytes: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BundledExampleOpen {
+    pub summary: BundledExampleSummary,
+    pub files: BTreeMap<String, String>,
+}
+
+struct BundledExample {
+    summary: BundledExampleSummary,
+    scenes: String,
+    helpers: String,
+    description: &'static str,
+}
+
+const FOURIER_DESCRIPTION: &str =
+    include_str!("../../../projects/fourier_epicycles/brief/description.md");
+const ORBITAL_DESCRIPTION: &str =
+    include_str!("../../../projects/orbital_mechanics/brief/description.md");
+const SN2_DESCRIPTION: &str = include_str!("../../../projects/sn2_reaction/brief/description.md");
+const DIJKSTRA_DESCRIPTION: &str =
+    include_str!("../../../projects/dijkstra_execution/brief/description.md");
+const FEEDBACK_DESCRIPTION: &str =
+    include_str!("../../../projects/feedback_control/brief/description.md");
+const SUPPLY_SHOCK_DESCRIPTION: &str =
+    include_str!("../../../projects/supply_shock/brief/description.md");
+const DNA_DESCRIPTION: &str = include_str!("../../../projects/dna_to_protein/brief/description.md");
+const WWI_DESCRIPTION: &str =
+    include_str!("../../../projects/wwi_chain_reaction/brief/description.md");
+const THESEUS_DESCRIPTION: &str =
+    include_str!("../../../projects/ship_of_theseus/brief/description.md");
+const LANGUAGE_DESCRIPTION: &str =
+    include_str!("../../../projects/sentence_across_languages/brief/description.md");
+const CLEAN_WATER_DESCRIPTION: &str =
+    include_str!("../../../projects/clean_water_system/brief/description.md");
+
+fn flagship_authoring_template(title: &str) -> String {
+    format!(
+        r#""""Authoring template for the Matemium flagship project: {title}."""
+
+from __future__ import annotations
+
+from canvas import CanvasScene, CanvasSettings
+from canvas.builder import CanvasBuilder
+
+
+class MyScene(CanvasScene):
+    """Replace this placeholder with the authored flagship explanation."""
+
+    def __init__(self, **kwargs):
+        builder = CanvasBuilder(
+            title={title:?},
+            canvas_settings=CanvasSettings.for_youtube(title={title:?}),
+        )
+        tape = builder.add_tape("main")
+        tape.add_heading({title:?})
+        tape.add_body(
+            "Authoring has not started. Read brief/description.md for the complete "
+            "narrative, visual, accuracy, and acceptance expectations."
+        )
+        super().__init__(dsl=builder.build(), **kwargs)
+"#
+    )
+}
+
+fn bundled_examples() -> Vec<BundledExample> {
+    let examples = [
+        (
+            "mathematics/fourier-epicycles",
+            1,
+            "Fourier Series: Drawing With Rotating Circles",
+            "mathematics",
+            "Mathematics",
+            "∑",
+            "How can simple circular motions reconstruct a complex wave or drawing?",
+            "Connect rotating vectors, sinusoidal waves, frequency spectra, and partial-sum reconstruction.",
+            "visual-first",
+            vec!["Synchronized views", "Vector motion", "Path tracing", "Frequency spectrum"],
+            FOURIER_DESCRIPTION,
+        ),
+        (
+            "physics/orbital-mechanics",
+            1,
+            "Why an Orbit Is a Continuous Fall",
+            "physics",
+            "Physics",
+            "◎",
+            "Why does a satellite keep falling toward Earth without hitting it?",
+            "Build orbital intuition from falling objects, sideways velocity, force vectors, and trajectory comparisons.",
+            "visual-first",
+            vec!["World-space motion", "Force vectors", "Parameter sweep", "Camera scale"],
+            ORBITAL_DESCRIPTION,
+        ),
+        (
+            "chemistry/sn2-reaction",
+            1,
+            "Inside an SN2 Reaction",
+            "chemistry",
+            "Chemistry",
+            "⚗",
+            "How can bond formation and bond breaking occur in one coordinated event?",
+            "Coordinate molecular geometry, electron movement, stereochemical inversion, and an energy profile.",
+            "visual-first",
+            vec!["Molecular geometry", "Reaction states", "Energy plot", "Spatial camera"],
+            SN2_DESCRIPTION,
+        ),
+        (
+            "computer-science/dijkstra-execution",
+            1,
+            "What Really Happens During Dijkstra’s Algorithm",
+            "computer-science",
+            "Computer Science",
+            "{ }",
+            "How does a computer discover the shortest path without trying every complete route?",
+            "Synchronize a weighted graph, tentative distances, priority queue, pseudocode, and execution trace.",
+            "visual-first",
+            vec!["Graph layout", "Execution trace", "Mutable state", "Pseudocode sync"],
+            DIJKSTRA_DESCRIPTION,
+        ),
+        (
+            "engineering/feedback-control",
+            1,
+            "How Feedback Stabilizes a System",
+            "engineering",
+            "Engineering",
+            "↻",
+            "How does a system detect a disturbance and correct itself?",
+            "Connect cruise-control behavior to a feedback loop, live signals, and response plots.",
+            "visual-first",
+            vec!["Block diagrams", "Signal flow", "Live plots", "Scenario comparison"],
+            FEEDBACK_DESCRIPTION,
+        ),
+        (
+            "economics/supply-shock",
+            1,
+            "How a Supply Shock Moves Through a Market",
+            "economics",
+            "Economics",
+            "↗",
+            "How can one disruption change prices, quantities, and human decisions?",
+            "Trace a concrete disruption through causal flows, supply-demand graphs, and alternative scenarios.",
+            "visual-first",
+            vec!["Causal chains", "Economic graphs", "Scenarios", "Assumption labels"],
+            SUPPLY_SHOCK_DESCRIPTION,
+        ),
+        (
+            "biology/dna-to-protein",
+            1,
+            "From DNA to Protein",
+            "biology",
+            "Biology",
+            "DNA",
+            "How does information stored in DNA become a working protein?",
+            "Follow information through transcription, RNA processing, translation, folding, and function.",
+            "visual-first",
+            vec!["Multiscale camera", "Sequence transforms", "Process stages", "Spatial compartments"],
+            DNA_DESCRIPTION,
+        ),
+        (
+            "history/wwi-chain-reaction",
+            1,
+            "The Chain Reaction That Began World War I",
+            "history",
+            "History",
+            "1914",
+            "How did a regional assassination become a European war within weeks?",
+            "Combine maps, a precise timeline, decisions, alliances, and multiple layers of historical cause.",
+            "visual-first",
+            vec!["Animated maps", "Timeline", "Decision network", "Causal layers"],
+            WWI_DESCRIPTION,
+        ),
+        (
+            "philosophy/ship-of-theseus",
+            1,
+            "The Ship of Theseus as an Argument Map",
+            "philosophy",
+            "Philosophy",
+            "◇",
+            "What makes an object remain the same object while its parts change?",
+            "Navigate claims, intuitions, objections, counterexamples, and competing criteria for identity.",
+            "visual-first",
+            vec!["Argument map", "Branching reasoning", "Object transformation", "Concept focus"],
+            THESEUS_DESCRIPTION,
+        ),
+        (
+            "language-learning/sentence-across-languages",
+            1,
+            "How One Thought Changes Across Languages",
+            "language-learning",
+            "Language Learning",
+            "Aa",
+            "How can languages organize the same intended meaning in different ways?",
+            "Transform semantic roles through word order, morphology, sentence structure, and pronunciation timing.",
+            "visual-first",
+            vec!["Token transforms", "Syntax structure", "Morphology", "Audio timing"],
+            LANGUAGE_DESCRIPTION,
+        ),
+        (
+            "general-education/clean-water-system",
+            1,
+            "How a City Gets Clean Water",
+            "general-education",
+            "General Education",
+            "H₂O",
+            "What happens between a natural water source and safe water arriving at a tap?",
+            "Travel across infrastructure, treatment stages, microscopic processes, distribution, and monitoring.",
+            "visual-first",
+            vec!["System diagram", "Multiscale camera", "Process flow", "Monitoring feedback"],
+            CLEAN_WATER_DESCRIPTION,
+        ),
+    ];
+
+    examples
+        .into_iter()
+        .map(
+            |(
+                id,
+                version,
+                title,
+                subject,
+                subject_label,
+                symbol,
+                question,
+                description,
+                production_path,
+                capabilities,
+                project_description,
+            )| {
+                let scenes = flagship_authoring_template(title);
+                let helpers = HELPERS_TEMPLATE.to_string();
+                let source_bytes = scenes.len() + helpers.len() + project_description.len();
+                BundledExample {
+                    summary: BundledExampleSummary {
+                        id: id.to_string(),
+                        version,
+                        title: title.to_string(),
+                        subject: subject.to_string(),
+                        subject_label: subject_label.to_string(),
+                        symbol: symbol.to_string(),
+                        question: question.to_string(),
+                        description: description.to_string(),
+                        scene_class: "MyScene".to_string(),
+                        orientation: "landscape".to_string(),
+                        production_path: production_path.to_string(),
+                        stage: "brief-ready".to_string(),
+                        capabilities: capabilities.into_iter().map(str::to_string).collect(),
+                        source_bytes,
+                    },
+                    scenes,
+                    helpers,
+                    description: project_description,
+                }
+            },
+        )
+        .collect()
+}
+
+pub fn list_bundled_examples() -> Vec<BundledExampleSummary> {
+    bundled_examples()
+        .into_iter()
+        .map(|example| example.summary)
+        .collect()
+}
+
+pub fn open_bundled_example(example_id: &str) -> Result<BundledExampleOpen, String> {
+    let example = bundled_examples()
+        .into_iter()
+        .find(|candidate| candidate.summary.id == example_id)
+        .ok_or_else(|| format!("bundled example not found: {example_id}"))?;
+
+    let mut files = BTreeMap::new();
+    files.insert("scenes".to_string(), example.scenes);
+    files.insert("helpers".to_string(), example.helpers);
+    files.insert("description".to_string(), example.description.to_string());
+    Ok(BundledExampleOpen {
+        summary: example.summary,
+        files,
+    })
 }
 
 fn media_dir(workspace: &Path, category: &str) -> Result<PathBuf, String> {
@@ -717,6 +1026,7 @@ pub fn create_project(paths: &AppPaths, name: String) -> Result<ProjectOpen, Str
         orientation: default_orientation(),
         created_at: now.clone(),
         updated_at: now,
+        origin: None,
     };
 
     write_json(&paths.project_json_path(&id), &meta)?;
@@ -725,6 +1035,56 @@ pub fn create_project(paths: &AppPaths, name: String) -> Result<ProjectOpen, Str
     ensure_workspace_structure(&workspace, trimmed)?;
 
     open_project(paths, &id)
+}
+
+pub fn create_project_from_bundled_example(
+    paths: &AppPaths,
+    example_id: &str,
+) -> Result<ProjectOpen, String> {
+    let example = bundled_examples()
+        .into_iter()
+        .find(|candidate| candidate.summary.id == example_id)
+        .ok_or_else(|| format!("bundled example not found: {example_id}"))?;
+
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    let workspace = paths.workspace_dir(&id);
+    fs::create_dir_all(&workspace).map_err(|e| format!("create example workspace: {e}"))?;
+
+    let result = (|| {
+        fs::write(paths.scenes_path(&id), &example.scenes)
+            .map_err(|e| format!("write bundled scenes.py: {e}"))?;
+        fs::write(paths.helpers_path(&id), &example.helpers)
+            .map_err(|e| format!("write bundled helpers.py: {e}"))?;
+        fs::create_dir_all(workspace.join("brief"))
+            .map_err(|e| format!("create bundled example brief: {e}"))?;
+        fs::write(workspace.join("brief/description.md"), example.description)
+            .map_err(|e| format!("write bundled description: {e}"))?;
+
+        let meta = ProjectMeta {
+            id: id.clone(),
+            name: example.summary.title.clone(),
+            description: example.summary.description.clone(),
+            scene_class: example.summary.scene_class.clone(),
+            orientation: example.summary.orientation.clone(),
+            created_at: now.clone(),
+            updated_at: now,
+            origin: Some(ProjectOrigin {
+                kind: "bundled_example".to_string(),
+                example_id: example.summary.id.clone(),
+                example_version: example.summary.version,
+            }),
+        };
+
+        write_json(&paths.project_json_path(&id), &meta)?;
+        ensure_workspace_structure(&workspace, &example.summary.title)?;
+        open_project(paths, &id)
+    })();
+
+    if result.is_err() {
+        let _ = fs::remove_dir_all(&workspace);
+    }
+    result
 }
 
 pub fn open_project(paths: &AppPaths, project_id: &str) -> Result<ProjectOpen, String> {
@@ -819,6 +1179,203 @@ pub fn delete_project(paths: &AppPaths, project_id: &str) -> Result<(), String> 
     fs::remove_dir_all(&workspace).map_err(|e| format!("delete workspace: {e}"))
 }
 
+fn zip_relative_name(base: &Path, path: &Path) -> Result<String, String> {
+    let relative = path
+        .strip_prefix(base)
+        .map_err(|e| format!("make archive path for {}: {e}", path.display()))?;
+    let mut parts = Vec::new();
+    for component in relative.components() {
+        match component {
+            Component::Normal(part) => {
+                let part = part
+                    .to_str()
+                    .ok_or_else(|| format!("archive path is not valid UTF-8: {}", path.display()))?;
+                parts.push(part.to_string());
+            }
+            Component::CurDir => {}
+            _ => return Err(format!("unsupported archive path: {}", path.display())),
+        }
+    }
+    Ok(parts.join("/"))
+}
+
+fn add_workspace_to_zip(
+    writer: &mut ZipWriter<File>,
+    workspace: &Path,
+    current: &Path,
+    options: SimpleFileOptions,
+) -> Result<(), String> {
+    let mut entries = fs::read_dir(current)
+        .map_err(|e| format!("read {}: {e}", current.display()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("read {}: {e}", current.display()))?;
+    entries.sort_by_key(|entry| entry.path());
+
+    if entries.is_empty() && current != workspace {
+        let name = format!("{}/", zip_relative_name(workspace, current)?);
+        writer
+            .add_directory(name, options)
+            .map_err(|e| format!("add archive directory: {e}"))?;
+    }
+
+    for entry in entries {
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|e| format!("read file type for {}: {e}", path.display()))?;
+        if file_type.is_dir() {
+            add_workspace_to_zip(writer, workspace, &path, options)?;
+            continue;
+        }
+        if !file_type.is_file() {
+            continue;
+        }
+
+        let name = zip_relative_name(workspace, &path)?;
+        writer
+            .start_file(name, options)
+            .map_err(|e| format!("start archive file: {e}"))?;
+        let mut file = File::open(&path).map_err(|e| format!("open {}: {e}", path.display()))?;
+        std::io::copy(&mut file, writer)
+            .map_err(|e| format!("write archive entry for {}: {e}", path.display()))?;
+    }
+
+    Ok(())
+}
+
+pub fn export_project_archive(
+    paths: &AppPaths,
+    project_id: &str,
+    destination: &str,
+) -> Result<String, String> {
+    let workspace = paths.workspace_dir(project_id);
+    if !workspace.is_dir() {
+        return Err(format!("project not found: {project_id}"));
+    }
+    if !paths.project_json_path(project_id).is_file() {
+        return Err(format!("missing project.json for {project_id}"));
+    }
+
+    let destination = PathBuf::from(destination);
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
+    }
+    let file =
+        File::create(&destination).map_err(|e| format!("create {}: {e}", destination.display()))?;
+    let mut writer = ZipWriter::new(file);
+    let options = SimpleFileOptions::default()
+        .compression_method(CompressionMethod::Deflated)
+        .unix_permissions(0o644);
+    add_workspace_to_zip(&mut writer, &workspace, &workspace, options)?;
+    writer
+        .finish()
+        .map_err(|e| format!("finish archive {}: {e}", destination.display()))?;
+    Ok(destination.display().to_string())
+}
+
+fn validate_archive_entry_name(path: &Path) -> Result<(), String> {
+    for component in path.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => {
+                return Err(format!(
+                    "archive contains an unsafe path: {}",
+                    path.display()
+                ))
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn import_project_archive(paths: &AppPaths, source: &str) -> Result<ProjectOpen, String> {
+    let source = PathBuf::from(source);
+    let file = File::open(&source).map_err(|e| format!("open {}: {e}", source.display()))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|e| format!("read archive {}: {e}", source.display()))?;
+
+    let id = Uuid::new_v4().to_string();
+    let temp_workspace = paths.workspaces_root.join(format!(".import-{id}"));
+    let workspace = paths.workspace_dir(&id);
+    if temp_workspace.exists() {
+        return Err(format!(
+            "temporary import workspace already exists: {}",
+            temp_workspace.display()
+        ));
+    }
+
+    let result = (|| {
+        fs::create_dir_all(&temp_workspace)
+            .map_err(|e| format!("create import workspace: {e}"))?;
+
+        let mut has_project_json = false;
+        let mut has_scenes = false;
+        for index in 0..archive.len() {
+            let mut entry = archive
+                .by_index(index)
+                .map_err(|e| format!("read archive entry {index}: {e}"))?;
+            let enclosed = entry
+                .enclosed_name()
+                .ok_or_else(|| format!("archive contains an unsafe path: {}", entry.name()))?
+                .to_path_buf();
+            validate_archive_entry_name(&enclosed)?;
+            if enclosed.as_os_str().is_empty() {
+                continue;
+            }
+
+            has_project_json |= enclosed == Path::new("project.json");
+            has_scenes |= enclosed == Path::new("scenes.py");
+
+            let target = temp_workspace.join(&enclosed);
+            if entry.is_dir() {
+                fs::create_dir_all(&target)
+                    .map_err(|e| format!("create {}: {e}", target.display()))?;
+                continue;
+            }
+
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("create {}: {e}", parent.display()))?;
+            }
+            let mut output =
+                File::create(&target).map_err(|e| format!("create {}: {e}", target.display()))?;
+            std::io::copy(&mut entry, &mut output)
+                .map_err(|e| format!("extract {}: {e}", target.display()))?;
+        }
+
+        if !has_project_json {
+            return Err("archive is missing project.json".to_string());
+        }
+        if !has_scenes {
+            return Err("archive is missing scenes.py".to_string());
+        }
+
+        let project_json_path = temp_workspace.join("project.json");
+        let mut meta: ProjectMeta = serde_json::from_value(read_json_file(&project_json_path)?)
+            .map_err(|e| format!("invalid project.json in archive: {e}"))?;
+        let now = Utc::now().to_rfc3339();
+        meta.id = id.clone();
+        meta.created_at = now.clone();
+        meta.updated_at = now;
+        write_json(&project_json_path, &meta)?;
+        ensure_workspace_structure(&temp_workspace, &meta.name)?;
+
+        fs::rename(&temp_workspace, &workspace).map_err(|e| {
+            format!(
+                "move imported project into {}: {e}",
+                workspace.display()
+            )
+        })?;
+        open_project(paths, &id)
+    })();
+
+    if result.is_err() {
+        let _ = fs::remove_dir_all(&temp_workspace);
+        let _ = fs::remove_dir_all(&workspace);
+    }
+    result
+}
+
 pub fn workspace_path(paths: &AppPaths, project_id: &str) -> Result<String, String> {
     let workspace = paths.workspace_dir(project_id);
     if !workspace.is_dir() {
@@ -830,6 +1387,7 @@ pub fn workspace_path(paths: &AppPaths, project_id: &str) -> Result<String, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_paths() -> AppPaths {
@@ -846,6 +1404,168 @@ mod tests {
             assets_root: root.join("assets"),
             agent_root: root.join("agent"),
         }
+    }
+
+    fn contains_video(path: &Path) -> bool {
+        fs::read_dir(path)
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .any(|entry| {
+                let entry_path = entry.path();
+                if entry_path.is_dir() {
+                    return contains_video(&entry_path);
+                }
+                matches!(
+                    entry_path
+                        .extension()
+                        .and_then(|extension| extension.to_str()),
+                    Some("mp4" | "webm" | "mov" | "mkv")
+                )
+            })
+    }
+
+    #[test]
+    fn project_archive_export_import_roundtrip_rewrites_identity() {
+        let paths = temp_paths();
+        paths.ensure().unwrap();
+        let created = create_project(&paths, "Archive Demo".to_string()).unwrap();
+        save_scenes(
+            &paths,
+            &created.id,
+            "from canvas import CanvasScene\n\nclass ArchiveScene(CanvasScene):\n    pass\n",
+        )
+        .unwrap();
+        fs::write(
+            paths.workspace_dir(&created.id).join("assets/images/source.txt"),
+            "portable asset",
+        )
+        .unwrap();
+
+        let archive = paths.data_root.join("archive-demo.matemium.zip");
+        export_project_archive(&paths, &created.id, archive.to_str().unwrap()).unwrap();
+        delete_project(&paths, &created.id).unwrap();
+
+        let imported = import_project_archive(&paths, archive.to_str().unwrap()).unwrap();
+        assert_ne!(imported.id, created.id);
+        assert_eq!(imported.name, "Archive Demo");
+        assert!(imported.files["scenes"].contains("ArchiveScene"));
+        assert_eq!(
+            fs::read_to_string(paths.workspace_dir(&imported.id).join("assets/images/source.txt"))
+                .unwrap(),
+            "portable asset"
+        );
+        let meta: ProjectMeta =
+            serde_json::from_value(read_json_file(&paths.project_json_path(&imported.id)).unwrap())
+                .unwrap();
+        assert_eq!(meta.id, imported.id);
+    }
+
+    #[test]
+    fn project_archive_import_rejects_unsafe_paths() {
+        let paths = temp_paths();
+        paths.ensure().unwrap();
+        let archive = paths.data_root.join("unsafe.matemium.zip");
+        let file = File::create(&archive).unwrap();
+        let mut writer = ZipWriter::new(file);
+        let options = SimpleFileOptions::default();
+        writer.start_file("../escape.txt", options).unwrap();
+        writer.write_all(b"bad").unwrap();
+        writer.finish().unwrap();
+
+        let error = import_project_archive(&paths, archive.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("unsafe path"));
+        assert_eq!(list_projects(&paths).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn bundled_example_catalog_is_unique_and_source_only() {
+        let catalog = list_bundled_examples();
+        assert_eq!(catalog.len(), 11);
+
+        let mut ids = catalog
+            .iter()
+            .map(|example| example.id.as_str())
+            .collect::<Vec<_>>();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), catalog.len());
+        let subjects = catalog
+            .iter()
+            .map(|example| example.subject.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            subjects,
+            std::collections::BTreeSet::from([
+                "biology",
+                "chemistry",
+                "computer-science",
+                "economics",
+                "engineering",
+                "general-education",
+                "history",
+                "language-learning",
+                "mathematics",
+                "philosophy",
+                "physics",
+            ])
+        );
+        assert!(catalog.iter().all(|example| example.stage == "brief-ready"));
+        assert!(catalog.iter().all(|example| example.source_bytes > 0));
+        assert!(
+            catalog
+                .iter()
+                .map(|example| example.source_bytes)
+                .sum::<usize>()
+                < 2_000_000
+        );
+
+        for example in catalog {
+            let opened = open_bundled_example(&example.id).expect("open bundled source");
+            assert!(opened.files["scenes"].contains(&example.scene_class));
+            assert!(opened.files["scenes"].contains(&example.title));
+            assert!(opened.files.contains_key("helpers"));
+            assert!(opened.files["description"].contains("## Acceptance criteria"));
+            assert_eq!(opened.files.len(), 3);
+        }
+        assert!(open_bundled_example("../unknown").is_err());
+    }
+
+    #[test]
+    fn bundled_example_copy_is_editable_independent_and_has_provenance() {
+        let paths = temp_paths();
+        paths.ensure().expect("ensure");
+        let example_id = "physics/orbital-mechanics";
+        let bundled = open_bundled_example(example_id).expect("open source");
+
+        let first =
+            create_project_from_bundled_example(&paths, example_id).expect("create first copy");
+        assert_eq!(first.files["scenes"], bundled.files["scenes"]);
+        assert_eq!(first.project_json["origin"]["kind"], "bundled_example");
+        assert_eq!(first.project_json["origin"]["example_id"], example_id);
+        assert_eq!(first.project_json["origin"]["example_version"], 1);
+        assert!(!contains_video(&paths.workspace_dir(&first.id)));
+
+        save_scenes(&paths, &first.id, "# independently edited\n").expect("edit first copy");
+        let second =
+            create_project_from_bundled_example(&paths, example_id).expect("create second copy");
+        assert_ne!(first.id, second.id);
+        assert_eq!(second.files["scenes"], bundled.files["scenes"]);
+        assert_eq!(
+            open_project(&paths, &first.id).expect("reopen first").files["scenes"],
+            "# independently edited\n"
+        );
+        assert_eq!(list_projects(&paths).expect("list copies").len(), 2);
+        let _ = fs::remove_dir_all(&paths.data_root);
+    }
+
+    #[test]
+    fn unknown_bundled_example_never_creates_a_workspace() {
+        let paths = temp_paths();
+        paths.ensure().expect("ensure");
+        assert!(create_project_from_bundled_example(&paths, "../../escape").is_err());
+        assert!(list_projects(&paths).expect("list").is_empty());
+        let _ = fs::remove_dir_all(&paths.data_root);
     }
 
     #[test]

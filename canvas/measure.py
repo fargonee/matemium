@@ -66,6 +66,8 @@ def register_object_kind(
     measure: Optional[Callable] = None,
     observe: Optional[Callable] = None,
     preview: Optional[Callable] = None,
+    validate: Optional[Callable[[Any], list[str]]] = None,
+    parts: Optional[Callable[[Any], set[str]]] = None,
 ) -> None:
     """Register a custom object kind for the 3D world / sheet model (Phase 9).
 
@@ -82,6 +84,8 @@ def register_object_kind(
         "measure": measure,
         "observe": observe,
         "preview": preview,
+        "validate": validate,
+        "parts": parts,
     }
     if build:
         _CUSTOM_BUILDERS[name] = build
@@ -486,8 +490,8 @@ def measure_element(
         target_width=None,
         surface_factory=surface_factory,
     )
-    nat_w = mob.get_width() if mob else 1.0
-    nat_h = mob.get_height() if mob else 1.0
+    nat_w = mob.width if mob else 1.0
+    nat_h = mob.height if mob else 1.0
 
     tw = float(style_width) if style_width is not None else nat_w
     th = float(style_height) if style_height is not None else nat_h
@@ -570,6 +574,20 @@ def build_mobject(
 # -------------------------------------------------------------------
 
 def _auto_register_builtins():
+    from .generic_visuals import (
+        build_data_path,
+        build_data_plot,
+        build_diagram,
+        data_path_parts,
+        data_plot_parts,
+        diagram_parts,
+        measure_boxed,
+        measure_data_path,
+        validate_data_path,
+        validate_data_plot,
+        validate_diagram,
+    )
+
     register_object_kind("MathTex", build=_build_mathtex)
     register_object_kind("Text", build=_build_text)
     register_object_kind("Solid3D", build=_build_solid3d)
@@ -582,6 +600,27 @@ def _auto_register_builtins():
     register_object_kind("GridMark", build=_build_grid_mark)
     register_object_kind("QuadraticPlot", build=_build_quadratic_plot)
     register_object_kind("QuadraticPlotPair", build=_build_quadratic_plot_pair)
+    register_object_kind(
+        "DataPath",
+        build=build_data_path,
+        measure=measure_data_path,
+        validate=validate_data_path,
+        parts=data_path_parts,
+    )
+    register_object_kind(
+        "DataPlot",
+        build=build_data_plot,
+        measure=measure_boxed,
+        validate=validate_data_plot,
+        parts=data_plot_parts,
+    )
+    register_object_kind(
+        "Diagram",
+        build=build_diagram,
+        measure=measure_boxed,
+        validate=validate_diagram,
+        parts=diagram_parts,
+    )
     # Unknown falls back inside _build_raw_mobject but is also registered for completeness
     register_object_kind("Unknown", build=_build_unknown)
 

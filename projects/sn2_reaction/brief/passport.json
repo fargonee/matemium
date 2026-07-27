@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "project_slug": "sn2_reaction",
+  "title": "Inside an SN2 Reaction",
+  "production_path": "mute_video",
+  "production_path_basis": "The flagship showcase cycle requires explanations that work without narration or music.",
+  "audience": "Introductory organic chemistry learners",
+  "assumed_knowledge": [
+    "covalent bonds connect atoms",
+    "nucleophiles donate an electron pair",
+    "a reaction-coordinate diagram represents relative energy"
+  ],
+  "central_message": "SN2 substitution is one concerted backside passage in which bond formation, bond breaking, and stereochemical inversion describe the same event.",
+  "takeaway": "Backside approach leads through one transition state, not an intermediate, and steric access controls how readily that path can occur.",
+  "platform": "website showcase, social portrait demo, and bundled desktop example",
+  "orientation": "portrait",
+  "aspect_ratio": "9:16",
+  "resolution_master": "1080x1920",
+  "duration_target_seconds": {
+    "minimum": 50,
+    "maximum": 65
+  },
+  "language": "English",
+  "scientific_depth": "introductory mechanism, qualitative energy profile, and the rate law for the standard elementary case",
+  "visual_direction": "dark editorial portrait, atom-identity palette, stable molecular projection, single-hump energy profile",
+  "tone": "precise, microscopic, spatial",
+  "pacing": "short claims around staged molecular and energy states",
+  "audio": {
+    "final_track": "none",
+    "must_remain_understandable_without_sound": true
+  },
+  "constraints": [
+    "offline and deterministic",
+    "no external molecular files",
+    "do not depict a stable intermediate",
+    "do not imply bonds are mechanical springs",
+    "call energy/molecule coordination staged until a shared-clock binding exists"
+  ],
+  "success_criteria": [
+    "backside approach is spatially unambiguous",
+    "forming and breaking partial bonds coexist in one transition state",
+    "stereochemical inversion is visible",
+    "the energy profile has one maximum and no intermediate well",
+    "steric access is compared using the same visual vocabulary"
+  ],
+  "readiness": {
+    "status": "ready",
+    "missing_fields": []
+  },
+  "last_updated": "2026-07-27"
+}

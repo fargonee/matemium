@@ -102,6 +102,9 @@ Generic capabilities belong in `canvas/`:
 - Focus
 - Timeline behavior
 - General solids and surfaces
+- Sampled paths and plots
+- Semantic node-edge diagrams
+- Allowlisted state transitions and compiled morphs
 
 Subject recipes belong in `projects/<name>/helpers.py`:
 
@@ -112,6 +115,26 @@ Subject recipes belong in `projects/<name>/helpers.py`:
 
 This boundary allows Matemium to expand across subjects without forcing every
 topic into its core API.
+
+## Current generic contracts
+
+`DataPath`, `DataPlot`, and `Diagram` provide shared build/measurement
+behavior, pure content validation, and stable semantic parts. Timeline actions
+address parts with `element_id::part_id`.
+
+`StateTransition` changes an allowlisted set of visual properties in one
+synchronized action. `ElementMorph` recompiles a target `CanvasElement` and
+replaces the source registry object. `CanvasScene` validates these contracts
+strictly before render by default.
+
+The automatic root tape is the mature default. Additional-tape switching and
+free-world camera composition are experimental; `scroll_tape()` is currently
+unusable because its `TapeScroll` target is absent from the DSL. Architecture
+plans that describe that target are design records rather than current API
+evidence.
+
+See the [CanvasBuilder reference](/reference/canvasbuilder/) and
+[Data visuals and transitions](/authoring/data-visuals-and-transitions/).
 
 ## Deeper engineering records
 

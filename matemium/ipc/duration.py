@@ -22,9 +22,11 @@ def estimate_timeline_duration(dsl: Any) -> float:
         CameraInspect,
         CameraMove,
         CanvasElement,
+        ElementMorph,
         PlotTrace,
         SolidLift,
         SolidRotate,
+        StateTransition,
         TransformElement,
     )
 
@@ -37,6 +39,8 @@ def estimate_timeline_duration(dsl: Any) -> float:
         elif isinstance(item, CameraMove):
             total += float(item.run_time)
         elif isinstance(item, TransformElement):
+            total += float(item.run_time)
+        elif isinstance(item, (StateTransition, ElementMorph)):
             total += float(item.run_time)
         elif isinstance(item, PlotTrace):
             total += float(item.run_time)
@@ -64,9 +68,11 @@ def estimate_animation_count(dsl: Any) -> int:
         CameraInspect,
         CameraMove,
         CanvasElement,
+        ElementMorph,
         PlotTrace,
         SolidLift,
         SolidRotate,
+        StateTransition,
         TransformElement,
     )
 
@@ -78,6 +84,8 @@ def estimate_animation_count(dsl: Any) -> int:
                 CanvasElement,
                 CameraMove,
                 TransformElement,
+                StateTransition,
+                ElementMorph,
                 PlotTrace,
                 SolidLift,
                 SolidRotate,

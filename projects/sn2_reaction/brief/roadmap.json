@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "project_slug": "sn2_reaction",
+  "production_path": "mute_video",
+  "current_phase": "mute_delivery",
+  "phases": [
+    {
+      "id": "description",
+      "label": "Creative description",
+      "status": "complete",
+      "evidence": [
+        "brief/description.md"
+      ]
+    },
+    {
+      "id": "passport",
+      "label": "Passport and mute path",
+      "status": "complete",
+      "evidence": [
+        "brief/passport.json"
+      ]
+    },
+    {
+      "id": "tape_content",
+      "label": "Visible content",
+      "status": "complete",
+      "evidence": [
+        "brief/tapes/main.md"
+      ]
+    },
+    {
+      "id": "orchestration",
+      "label": "Visual orchestration",
+      "status": "complete",
+      "evidence": [
+        "brief/orchestration.md"
+      ]
+    },
+    {
+      "id": "authoring",
+      "label": "Scene and helper authoring",
+      "status": "complete",
+      "evidence": [
+        "scenes.py",
+        "helpers.py",
+        "successful check_project with 33 authored timeline items and no diagnostics"
+      ]
+    },
+    {
+      "id": "render_repair",
+      "label": "Preview render and visual repair",
+      "status": "complete",
+      "evidence": [
+        "two preview iterations rendered at 540x960",
+        "contact sheets and full-resolution frames exposed and repaired a collapsed two-line title and a duplicated overlay-focus molecular view",
+        "rate-law copy was qualified as the standard elementary case during domain review",
+        "accepted preview duration 53.131 seconds with 62 rendered animations",
+        "accepted MP4 contains one H.264 video stream and no audio stream"
+      ]
+    },
+    {
+      "id": "mute_delivery",
+      "label": "Validated mute-video delivery",
+      "status": "pending",
+      "evidence": [
+        "authoring-stage portrait preview accepted",
+        "final-quality 1080x1920 master remains required before public showcase delivery"
+      ]
+    }
+  ],
+  "invalidated_phases": [],
+  "blockers": [],
+  "next_action": "Render and inspect the 1080x1920 final-quality master when the showcase export cycle begins.",
+  "last_updated": "2026-07-27"
+}

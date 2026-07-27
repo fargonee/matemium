@@ -18,11 +18,14 @@ from .dsl import (
     CameraMove,
     CameraKeyframe,  # Phase 3
     EntryAnimation,
+    ElementMorph,
     PlotTrace,
     SheetDSL,
     SolidLift,
     SolidRotate,
     StateBehavior,
+    StatePatch,
+    StateTransition,
     TapeObject,
     WorldObject,  # Phase 5
 )
@@ -72,6 +75,11 @@ class TapeBuilder:
     def add_relative(self, *args, **kwargs): return self._with_tape(self._builder.add_relative, *args, **kwargs)
     def add_raw(self, *args, **kwargs): return self._with_tape(self._builder.add_raw, *args, **kwargs)
     def add_camera_move(self, *args, **kwargs): return self._with_tape(self._builder.add_camera_move, *args, **kwargs)
+    def add_data_path(self, *args, **kwargs): return self._with_tape(self._builder.add_data_path, *args, **kwargs)
+    def add_data_plot(self, *args, **kwargs): return self._with_tape(self._builder.add_data_plot, *args, **kwargs)
+    def add_diagram(self, *args, **kwargs): return self._with_tape(self._builder.add_diagram, *args, **kwargs)
+    def add_state_transition(self, *args, **kwargs): return self._with_tape(self._builder.add_state_transition, *args, **kwargs)
+    def add_element_morph(self, *args, **kwargs): return self._with_tape(self._builder.add_element_morph, *args, **kwargs)
 
     def text_spec(self, *args, **kwargs): return self._builder.text_spec(*args, **kwargs)
     def math_spec(self, *args, **kwargs): return self._builder.math_spec(*args, **kwargs)
@@ -267,6 +275,86 @@ class CanvasBuilder:
             **kwargs,
         )
         return self._add(self._layout.place_block(el, style))
+
+    def _add_generic_visual(
+        self,
+        type_name: str,
+        content: Dict[str, Any],
+        *,
+        id: Optional[str],
+        style: Optional[Dict[str, Any]],
+        run_time: float,
+        **kwargs: Any,
+    ) -> str:
+        element_id = id or self._get_id(type_name.lower())
+        element = CanvasElement(
+            id=element_id,
+            type=type_name,
+            content=content,
+            entry_animation=EntryAnimation(type="Create", run_time=run_time),
+            **kwargs,
+        )
+        self._add(self._layout.place_block(element, style))
+        return element_id
+
+    def add_data_path(
+        self,
+        points: List[tuple[float, ...] | list[float]],
+        *,
+        id: Optional[str] = None,
+        style: Optional[Dict[str, Any]] = None,
+        run_time: float = 1.2,
+        **path_options: Any,
+    ) -> str:
+        """Add a generic sampled path, trajectory, contour, flow route, or vector."""
+        return self._add_generic_visual(
+            "DataPath",
+            {"points": [list(point) for point in points], **path_options},
+            id=id,
+            style=style,
+            run_time=run_time,
+        )
+
+    def add_data_plot(
+        self,
+        series: List[Dict[str, Any]],
+        *,
+        id: Optional[str] = None,
+        markers: Optional[List[Dict[str, Any]]] = None,
+        style: Optional[Dict[str, Any]] = None,
+        run_time: float = 1.2,
+        **plot_options: Any,
+    ) -> str:
+        """Add axes with named, sampled data series and optional named markers."""
+        content = {"series": series, **plot_options}
+        if markers is not None:
+            content["markers"] = markers
+        return self._add_generic_visual(
+            "DataPlot",
+            content,
+            id=id,
+            style=style,
+            run_time=run_time,
+        )
+
+    def add_diagram(
+        self,
+        nodes: List[Dict[str, Any]],
+        edges: Optional[List[Dict[str, Any]]] = None,
+        *,
+        id: Optional[str] = None,
+        style: Optional[Dict[str, Any]] = None,
+        run_time: float = 1.2,
+        **diagram_options: Any,
+    ) -> str:
+        """Add a generic semantic node-edge diagram with explicit local positions."""
+        return self._add_generic_visual(
+            "Diagram",
+            {"nodes": nodes, "edges": list(edges or []), **diagram_options},
+            id=id,
+            style=style,
+            run_time=run_time,
+        )
 
     def add_solid(
         self,
@@ -899,6 +987,57 @@ class CanvasBuilder:
                 x_to=x_to,
                 run_time=run_time,
                 show_readout=show_readout,
+            )
+        )
+        return self
+
+    def add_state_transition(
+        self,
+        patches: List[StatePatch | Dict[str, Any]],
+        *,
+        run_time: float = 1.0,
+        lag_ratio: float = 0.0,
+        rate_func: str = "smooth",
+    ) -> "CanvasBuilder":
+        """Apply generic property patches to elements or ``element::semantic-part`` targets."""
+        normalized = [
+            patch
+            if isinstance(patch, StatePatch)
+            else StatePatch(
+                target_id=str(patch.get("target_id", "")),
+                changes=dict(patch.get("changes") or {}),
+            )
+            for patch in patches
+        ]
+        self.dsl.add_state_transition(
+            StateTransition(
+                id=self._get_id("state"),
+                patches=normalized,
+                run_time=run_time,
+                lag_ratio=lag_ratio,
+                rate_func=rate_func,
+            )
+        )
+        return self
+
+    def add_element_morph(
+        self,
+        element_id: str,
+        target: CanvasElement,
+        *,
+        run_time: float = 1.0,
+        match_shapes: bool = False,
+        rate_func: str = "smooth",
+    ) -> "CanvasBuilder":
+        """Morph an existing element to a target compiled through the normal object pipeline."""
+        self.dsl.add_element_morph(
+            ElementMorph(
+                id=self._get_id("morph"),
+                element_id=element_id,
+                target=target,
+                run_time=run_time,
+                match_shapes=match_shapes,
+                rate_func=rate_func,
             )
         )
         return self

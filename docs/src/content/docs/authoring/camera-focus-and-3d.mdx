@@ -9,10 +9,10 @@ should clarify relationships, not become decoration.
 ## Focus an existing element
 
 ```python
-plot_id = tape.add_math(r"y = x^2")
+builder.add_math(r"y = x^2", id="plot_equation")
 
 builder.add_camera_focus(
-    plot_id,
+    "plot_equation",
     mode="isolate",
     zoom=2.0,
     hold_time=1.2,
@@ -86,8 +86,13 @@ Matemium’s world uses:
 | Y | Tape scroll direction |
 | Z | Depth above or below a tape |
 
-A tape may itself be transformed in the larger world. Its content layout remains
-local to that tape.
+The current high-level tape API provides isolated 2D layout contexts and
+tape-scroll observation. Arbitrary physical tape transforms remain an
+unfinished world-camera seam; do not author against old `set_tape_pose` examples.
+Free world objects use `add_object()` and explicit observation, but that
+world-camera path is experimental. Prefer tape-local solids and
+`add_camera_inspect()` for production work unless a free-world composition has
+been preview-rendered and accepted.
 
 ## Camera guidelines
 

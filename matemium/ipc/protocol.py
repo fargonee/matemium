@@ -12,12 +12,12 @@ IPC_PROTOCOL_VERSION = "1.0"
 ELEMENT_TYPES = frozenset({
     "MathTex", "Text", "ThreeDGraph", "Surface", "Solid3D", "Axes",
     "NumberPlane", "ParametricFunction", "VGroup", "Dot", "Arrow",
-    "Image", "SVG",
+    "Image", "SVG", "DataPath", "DataPlot", "Diagram",
 })
 
 ACTION_TYPES = frozenset({
     "CameraMove", "TransformElement", "SolidLift", "SolidRotate",
-    "CameraInspect", "CameraFocus",
+    "CameraInspect", "CameraFocus", "StateTransition", "ElementMorph",
 })
 
 # Dev / legacy types still parseable but flagged in strict validation.

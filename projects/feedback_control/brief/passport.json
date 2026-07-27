@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "project_slug": "feedback_control",
+  "title": "How Feedback Stabilizes a System",
+  "production_path": "mute_video",
+  "production_path_basis": "The flagship explanation must work without narration or music.",
+  "audience": "General engineering learners and introductory controls students",
+  "assumed_knowledge": ["speed can be measured", "a target value may differ from output", "plots show change over time"],
+  "central_message": "Feedback repeatedly measures output, compares it with a target, and changes the input.",
+  "takeaway": "Closed-loop correction can reject a disturbance, but tuning shapes drop, overshoot, oscillation, and settling.",
+  "platform": "website showcase and bundled desktop example",
+  "orientation": "landscape",
+  "aspect_ratio": "16:9",
+  "resolution_master": "1920x1080",
+  "duration_target_seconds": {"minimum": 45, "maximum": 60},
+  "language": "English",
+  "scientific_depth": "introductory closed-loop feedback, PI action, actuator lag, disturbance rejection, and tuning tradeoffs",
+  "visual_direction": "dark systems dashboard with stable signal colors and aligned response plots",
+  "tone": "causal, precise, practical",
+  "pacing": "physical hook, one signal cycle, one numerical correction, response, tuning, synthesis",
+  "audio": {"final_track": "none", "must_remain_understandable_without_sound": true},
+  "constraints": [
+    "offline and deterministic",
+    "disclose the teaching model",
+    "use identical axes and disturbance time across cases",
+    "do not present the controller as production automotive design"
+  ],
+  "success_criteria": [
+    "every signal has a clear direction and meaning",
+    "balanced response returns near target",
+    "aggressive tuning visibly oscillates",
+    "open loop cannot reject the hill load",
+    "model parameters remain editable"
+  ],
+  "readiness": {"status": "ready", "missing_fields": []},
+  "last_updated": "2026-07-27"
+}

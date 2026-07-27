@@ -16,7 +16,7 @@ Checkboxes describe verified repository state. Do not mark an item complete mere
 - [x] Add runtime versioning so legacy and new runs are distinguishable in APIs and telemetry.
 - [x] Decide durable checkpoint storage and retention policy.
 
-**Exit gate:** Met by [`docs/agent/phase0-baseline.md`](docs/agent/phase0-baseline.md), the versioned files under `evals/agent/`, and ADR-001. Benchmark execution is deliberately deferred until the harness and pinned fixtures are implemented.
+**Exit gate:** Met by [`agent/phase0-baseline.md`](agent/phase0-baseline.md), the versioned files under `evals/agent/`, and ADR-001. Benchmark execution is deliberately deferred until the harness and pinned fixtures are implemented.
 
 ## Phase 1 — Typed domain model and state machine
 
@@ -27,7 +27,7 @@ Checkboxes describe verified repository state. Do not mark an item complete mere
 - [x] Add cancellation and terminal-reason contracts.
 - [x] Test crash/restart, cancellation, invalid transitions, and concurrent user edits.
 
-**Exit gate:** Met by the desktop-owned state/store in `desktop/src-tauri/src/agent_runs.rs`; see [`docs/agent/phase1-state-machine.md`](docs/agent/phase1-state-machine.md).
+**Exit gate:** Met by the desktop-owned state/store in `desktop/src-tauri/src/agent_runs.rs`; see [`agent/phase1-state-machine.md`](agent/phase1-state-machine.md).
 
 ## Phase 2 — Structured model gateway
 
@@ -39,7 +39,7 @@ Checkboxes describe verified repository state. Do not mark an item complete mere
 - [x] Preserve or summarize the full relevant conversation, not only the last user message.
 - [x] Remove `<thought>`/`<tool_call>` XML as the production protocol.
 
-**Exit gate:** Met by the recorded OpenAI-compatible family fixtures and local schema/grammar contract tests; see [`docs/agent/phase2-model-gateway.md`](docs/agent/phase2-model-gateway.md).
+**Exit gate:** Met by the recorded OpenAI-compatible family fixtures and local schema/grammar contract tests; see [`agent/phase2-model-gateway.md`](agent/phase2-model-gateway.md).
 
 ## Phase 3 — Tool platform and mutation journal
 
@@ -52,7 +52,7 @@ Checkboxes describe verified repository state. Do not mark an item complete mere
 - [x] Ensure exceptions cannot become unclassified success-like strings.
 - [x] Add adversarial path, stale edit, ambiguous patch, and oversized-output tests.
 
-**Exit gate:** Met by the desktop-owned tool platform and mutation journal; see [`docs/agent/phase3-tool-platform.md`](docs/agent/phase3-tool-platform.md).
+**Exit gate:** Met by the desktop-owned tool platform and mutation journal; see [`agent/phase3-tool-platform.md`](agent/phase3-tool-platform.md).
 
 ## Phase 4 — Planner, executor, and policy engine
 
@@ -64,7 +64,7 @@ Checkboxes describe verified repository state. Do not mark an item complete mere
 - [x] Enforce independent model-call, tool-call, token, cost, time, compile, and render budgets.
 - [x] Implement `blocked` behavior for genuinely missing user input or capabilities.
 
-**Exit gate:** Met by the LLM-independent fault-injection suite; see [`docs/agent/phase4-policy-engine.md`](docs/agent/phase4-policy-engine.md).
+**Exit gate:** Met by the LLM-independent fault-injection suite; see [`agent/phase4-policy-engine.md`](agent/phase4-policy-engine.md).
 
 ## Phase 5 — Verification and completion controller
 
@@ -77,7 +77,7 @@ Checkboxes describe verified repository state. Do not mark an item complete mere
 - [x] Produce a verification manifest used by the final response.
 - [x] Prevent claims about checks that were not executed.
 
-**Exit gate:** Met by deterministic false-success tests covering compile-successful semantic and visual failures; see [`docs/agent/phase5-verification-controller.md`](docs/agent/phase5-verification-controller.md).
+**Exit gate:** Met by deterministic false-success tests covering compile-successful semantic and visual failures; see [`agent/phase5-verification-controller.md`](agent/phase5-verification-controller.md).
 
 ## Phase 6 — Context engine and durable memory
 
@@ -87,7 +87,7 @@ Checkboxes describe verified repository state. Do not mark an item complete mere
 - [x] Reload raw evidence on demand without placing the full transcript in every request.
 - [x] Measure context growth and fact retention on long tasks.
 
-**Exit gate:** Met by deterministic 1,000-observation growth and retention tests; see [`docs/agent/phase6-context-memory.md`](docs/agent/phase6-context-memory.md).
+**Exit gate:** Met by deterministic 1,000-observation growth and retention tests; see [`agent/phase6-context-memory.md`](agent/phase6-context-memory.md).
 
 ## Phase 7 — Accounting, streaming, and user control
 
@@ -98,7 +98,7 @@ Checkboxes describe verified repository state. Do not mark an item complete mere
 - [x] Add cancel, resume, approval, blocked-input, and run-history UI states.
 - [x] Bound and redact streamed tool output.
 
-**Exit gate:** Met by per-call reconciliation tests, versioned event tests, and the compiled typed terminal-state UI; see [`docs/agent/phase7-accounting-events-controls.md`](docs/agent/phase7-accounting-events-controls.md).
+**Exit gate:** Met by per-call reconciliation tests, versioned event tests, and the compiled typed terminal-state UI; see [`agent/phase7-accounting-events-controls.md`](agent/phase7-accounting-events-controls.md).
 
 ## Phase 8 — Optional scoped delegation
 
@@ -108,7 +108,7 @@ Checkboxes describe verified repository state. Do not mark an item complete mere
 - [x] Keep final verification and completion authority in the parent.
 - [ ] Benchmark delegation against the single-agent baseline before enabling it (Phase 9 execution; delegation remains disabled meanwhile).
 
-**Exit gate:** The scoped delegation implementation is complete, but operational enablement remains gated on a passing Phase 9 model benchmark. The comparison contract and default-off behavior are tested; see [`docs/agent/phase8-scoped-delegation.md`](docs/agent/phase8-scoped-delegation.md) and `evals/agent/phase8-delegation-gate.json`.
+**Exit gate:** The scoped delegation implementation is complete, but operational enablement remains gated on a passing Phase 9 model benchmark. The comparison contract and default-off behavior are tested; see [`agent/phase8-scoped-delegation.md`](agent/phase8-scoped-delegation.md) and `evals/agent/phase8-delegation-gate.json`.
 
 ## Phase 9 — End-to-end evaluation and rollout
 
@@ -120,7 +120,7 @@ Checkboxes describe verified repository state. Do not mark an item complete mere
 - [ ] Roll out behind a versioned feature flag with a legacy fallback (fail-closed controller is implemented; production integration remains).
 - [ ] Publish operational dashboards and rollback criteria (machine-readable metrics and criteria exist; deployed dashboard remains).
 
-**Exit gate:** Implementation is available in `matemium.agent.evaluation`, `matemium.agent.rollout`, and `evals/agent/`; operational evidence remains open. See [`docs/agent/phase9-evaluation-rollout.md`](docs/agent/phase9-evaluation-rollout.md). All thresholds must pass and rollback must be exercised before v2 mutations are enabled.
+**Exit gate:** Implementation is available in `matemium.agent.evaluation`, `matemium.agent.rollout`, and `evals/agent/`; operational evidence remains open. See [`agent/phase9-evaluation-rollout.md`](agent/phase9-evaluation-rollout.md). All thresholds must pass and rollback must be exercised before v2 mutations are enabled.
 
 ## Legacy components: disposition
 

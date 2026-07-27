@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "project_slug": "dna_to_protein",
+  "title": "From DNA to Protein",
+  "production_path": "mute_video",
+  "production_path_basis": "The full information-flow explanation must remain understandable without narration or music.",
+  "audience": "Secondary-school and introductory biology learners",
+  "assumed_knowledge": ["cells contain DNA", "sequences have direction", "proteins are amino-acid polymers"],
+  "central_message": "Cells preserve and transform sequence information through transcription, RNA processing, and translation before folding and maturation contribute to function.",
+  "takeaway": "A traceable nucleotide sequence can become an amino-acid sequence, but real gene expression and protein maturation are richer than a linear cartoon.",
+  "platform": "website showcase and bundled desktop example",
+  "orientation": "landscape",
+  "aspect_ratio": "16:9",
+  "resolution_master": "1920x1080",
+  "duration_target_seconds": {"minimum": 45, "maximum": 60},
+  "language": "English",
+  "scientific_depth": "introductory eukaryotic transcription directionality, complementary RNA, processing/export, codon translation, stop signaling, and folding boundaries",
+  "visual_direction": "dark molecular storyboard with stable colors for DNA, RNA, exons, ribosome context, and amino-acid sequence",
+  "tone": "traceable, spatial, biologically cautious",
+  "pacing": "function hook, scale ladder, transcription, processing/export, translation, folding boundary, synthesis",
+  "audio": {"final_track": "none", "must_remain_understandable_without_sound": true},
+  "constraints": [
+    "offline and deterministic",
+    "preserve 3-prime and 5-prime directionality",
+    "separate nuclear processing from cytoplasmic translation",
+    "identify stop as a signal rather than an amino acid",
+    "do not present the four-residue teaching chain as a realistic protein or structure prediction"
+  ],
+  "success_criteria": [
+    "DNA template and mRNA are exactly complementary",
+    "codons map to Met-Pro-Lys-Gly followed by Stop",
+    "cell, nucleus, gene, and sequence contexts remain explicit",
+    "processing and export precede translation",
+    "folding limitations appear before the final synthesis"
+  ],
+  "readiness": {"status": "ready", "missing_fields": []},
+  "last_updated": "2026-07-27"
+}

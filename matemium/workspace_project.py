@@ -240,11 +240,12 @@ def instantiate_scene(
     scene_name: str,
     *,
     path: str | None = None,
+    strict_validation: bool = True,
 ) -> Any:
     # Lazy import happens inside load_scene_class
     cls = load_scene_class(workspace, scene_name, path=path)
     with workspace_context(workspace):
-        return cls()
+        return cls(strict_validation=strict_validation)
 
 
 def lint_scenes_file(workspace: Path, *, path: str | None = None) -> list[Diagnostic]:
@@ -339,9 +340,15 @@ def check_project(
 
     try:
         scene_name = resolve_scene_name(workspace, scene, path=path)
-        instance = instantiate_scene(workspace, scene_name, path=path)
+        instance = instantiate_scene(
+            workspace,
+            scene_name,
+            path=path,
+            strict_validation=False,
+        )
         dsl = instance.dsl
         timeline_len = len(dsl.timeline) if dsl else 0
+        dsl_issues = dsl.validate() if dsl else []
     except (ValueError, RuntimeError) as exc:
         return {
             "ok": False,
@@ -375,11 +382,27 @@ def check_project(
             "warnings": [],
         }
 
+    dsl_diagnostics = [
+        {
+            "line": 0,
+            "column": 0,
+            "message": issue.message,
+            "severity": issue.severity.value,
+            "code": issue.code,
+            "source": "dsl",
+            "element_id": issue.element_id or "",
+            "field": issue.field or "",
+        }
+        for issue in dsl_issues
+    ]
+    dsl_errors = [item for item in dsl_diagnostics if item["severity"] == "error"]
+    dsl_warnings = [item for item in dsl_diagnostics if item["severity"] == "warning"]
+
     return {
-        "ok": True,
+        "ok": not dsl_errors,
         "scene": scene_name,
-        "errors": [],
-        "warnings": [d.to_dict() for d in diagnostics if d.severity == "warning"],
+        "errors": dsl_errors,
+        "warnings": [d.to_dict() for d in diagnostics if d.severity == "warning"] + dsl_warnings,
         "timeline_length": timeline_len,
         "title": dsl.canvas_settings.title if dsl else "",
     }

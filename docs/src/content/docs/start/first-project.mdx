@@ -106,8 +106,9 @@ Open `scenes.py`. A healthy project normally has:
 
 - Imports from `canvas`
 - A `CanvasBuilder`
-- One or more tapes
-- Content and timeline operations
+- The automatic root tape, with additional tapes only when deliberately needed
+- Content and timeline operations, which may include sampled paths/plots,
+  semantic diagrams, state transitions, and morphs
 - A `CanvasScene` subclass
 - A final `super().__init__(dsl=builder.build(), **kwargs)`
 
@@ -143,3 +144,4 @@ production journey, not an exceptional failure.
 - [Understand the project lifecycle](/desktop/project-lifecycle/)
 - [Choose a production path](/production/choose-a-path/)
 - [Learn how `scenes.py` works](/authoring/scenes-py/)
+- [Use data visuals and transitions](/authoring/data-visuals-and-transitions/)

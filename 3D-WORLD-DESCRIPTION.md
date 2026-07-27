@@ -1,3 +1,12 @@
+> **Status — design target, not current authoring specification (2026-07-27).**
+> This document describes the intended unified world model. The current
+> high-level API supports 2D tape layout/scroll contexts and free 3D objects,
+> but `add_tape()` rejects physical position/rotation/scale and transformed-tape
+> observation is not a proven public capability. Use
+> [`AUTHORING_API.md`](AUTHORING_API.md) for implemented authoring behavior.
+> `TapeScroll` references below are proposals. The current DSL does not define
+> that type, and `scroll_tape()` is therefore not usable.
+
 The core image is powerful: the world is one infinite 3D space. The "infinite tape" is no longer the root of the universe. It is one special kind of object living inside that space — a flat, content-bearing plane that can be positioned, rotated, scaled, and observed like anything else, but which carries its own rich internal rules.
 
 This single shift can (and should) ripple outward to solve the deeper architectural problems we've been circling:

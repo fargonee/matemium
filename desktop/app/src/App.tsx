@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "./api/tauri";
 import config from "./config.json";
 import type {
+  BundledExampleSummary,
   ChatMessage,
   CodeEdit,
   Conversation,
@@ -291,6 +292,7 @@ export default function App() {
   const chatCancelRequestedRef = useRef(false);
 
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [examples, setExamples] = useState<BundledExampleSummary[]>([]);
   const [project, setProject] = useState<ProjectOpen | null>(null);
   const [fileContents, setFileContents] = useState<Record<ProjectFile, string>>(EMPTY_CONTENTS);
   const [dirtyFiles, setDirtyFiles] = useState(EMPTY_DIRTY);
@@ -462,6 +464,11 @@ export default function App() {
   const refreshProjects = useCallback(async () => {
     const list = await api.projectList();
     setProjects(list);
+  }, []);
+
+  const refreshExamples = useCallback(async () => {
+    const list = await api.exampleList();
+    setExamples(list);
   }, []);
 
   const loadScenes = useCallback(async (projectId: string, fallback?: string) => {
@@ -874,7 +881,7 @@ export default function App() {
     void (async () => {
       try {
         setBusy(true);
-        await refreshProjects();
+        await Promise.all([refreshProjects(), refreshExamples()]);
         const loadedSettings = await api.settingsGet();
         setSettings(loadedSettings);
         if (loadedSettings.apiToken) {
@@ -898,7 +905,7 @@ export default function App() {
         setBusy(false);
       }
     })();
-  }, [appendLog, inTauri, refreshProjects]);
+  }, [appendLog, inTauri, refreshExamples, refreshProjects]);
 
   useEffect(() => {
     if (!project) return;
@@ -960,6 +967,26 @@ export default function App() {
     }
   };
 
+  const handleCreateExample = async (exampleId: string) => {
+    if (!isReady) {
+      setStatusMessage("App not ready yet — waiting for assets and engine", "idle");
+      return;
+    }
+    try {
+      setBusy(true);
+      await flushDirtyFiles();
+      const created = await api.exampleCreateCopy(exampleId);
+      await refreshProjects();
+      await openProjectById(created.id);
+      setStatusMessage("Editable example created", "ok");
+    } catch (error) {
+      setStatusMessage(formatError(error), "error");
+      appendLog(`[error] ${formatError(error)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleDelete = async (projectId: string) => {
     if (!window.confirm("Delete this project and all renders?")) return;
     try {
@@ -978,6 +1005,42 @@ export default function App() {
       setStatusMessage("Project deleted", "ok");
     } catch (error) {
       setStatusMessage(formatError(error), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleExportArchive = async (projectId: string, destination: string) => {
+    try {
+      setBusy(true);
+      if (project?.id === projectId) {
+        await flushDirtyFiles();
+      }
+      const exported = await api.projectExportArchive(projectId, destination);
+      setStatusMessage(`Project exported to ${exported}`, "ok");
+    } catch (error) {
+      const message = formatError(error);
+      setStatusMessage(message, "error");
+      appendLog(`[error] ${message}`);
+      throw error;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleImportArchive = async (source: string) => {
+    try {
+      setBusy(true);
+      await flushDirtyFiles();
+      const imported = await api.projectImportArchive(source);
+      await refreshProjects();
+      await openProjectById(imported.id);
+      setStatusMessage(`Imported project "${imported.name}"`, "ok");
+    } catch (error) {
+      const message = formatError(error);
+      setStatusMessage(message, "error");
+      appendLog(`[error] ${message}`);
+      throw error;
     } finally {
       setBusy(false);
     }
@@ -2274,15 +2337,19 @@ export default function App() {
                 </div>
               )}
               <ProjectsLanding
-              projects={projects}
-              newName={newName}
-              busy={busy || !isReady}
-              onNewNameChange={setNewName}
-              onCreate={() => void handleCreate()}
-              onOpen={(id) => void openProjectById(id)}
-              onDelete={(id) => void handleDelete(id)}
-              readinessMessage={!isReady ? readinessMessage : undefined}
-            />
+                examples={examples}
+                projects={projects}
+                newName={newName}
+                busy={busy || !isReady}
+                onNewNameChange={setNewName}
+                onCreate={() => void handleCreate()}
+                onCreateExample={(exampleId) => void handleCreateExample(exampleId)}
+                onOpen={(id) => void openProjectById(id)}
+                onDelete={(id) => void handleDelete(id)}
+                onExportArchive={(id, destination) => handleExportArchive(id, destination)}
+                onImportArchive={(source) => handleImportArchive(source)}
+                readinessMessage={!isReady ? readinessMessage : undefined}
+              />
             </>
           )}
         </section>

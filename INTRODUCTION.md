@@ -1,10 +1,15 @@
 # Matemium — Project Introduction
 
-Matemium is a **layout-to-animation compiler** for math education videos. It sits on top of [Manim Community Edition](https://www.manim.community/) (Python) and changes how you author animations: instead of writing imperative scene scripts where you manually call `self.play(Write(...))` and `self.wait()`, you describe content on an **infinite vertical learning sheet**. The engine handles layout, camera scroll, entry animations, persistent element state, and export to social-friendly formats.
+Matemium is a **layout-to-animation compiler for structured visual explanations**. It sits on top of [Manim Community Edition](https://www.manim.community/) (Python) and changes how you author animations: instead of writing imperative scene scripts where you manually call `self.play(Write(...))` and `self.wait()`, you describe content on an **infinite vertical learning tape** and optional 3D world. The engine handles layout, camera movement, entry animations, persistent element state, generic data visuals, synchronized transitions, morphs, and export to social-friendly formats.
+
+Mathematics is the original proving ground, not the product boundary. Sampled
+paths and plots, semantic diagrams, stable visual-part identities, and stateful
+transformations support physics, chemistry, computing, engineering, economics,
+biology, history, philosophy, language learning, and other structured topics.
 
 ---
 
-## Product direction (updated 2026-07-26)
+## Product direction (updated 2026-07-27)
 
 We are building a **free, source-available desktop application** under the Matemium Source-Available License. Matemium is completely free to use and its source code is publicly available for inspection, personal use, education, internal use, and contribution to the official project.
 
@@ -17,6 +22,11 @@ Private modifications are permitted. Redistribution, publication of derivative b
 | **Local engine** | PyInstaller sidecar | Frozen `canvas/` + Manim; lint, import, render on the user's machine |
 
 **Authoring surface:** Python `scenes.py` using `CanvasBuilder` + `CanvasScene` — the same API in the dev repo and the desktop app. `SheetDSL` is **internal IR** from `builder.build()`; AI does not emit JSON over the network.
+
+The builder creates a root tape automatically. Root-tape text/math, style,
+flex, generic sampled visuals, semantic transitions, morphs, focus, and
+portrait/landscape settings are the current production authoring surface.
+Additional tapes and free-world camera composition remain experimental.
 
 **AI integration tiers:**
 
@@ -122,7 +132,11 @@ canvas/                     ← engine: layout, measure, scene, camera, focus, r
 Manim ThreeDScene           ← rendered .mp4, PNG/PDF export, reel cuts
 ```
 
-`CanvasScene` walks the timeline in order: lazy reveal, auto-focus, flex groups, camera moves, transforms, solid lifts, inspect paths, and focus modes. This is deliberately not a pre-laid static sheet the camera merely scrolls over.
+`CanvasScene` walks the timeline in order: lazy reveal, auto-focus, flex groups,
+camera moves, semantic state transitions, compiled morphs, transforms, solid
+lifts, inspect paths, and focus modes. Strict structural validation runs before
+Manim setup. This is deliberately not a pre-laid static sheet the camera merely
+scrolls over.
 
 ---
 
@@ -204,6 +218,7 @@ Manim needs LaTeX for math. Full TeX Live installs are too large to bundle. Prod
 |--------|---------|
 | `dsl.py` | Sheet specification — elements, timeline, settings |
 | `builder.py` | Fluent `CanvasBuilder` API |
+| `generic_visuals.py` | Validated sampled paths/plots/diagrams and semantic-part resolution |
 | `layout.py` | CSS-like `Style`, flex rows/columns, vertical flow |
 | `measure.py` | Unified measure + mobject build |
 | `scene.py` | Timeline compiler — lazy reveal, auto-focus, dispatch |
@@ -214,6 +229,8 @@ Manim needs LaTeX for math. Full TeX Live installs are too large to bundle. Prod
 | `solids.py` | Generic 3D primitives on the tape |
 | `cutter.py` | `ReelCutter` — chunk long videos at chapter boundaries |
 | `rich_text.py` | Inline styled text runs (per-letter color/highlight) |
+
+Current authoring contract: [`AUTHORING_API.md`](AUTHORING_API.md).
 
 **Persistent state:** `MobjectRegistry` holds every revealed element by ID. `TransformElement` and similar actions reference existing mobjects — no rebuild required.
 
@@ -245,18 +262,31 @@ IPC protocol: [`matemium/ipc/PROTOCOL.md`](matemium/ipc/PROTOCOL.md).
 
 ## Example projects
 
-Each folder under `projects/` is one video module with a required `scenes.py`:
+Each project folder has a `scenes.py` entrypoint and may use `helpers.py` for
+deterministic subject logic and structured data.
 
-| Project | What it demonstrates |
-|---------|---------------------|
-| `demo` | Engine smoke tests — portrait/landscape, flex layout, tic-tac-toe grid |
-| `quadratic_factoring` | Clean core-only lesson — factoring with flex rows and 3D parabola |
-| `em_waves` | Multi-section physics — Maxwell's equations, wave equation, 3D surfaces |
-| `quadratic_graphs` | Side-by-side parabola comparison, plot traces, camera focus |
-| `inscribed_sphere` | 3D solids — cube + inscribed sphere, lift, camera orbit |
-| `olmoshlar` | Additional lesson |
+The flagship source library now spans eleven different explanatory grammars:
 
-Topic-specific geometry lives in `helpers.py` (dev repo) or `assets.py` (desktop agent mode); the scene file stays readable narrative.
+| Subject | Project |
+| --- | --- |
+| Mathematics | `fourier_epicycles` |
+| Physics | `orbital_mechanics` |
+| Chemistry | `sn2_reaction` |
+| Computer science | `dijkstra_execution` |
+| Engineering | `feedback_control` |
+| Economics | `supply_shock` |
+| Biology | `dna_to_protein` |
+| History | `wwi_chain_reaction` |
+| Philosophy | `ship_of_theseus` |
+| Language learning | `sentence_across_languages` |
+| General education | `clean_water_system` |
+
+These are deterministic first authoring passes and engine evidence. They still
+require reauthoring with the current primitives, domain review, render review,
+and visual acceptance before being presented as showcase work. Legacy projects
+and `test_*` folders remain development/regression harnesses.
+
+See [`projects/flagship_library.md`](projects/flagship_library.md).
 
 ---
 
@@ -308,10 +338,19 @@ Dependencies: Python 3.11+, Manim Community Edition, Pillow. Desktop also needs 
 
 ## What is done vs. planned
 
+The authoritative method-by-method maturity matrix is
+[`AUTHORING_API.md`](AUTHORING_API.md). In particular, historical world-model
+documents mention `TapeScroll`, but the current DSL does not define that target;
+`scroll_tape()` must not be used until the gap is repaired.
+
 ### Engine (implemented)
 
 - Sheet DSL + `CanvasBuilder` authoring
 - CSS-like layout, flex, inline text runs
+- Validated sampled paths, plots, and semantic diagrams
+- Stable compound-part IDs + synchronized state transitions
+- Registered-pipeline element morphs
+- Strict pre-render validation + workspace diagnostics
 - Persistent registry + re-animation
 - Sheet camera + optional 3D tilt
 - 3D surfaces, solids, camera inspect paths
@@ -319,7 +358,7 @@ Dependencies: Python 3.11+, Manim Community Edition, Pillow. Desktop also needs 
 - Full static canvas export (PNG/PDF)
 - Reel cutter + manifest generator
 - CLI with project scaffolding
-- Multiple lesson projects (demo, quadratic_*, em_waves, inscribed_sphere, olmoshlar) + demo suite
+- Eleven cross-subject flagship first passes + development demos
 
 ### Desktop (Linux MVP shipping)
 
@@ -338,9 +377,10 @@ Dependencies: Python 3.11+, Manim Community Edition, Pillow. Desktop also needs 
 ### Engine (planned)
 
 - Move legacy grid/quadratic builder methods into project `helpers.py`
-- Generic parametric curve trace (replace quadratic-only `PlotTrace`)
+- Reauthor and visually accept the flagship library with current generic APIs
+- Generic timed traversal for `DataPath` / `DataPlot` (replace quadratic-only `PlotTrace`)
 - SolutionTape integration as canvas elements
-- Element-type plugin registry in `measure.py` / `scene.py`
+- Broader production-quality registered builders for currently placeholder-only primitives
 - Sidecar progress events for desktop preview matrix
 
 ---

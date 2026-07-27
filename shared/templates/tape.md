@@ -1,6 +1,6 @@
 # Tape content — Main tape
 
-This file contains only what must appear on the mathematical reasoning tape.
+This file contains only what must appear on the visual reasoning tape.
 Keep camera movement, 3D staging, transitions, narration delivery, and scene code
 in their dedicated artifacts.
 

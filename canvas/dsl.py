@@ -6,6 +6,7 @@ Supports both JSON files and programmatic Python construction.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from pathlib import Path
@@ -287,6 +288,81 @@ class TransformElement:
 
 
 @dataclass
+class StatePatch:
+    """One generic visual-property patch within a synchronized transition."""
+
+    target_id: str
+    changes: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+STATE_PATCH_PROPERTIES = frozenset(
+    {
+        "color",
+        "fill_color",
+        "fill_opacity",
+        "stroke_color",
+        "stroke_opacity",
+        "stroke_width",
+        "opacity",
+        "scale",
+        "shift",
+        "position",
+    }
+)
+
+
+@dataclass
+class StateTransition:
+    """Apply several generic visual-property patches in one timeline beat."""
+
+    id: str
+    type: Literal["StateTransition"] = "StateTransition"
+    patches: List[StatePatch] = field(default_factory=list)
+    run_time: float = 1.0
+    lag_ratio: float = 0.0
+    rate_func: str = "smooth"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "type": self.type,
+            "patches": [patch.to_dict() for patch in self.patches],
+            "run_time": self.run_time,
+            "lag_ratio": self.lag_ratio,
+            "rate_func": self.rate_func,
+        }
+
+
+@dataclass
+class ElementMorph:
+    """Morph an existing registry element into a newly compiled element state."""
+
+    id: str
+    type: Literal["ElementMorph"] = "ElementMorph"
+    element_id: str = ""
+    target: CanvasElement = field(
+        default_factory=lambda: CanvasElement(id="morph_target", type="Text", content="")
+    )
+    run_time: float = 1.0
+    match_shapes: bool = False
+    rate_func: str = "smooth"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "type": self.type,
+            "element_id": self.element_id,
+            "target": self.target.to_dict(),
+            "run_time": self.run_time,
+            "match_shapes": self.match_shapes,
+            "rate_func": self.rate_func,
+        }
+
+
+@dataclass
 class PlotTrace:
     """Animate a tracing dot along a quadratic plot to show y changing with x."""
     id: str
@@ -525,6 +601,8 @@ TimelineItem = Union[
     CameraMove,
     CameraKeyframe,  # Phase 3 generalized
     TransformElement,
+    StateTransition,
+    ElementMorph,
     PlotTrace,
     SolidLift,
     SolidRotate,
@@ -712,6 +790,7 @@ class SheetDSL:
         # (e.g. SolidLift.element_id) are order-independent — a target that
         # appears later in the timeline than its referencing action is still valid.
         all_element_ids: set = set()
+        element_specs: Dict[str, CanvasElement] = {}
         # Also collect tape/world-object ids for parent_object_id checks
         tape_and_world_ids: set = set()
 
@@ -721,18 +800,22 @@ class SheetDSL:
             for elem in getattr(tape, "local_elements", []) or []:
                 if elem and getattr(elem, "id", None):
                     all_element_ids.add(elem.id)
+                    element_specs[elem.id] = elem
 
         for wo in self.root_objects:
             if wo and getattr(wo, "id", None):
                 tape_and_world_ids.add(wo.id)
                 if wo.element and getattr(wo.element, "id", None):
                     all_element_ids.add(wo.element.id)
+                    element_specs[wo.element.id] = wo.element
 
         # Collect all timeline item ids in one sweep (order-independent)
         for item in self.timeline:
             item_id = getattr(item, "id", None)
             if item_id is not None:
                 all_element_ids.add(item_id)
+            if isinstance(item, CanvasElement) and item_id is not None:
+                element_specs[item_id] = item
 
         # --- Validation pass: iterate timeline items ---
         seen_ids: set = set()
@@ -769,6 +852,26 @@ class SheetDSL:
                         element_id=item_id,
                         field="type",
                     ))
+                kind = None
+                try:
+                    from .measure import _OBJECT_KINDS  # type: ignore[import]
+                    kind = _OBJECT_KINDS.get(item.type)
+                except Exception:
+                    kind = None
+                validator = kind.get("validate") if kind else None
+                if validator:
+                    try:
+                        content_issues = list(validator(item.content))
+                    except Exception as exc:
+                        content_issues = [f"content validator failed: {exc}"]
+                    for message in content_issues:
+                        issues.append(ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            code="invalid_element_content",
+                            message=f"{item.type}: {message}.",
+                            element_id=item_id,
+                            field="content",
+                        ))
 
                 # --- Check 3: parent_object_id ---
                 if item.parent_object_id is not None:
@@ -802,6 +905,125 @@ class SheetDSL:
                         element_id=item_id,
                         field="source_id",
                     ))
+
+            elif isinstance(item, StateTransition):
+                if not item.patches:
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="empty_state_transition",
+                        message="StateTransition must contain at least one patch.",
+                        element_id=item_id,
+                        field="patches",
+                    ))
+                for patch_index, patch in enumerate(item.patches):
+                    owner_id, separator, part_id = patch.target_id.partition("::")
+                    owner = element_specs.get(owner_id)
+                    if owner is None:
+                        issues.append(ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            code="unknown_target_element_id",
+                            message=f"State patch target {patch.target_id!r} has no known owning element.",
+                            element_id=item_id,
+                            field=f"patches[{patch_index}].target_id",
+                        ))
+                    elif separator:
+                        part_ids: set[str] = set()
+                        try:
+                            from .measure import _OBJECT_KINDS  # type: ignore[import]
+                            kind = _OBJECT_KINDS.get(owner.type)
+                            parts_fn = kind.get("parts") if kind else None
+                            if parts_fn:
+                                part_ids = set(parts_fn(owner.content))
+                        except Exception:
+                            part_ids = set()
+                        if part_id not in part_ids:
+                            issues.append(ValidationIssue(
+                                severity=ValidationSeverity.ERROR,
+                                code="unknown_semantic_part_id",
+                                message=f"State patch target part {part_id!r} is not declared by {owner_id!r}.",
+                                element_id=item_id,
+                                field=f"patches[{patch_index}].target_id",
+                            ))
+                    unknown = set(patch.changes) - STATE_PATCH_PROPERTIES
+                    if unknown:
+                        issues.append(ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            code="unknown_state_property",
+                            message=f"Unsupported state properties: {sorted(unknown)!r}.",
+                            element_id=item_id,
+                            field=f"patches[{patch_index}].changes",
+                        ))
+                    numeric_keys = {
+                        "fill_opacity", "stroke_opacity", "stroke_width",
+                        "opacity", "scale",
+                    }
+                    for key in numeric_keys & set(patch.changes):
+                        value = patch.changes[key]
+                        if not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                            issues.append(ValidationIssue(
+                                severity=ValidationSeverity.ERROR,
+                                code="invalid_state_property",
+                                message=f"State property {key!r} must be a finite number.",
+                                element_id=item_id,
+                                field=f"patches[{patch_index}].changes.{key}",
+                            ))
+                    for key in {"shift", "position"} & set(patch.changes):
+                        value = patch.changes[key]
+                        if (
+                            not isinstance(value, (list, tuple))
+                            or len(value) not in (2, 3)
+                            or any(not isinstance(v, (int, float)) or not math.isfinite(float(v)) for v in value)
+                        ):
+                            issues.append(ValidationIssue(
+                                severity=ValidationSeverity.ERROR,
+                                code="invalid_state_property",
+                                message=f"State property {key!r} must be a finite 2D/3D vector.",
+                                element_id=item_id,
+                                field=f"patches[{patch_index}].changes.{key}",
+                            ))
+
+            elif isinstance(item, ElementMorph):
+                if item.element_id not in element_specs:
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="unknown_target_element_id",
+                        message=f"ElementMorph target {item.element_id!r} does not reference a known element.",
+                        element_id=item_id,
+                        field="element_id",
+                    ))
+                if not isinstance(item.target, CanvasElement):
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="invalid_morph_target",
+                        message="ElementMorph.target must be a CanvasElement.",
+                        element_id=item_id,
+                        field="target",
+                    ))
+                else:
+                    target_kind = None
+                    try:
+                        from .measure import _OBJECT_KINDS  # type: ignore[import]
+                        target_kind = _OBJECT_KINDS.get(item.target.type)
+                    except Exception:
+                        target_kind = None
+                    if target_kind is None:
+                        issues.append(ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            code="unknown_morph_target_type",
+                            message=f"ElementMorph target type {item.target.type!r} is not registered.",
+                            element_id=item_id,
+                            field="target.type",
+                        ))
+                    else:
+                        validator = target_kind.get("validate")
+                        for message in list(validator(item.target.content)) if validator else []:
+                            issues.append(ValidationIssue(
+                                severity=ValidationSeverity.ERROR,
+                                code="invalid_morph_target_content",
+                                message=f"{item.target.type}: {message}.",
+                                element_id=item_id,
+                                field="target.content",
+                            ))
 
             elif isinstance(item, (SolidLift, SolidRotate, CameraInspect)):
                 # --- Check 4: element_id references existing element ---
@@ -930,7 +1152,7 @@ class SheetDSL:
             if t in ("MathTex", "Text", "ThreeDGraph", "Surface", "Solid3D", "Axes",
                      "NumberPlane", "ParametricFunction", "VGroup", "Dot", "Arrow",
                      "Image", "SVG", "GridBoard", "GridMark", "QuadraticPlot",
-                     "QuadraticPlotPair"):
+                     "QuadraticPlotPair", "DataPath", "DataPlot", "Diagram"):
                 entry = None
                 if "entry_animation" in item:
                     entry = EntryAnimation(**item["entry_animation"])
@@ -1003,6 +1225,52 @@ class SheetDSL:
                     run_time=item.get("run_time", 1.0),
                 )
                 timeline.append(te)
+            elif t == "StateTransition":
+                timeline.append(StateTransition(
+                    id=item["id"],
+                    patches=[
+                        StatePatch(
+                            target_id=str(patch.get("target_id", "")),
+                            changes=dict(patch.get("changes") or {}),
+                        )
+                        for patch in item.get("patches", [])
+                    ],
+                    run_time=float(item.get("run_time", 1.0)),
+                    lag_ratio=float(item.get("lag_ratio", 0.0)),
+                    rate_func=str(item.get("rate_func", "smooth")),
+                ))
+            elif t == "ElementMorph":
+                target_data = dict(item.get("target") or {})
+                target_layout = None
+                if target_data.get("layout"):
+                    target_layout = LayoutBox.from_dict(target_data["layout"])
+                target_entry = None
+                if target_data.get("entry_animation"):
+                    target_entry = EntryAnimation(**target_data["entry_animation"])
+                target = CanvasElement(
+                    id=str(target_data.get("id", f"{item['id']}_target")),
+                    type=str(target_data.get("type", "Text")),
+                    content=target_data.get("content"),
+                    canvas_position=tuple(target_data.get("canvas_position", (0, 0, 0))),
+                    world_transform=(
+                        WorldTransform.from_dict(target_data.get("world_transform"))
+                        if target_data.get("world_transform")
+                        else WorldTransform()
+                    ),
+                    layout=target_layout,
+                    entry_animation=target_entry,
+                    static_scale=float(target_data.get("static_scale", 1.0)),
+                    static_opacity=float(target_data.get("static_opacity", 1.0)),
+                    auto_focus=bool(target_data.get("auto_focus", False)),
+                )
+                timeline.append(ElementMorph(
+                    id=item["id"],
+                    element_id=str(item.get("element_id", "")),
+                    target=target,
+                    run_time=float(item.get("run_time", 1.0)),
+                    match_shapes=bool(item.get("match_shapes", False)),
+                    rate_func=str(item.get("rate_func", "smooth")),
+                ))
             elif t == "PlotTrace":
                 timeline.append(PlotTrace(
                     id=item["id"],
@@ -1133,6 +1401,14 @@ class SheetDSL:
 
     def add_transform(self, te: TransformElement) -> "SheetDSL":
         self.timeline.append(te)
+        return self
+
+    def add_state_transition(self, transition: StateTransition) -> "SheetDSL":
+        self.timeline.append(transition)
+        return self
+
+    def add_element_morph(self, morph: ElementMorph) -> "SheetDSL":
+        self.timeline.append(morph)
         return self
 
     def add_plot_trace(self, pt: PlotTrace) -> "SheetDSL":

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Iterator, List, Literal, Optional, Tuple, Union
 
 from manim import (
+    AnimationGroup,
     DEGREES,
     DOWN,
     FadeIn,
@@ -20,6 +21,8 @@ from manim import (
     RIGHT,
     Text,
     ThreeDScene,
+    Transform,
+    TransformMatchingShapes,
     UP,
     UR,
     VGroup,
@@ -45,12 +48,14 @@ from .dsl import (
     CameraKeyframe,  # Phase 3
     CanvasElement,
     CanvasSettings,
+    ElementMorph,
     ObjectAnchor,  # Phase 5
     ObservationMode,  # Phase 8
     PlotTrace,
     SheetDSL,
     SolidLift,
     SolidRotate,
+    StateTransition,
     TimelineItem,
     TransformElement,
     TapeObject,
@@ -60,6 +65,7 @@ from .dsl import (
 from .solids import place_solid_on_tape
 from .coords import local_to_world_point, _rotation_matrix_from_euler_deg
 from .focus import FocusEngine
+from .generic_visuals import resolve_semantic_part
 from .inspect_engine import InspectEngine
 from .rotation_engine import RotationEngine
 from .solid_labels import apply_billboard_labels
@@ -133,7 +139,7 @@ def _item_meta(payload: Any) -> Tuple[str, str, Optional[str]]:
     Works for both single items and flex-group lists.
     """
     from .dsl import (
-        CanvasElement, CameraMove, CameraKeyframe, TransformElement,
+        CanvasElement, CameraMove, CameraKeyframe, ElementMorph, StateTransition, TransformElement,
         PlotTrace, SolidLift, SolidRotate, CameraInspect, CameraFocus,
     )
 
@@ -153,6 +159,8 @@ def _item_meta(payload: Any) -> Tuple[str, str, Optional[str]]:
         CameraMove: "camera_move",
         CameraKeyframe: "camera_keyframe",
         TransformElement: "transform",
+        StateTransition: "state_transition",
+        ElementMorph: "element_morph",
         PlotTrace: "plot_trace",
         SolidLift: "solid_lift",
         SolidRotate: "solid_rotate",
@@ -190,6 +198,7 @@ class CanvasScene(ThreeDScene):
     """
 
     def __init__(self, dsl: SheetDSL, **kwargs):
+        strict_validation = bool(kwargs.pop("strict_validation", True))
         super().__init__(**kwargs)
         self.dsl = dsl
         self.settings: CanvasSettings = dsl.canvas_settings
@@ -199,41 +208,16 @@ class CanvasScene(ThreeDScene):
         # --- DSL validation pass (pre-render) ---
         # Run before any Manim setup so errors surface immediately with clear
         # diagnostics rather than as cryptic AttributeErrors mid-render.
-        # Validation is non-fatal for warnings; errors are printed loudly but
-        # do NOT abort __init__ (the render itself will fail at the offending
-        # item, which is the correct Manim failure mode).  Authors who want a
-        # hard pre-render gate can call dsl.validate(raise_on_error=True)
-        # themselves before constructing CanvasScene.
-        try:
-            issues = dsl.validate(raise_on_error=False)
-            errors = [i for i in issues if i.severity.value == "error"]
-            warnings = [i for i in issues if i.severity.value == "warning"]
-            if errors:
-                import sys
-                print(
-                    f"\n[Matemium] DSL validation found {len(errors)} error(s) "
-                    f"and {len(warnings)} warning(s) before render:\n",
-                    file=sys.stderr,
-                )
-                for issue in issues:
-                    print(f"  {issue}", file=sys.stderr)
-                print(
-                    "\nRender will proceed but may fail at the offending item. "
-                    "Fix the issues above for a clean render.\n",
-                    file=sys.stderr,
-                )
-            elif warnings:
-                import sys
-                print(
-                    f"[Matemium] DSL validation: {len(warnings)} warning(s):",
-                    file=sys.stderr,
-                )
-                for w in warnings:
-                    print(f"  {w}", file=sys.stderr)
-        except Exception:
-            # Validation itself must never crash the scene — it is a best-effort
-            # diagnostic layer.  Swallow any unexpected errors silently.
-            pass
+        issues = dsl.validate(raise_on_error=strict_validation)
+        warnings = [i for i in issues if i.severity.value == "warning"]
+        if warnings:
+            import sys
+            print(
+                f"[Matemium] DSL validation: {len(warnings)} warning(s):",
+                file=sys.stderr,
+            )
+            for warning in warnings:
+                print(f"  {warning}", file=sys.stderr)
         # Phase 3
         self.root_tape = getattr(dsl, "root_tape", None)
         # Phase 8
@@ -290,6 +274,10 @@ class CanvasScene(ThreeDScene):
                     self._handle_element_reveal(payload)
                 elif isinstance(payload, TransformElement):
                     self._handle_transform(payload)
+                elif isinstance(payload, StateTransition):
+                    self._handle_state_transition(payload)
+                elif isinstance(payload, ElementMorph):
+                    self._handle_element_morph(payload)
                 elif isinstance(payload, PlotTrace):
                     self._handle_plot_trace(payload)
                 elif isinstance(payload, SolidLift):
@@ -831,7 +819,13 @@ class CanvasScene(ThreeDScene):
                 pos = np.array(local_pos, dtype=float)
                 mob.move_to(pos)
             else:
-                if not is_tape_content and wt and hasattr(wt, 'position'):
+                has_explicit_world_position = bool(
+                    not is_tape_content
+                    and wt
+                    and hasattr(wt, "position")
+                    and any(abs(float(value)) > 1e-12 for value in wt.position.as_tuple())
+                )
+                if has_explicit_world_position:
                     p = wt.position
                     pos = np.array(p.as_tuple() if hasattr(p, 'as_tuple') else p, dtype=float)
                 else:
@@ -841,8 +835,6 @@ class CanvasScene(ThreeDScene):
                     pos = mob.get_center()
                 else:
                     mob.move_to(pos)
-            with open("overlap_log.txt", "a") as lf:
-                lf.write(f"PLACED {elem.id} ({getattr(elem, 'content', '')}) AT POS: {pos}. Actual mob center: {mob.get_center()}\n")
             # Register early ...
             self.registry.register(elem.id, mob, pos[1] if len(pos)>1 else 0, tuple(pos))
 
@@ -1096,6 +1088,84 @@ class CanvasScene(ThreeDScene):
         else:
             # Default: just move it
             self.play(source.animate.move_to(new_pos), run_time=rt)
+
+    def _resolve_state_target(self, target_id: str) -> Mobject:
+        element_id, separator, part_id = target_id.partition("::")
+        root = self.registry.get(element_id)
+        if root is None:
+            raise ValueError(f"State target element {element_id!r} is not in the registry")
+        if not separator:
+            return root
+        part = resolve_semantic_part(root, part_id)
+        if part is None:
+            raise ValueError(f"Semantic part {part_id!r} is not available on {element_id!r}")
+        return part
+
+    @staticmethod
+    def _vector3(value: Any) -> np.ndarray:
+        values = list(value)
+        if len(values) == 2:
+            values.append(0.0)
+        return np.array(values, dtype=float)
+
+    def _handle_state_transition(self, transition: StateTransition) -> None:
+        animations = []
+        for patch in transition.patches:
+            target = self._resolve_state_target(patch.target_id)
+            changes = patch.changes
+            animation = target.animate
+            if "color" in changes:
+                animation = animation.set_color(changes["color"])
+            if "fill_color" in changes:
+                animation = animation.set_fill(color=changes["fill_color"])
+            if "fill_opacity" in changes:
+                animation = animation.set_fill(opacity=float(changes["fill_opacity"]))
+            stroke_kwargs: dict[str, Any] = {}
+            if "stroke_color" in changes:
+                stroke_kwargs["color"] = changes["stroke_color"]
+            if "stroke_opacity" in changes:
+                stroke_kwargs["opacity"] = float(changes["stroke_opacity"])
+            if "stroke_width" in changes:
+                stroke_kwargs["width"] = float(changes["stroke_width"])
+            if stroke_kwargs:
+                animation = animation.set_stroke(**stroke_kwargs)
+            if "opacity" in changes:
+                animation = animation.set_opacity(float(changes["opacity"]))
+            if "scale" in changes:
+                animation = animation.scale(float(changes["scale"]))
+            if "shift" in changes:
+                animation = animation.shift(self._vector3(changes["shift"]))
+            if "position" in changes:
+                animation = animation.move_to(self._vector3(changes["position"]))
+            animations.append(animation)
+        if animations:
+            group = AnimationGroup(
+                *animations,
+                lag_ratio=transition.lag_ratio,
+                run_time=transition.run_time,
+                rate_func=self._get_rate_func(transition.rate_func),
+            )
+            self.play(group)
+
+    def _handle_element_morph(self, morph: ElementMorph) -> None:
+        source = self.registry.get(morph.element_id)
+        if source is None:
+            raise ValueError(f"Morph target {morph.element_id!r} is not in the registry")
+        target = self._build_mobject(morph.target)
+        if target is None:
+            raise ValueError(f"Morph target kind {morph.target.type!r} did not build a mobject")
+        target.move_to(source.get_center())
+        animation_cls = TransformMatchingShapes if morph.match_shapes else Transform
+        self.play(
+            animation_cls(source, target),
+            run_time=morph.run_time,
+            rate_func=self._get_rate_func(morph.rate_func),
+        )
+        # Keep the freshly compiled target so its semantic part registry is authoritative.
+        self.remove(source)
+        self.add(target)
+        self.registry.replace(morph.element_id, target)
+        self._element_specs[morph.element_id] = morph.target
 
     # --------------------------- Builders & Behaviors ------------------------
 

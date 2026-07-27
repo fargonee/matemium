@@ -5,11 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-06-30
+## [Unreleased] - 2026-07-27
 
 ### Added
+- Generic `DataPath`, `DataPlot`, and `Diagram` visual kinds backed by sampled,
+  JSON-compatible data.
+- Stable semantic-part addressing for compound visuals:
+  `path`, `axes`, `series:<id>`, `marker:<id>`, `node:<id>`,
+  `edge:<id>`, and `edge-label:<id>`.
+- `StateTransition` for synchronized allowlisted visual-property patches and
+  `ElementMorph` for registered-pipeline content/geometry replacement.
+- Registered-kind content validators and semantic-part declarations, strict
+  pre-render validation, and structured project-check diagnostics.
+- Eleven deterministic first-pass flagship projects across subjects.
+- Source-aligned `AUTHORING_API.md` and public docs for generic visuals/actions.
+- Corrected authoring docs to use the automatic root tape, distinguish mature
+  APIs from experimental world/multi-tape paths, and stop advertising the
+  currently missing `TapeScroll` target.
 - 3D world structures (TapeObject, WorldTransform, keyframes, mixed placement) added.
-- **Clarification (July 2026):** Tape is observed as a normal 3D object by default. Only explicit tape-scroll-mode (`TapeScroll`) activates internal sheet behaviors. See `3D-WORLD-DESCRIPTION.md` and `TODO-3d-tape-observation-enhancement.md`. Full realization of differentiated observation is still needed. Legacy tape behavior is preserved.
+- **3D design clarification (July 2026):** The target architecture treats a
+  tape as a world object and reserves `TapeScroll` for internal sheet behavior.
+  This remains a design target, not the current high-level tape contract:
+  `add_tape()` currently creates a 2D layout context and rejects physical
+  transforms. `TapeScroll` itself is not present in the current DSL; legacy
+  root-tape behavior is preserved through automatic reveal and `CameraMove`.
 - Auto-registration of all built-in object kinds; registry dispatch is primary path (no more core if/elif patching for new viz).
 - Enhanced Space3DDemo showcasing rotated tape, add_object, relative anchors, mixed camera keyframes (ObjectAnchor/TapeScroll/WorldPoint).
 - Comprehensive Phase 10 tests for registration, resolution, DSL roundtrips, mixed builder, dispatch parity.
@@ -19,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - measure.py: extracted builders + _auto_register_builtins; measure_element delegates to kind "measure" when present.
 - Builder, scene, DSL keep full backward compat (old add_* populate root_tape; legacy projects unaffected).
 - Docs and shared templates reflect unified 3D + tape model as default.
+- Root timeline elements with identity world transforms now retain tape-flow
+  placement.
+- Agent guidance now reflects cross-subject authoring and accurate method return
+  types.
 
 ### Fixed / Polished
 - Existing sheet videos continue to author and render identically; 3D features are opt-in extensions.

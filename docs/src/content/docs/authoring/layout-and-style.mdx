@@ -9,7 +9,7 @@ composition over manually calculating positions.
 ## Style a content block
 
 ```python
-tape.add_body(
+builder.add_body(
     "A longer explanation that should remain readable in portrait output.",
     style={
         "width": 5.8,
@@ -36,9 +36,9 @@ See the [style property reference](/reference/style-properties/) for guidance.
 ## Use semantic text methods
 
 ```python
-tape.add_heading("The central idea")
-tape.add_body("A readable explanatory paragraph.")
-tape.add_observation("Notice what changes and what remains fixed.")
+builder.add_heading("The central idea")
+builder.add_body("A readable explanatory paragraph.")
+builder.add_observation("Notice what changes and what remains fixed.")
 ```
 
 Semantic helpers have safer defaults than treating every string as an
@@ -47,7 +47,7 @@ undifferentiated text object.
 ## Compose a row
 
 ```python
-tape.add_flex_row(
+builder.add_flex_row(
     [
         tape.text_spec(
             "Cause",
@@ -70,7 +70,7 @@ focused independently.
 ## Compose a column
 
 ```python
-tape.add_flex_column(
+builder.add_flex_column(
     [
         tape.text_spec("Input", style={"width": 4.0}),
         tape.text_spec("Transformation", style={"width": 4.0}),
@@ -86,7 +86,7 @@ tape.add_flex_column(
 Use runs when part of a sentence needs its own color or highlight:
 
 ```python
-tape.add_text([
+builder.add_text([
     "The ",
     builder.run("middle value", color="#8d82ff", highlight=True),
     " determines which half remains.",

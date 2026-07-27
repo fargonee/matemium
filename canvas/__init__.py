@@ -1,8 +1,9 @@
-"""Matemium — layout-to-animation compiler for infinite scrollable math sheets.
+"""Matemium — layout-to-animation compiler for structured visual explanations.
 
-Elements appear as the view scrolls, stay at fixed positions in default state,
-and can be re-animated on demand. Full-tape export captures the entire sheet
-in its natural aspect (no forced portrait/landscape crop).
+Elements appear as the view moves through tapes/world content, remain
+addressable in a persistent registry, and can be restyled or morphed on demand.
+Validated sampled paths, plots, and diagrams provide cross-subject compound
+visuals. Full-tape export captures the reasoning canvas in its natural aspect.
 
 **Video formats (portrait-first)**:
 - `CanvasSettings.for_reels()`      → 9:16 vertical (default)
@@ -10,7 +11,7 @@ in its natural aspect (no forced portrait/landscape crop).
 
 Render videos: `./matemium.sh demo` or `python -m matemium --help`
 
-See project-spec.md, architecture.md, and canvas/USAGE.md.
+See AUTHORING_API.md, project-spec.md, architecture.md, and canvas/USAGE.md.
 """
 
 from .dsl import (
@@ -23,6 +24,9 @@ from .dsl import (
     WorldPoint,
     ObjectAnchor,
     ObservationMode,  # Phase 8
+    ElementMorph,
+    StatePatch,
+    StateTransition,
     TransformElement,
     EntryAnimation,
     StateBehavior,
@@ -88,6 +92,9 @@ __all__ = [
     "CameraMove",
     "CameraKeyframe",
     "TransformElement",
+    "ElementMorph",
+    "StatePatch",
+    "StateTransition",
     "EntryAnimation",
     "StateBehavior",
     "CanvasScene",

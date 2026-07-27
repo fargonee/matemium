@@ -26,9 +26,10 @@ use crate::outputs::{
     validate_project_workspace_path, validate_render_output_dir, OutputPathScope,
 };
 use crate::projects::{
-    create_project, create_tape_content, delete_project, delete_project_media,
-    import_project_media, list_project_media, list_projects, open_project, save_project_file,
-    save_scenes, save_tape_content, workspace_path,
+    create_project, create_project_from_bundled_example, create_tape_content, delete_project,
+    delete_project_media, export_project_archive, import_project_archive, import_project_media,
+    list_bundled_examples, list_project_media, list_projects, open_bundled_example, open_project,
+    save_project_file, save_scenes, save_tape_content, workspace_path,
 };
 use crate::state::{AppState, OpenRouterOAuthSession};
 use crate::workspace::{write_json, ProviderModelSettings, Settings};
@@ -43,6 +44,25 @@ pub struct ProjectCreateParams {
 #[serde(rename_all = "camelCase")]
 pub struct ProjectIdParams {
     pub project_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectArchiveExportParams {
+    pub project_id: String,
+    pub destination: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectArchiveImportParams {
+    pub source: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExampleIdParams {
+    pub example_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -214,6 +234,29 @@ pub async fn project_list(state: State<'_, AppState>) -> Result<Value, String> {
 }
 
 #[tauri::command]
+pub async fn example_list() -> Result<Value, String> {
+    serde_json::to_value(list_bundled_examples()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn example_open_source(params: ExampleIdParams) -> Result<Value, String> {
+    serde_json::to_value(open_bundled_example(&params.example_id)?).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn example_create_copy(
+    state: State<'_, AppState>,
+    params: ExampleIdParams,
+) -> Result<Value, String> {
+    let readiness = get_readiness(state.clone()).await?;
+    if !readiness.fully_ready {
+        return Err(format!("APP_NOT_READY: {}", readiness.message));
+    }
+    let project = create_project_from_bundled_example(&state.paths, &params.example_id)?;
+    serde_json::to_value(project).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn project_create(
     state: State<'_, AppState>,
     params: ProjectCreateParams,
@@ -334,6 +377,23 @@ pub async fn project_delete(
     params: ProjectIdParams,
 ) -> Result<(), String> {
     delete_project(&state.paths, &params.project_id)
+}
+
+#[tauri::command]
+pub async fn project_export_archive(
+    state: State<'_, AppState>,
+    params: ProjectArchiveExportParams,
+) -> Result<String, String> {
+    export_project_archive(&state.paths, &params.project_id, &params.destination)
+}
+
+#[tauri::command]
+pub async fn project_import_archive(
+    state: State<'_, AppState>,
+    params: ProjectArchiveImportParams,
+) -> Result<Value, String> {
+    let project = import_project_archive(&state.paths, &params.source)?;
+    serde_json::to_value(project).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

@@ -12,7 +12,7 @@ The production agent is a persistent state machine. A model response without too
 
 The agent also follows the project-management contract in [`project-manager-architecture.md`](project-manager-architecture.md): it owns Passport discovery, structured preference questions, proactive production planning, and the Roadmap that is read-only to users.
 
-The normative production sequence and its mute, TTS, and custom-audio branches are defined in [`docs/product-production-lifecycle.md`](docs/product-production-lifecycle.md). The bounded tool policy includes the lifecycle's separate tape-content, orchestration, narration/audio, transcript, and timestamp artifacts.
+The normative production sequence and its mute, TTS, and custom-audio branches are defined in [`product-production-lifecycle.md`](product-production-lifecycle.md). The bounded tool policy includes the lifecycle's separate tape-content, orchestration, narration/audio, transcript, and timestamp artifacts.
 
 **Product decisions** (vector DB/RAG, lazy loading, first-run downloads, Jina embeddings, strict UX gating, thin YouTube publishing, local+hosted MCP, minimal control-plane sidecar) are documented in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
@@ -306,7 +306,7 @@ Agent mode enforces a **bounded project workspace**. It is richer than the old t
 
 ### 7.1 File roles
 
-The target file roles and path-specific artifacts are defined by [`docs/product-production-lifecycle.md`](docs/product-production-lifecycle.md).
+The target file roles and path-specific artifacts are defined by [`product-production-lifecycle.md`](product-production-lifecycle.md).
 
 | File | Role | UI surface |
 |------|------|------------|
@@ -314,7 +314,7 @@ The target file roles and path-specific artifacts are defined by [`docs/product-
 | **`helpers.py`** | **The Helper Room** — raw computations, coordinate arrays, custom LaTeX groupings, reusable geometry/data helpers | Secondary code drawer |
 | **`brief/passport.json`** | Structured creative/production identity: topic, audience, difficulty, style, duration, language, constraints, learning goals | Form editor with JSON fallback |
 | **`brief/description.md`** | Human-readable project brief and intent | Markdown editor |
-| **`brief/tapes/*.md`** | Exact visible mathematical/reasoning content for one or more tapes | Markdown editor with tape and beat navigation |
+| **`brief/tapes/*.md`** | Exact visible subject/reasoning content for one or more tapes | Markdown editor with tape and beat navigation |
 | **`brief/orchestration.md`** | 3D world, camera, tape choreography, reveals, transformations, transitions, and pacing intent | Markdown editor with beat references |
 | **`brief/roadmap.json`** | Phases, completion, current working point, blockers | AI-owned file shown as a read-only route in desktop; keep JSON valid and update progress only from supported project evidence |
 | **Path-specific narration/audio files** | TTS narration/style or custom-audio description/narration, plus verified transcript/timestamps where required | Phase-aware Markdown, script, and timeline editors |

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "project_slug": "dijkstra_execution",
+  "title": "What Really Happens During Dijkstra's Algorithm",
+  "production_path": "mute_video",
+  "production_path_basis": "The flagship showcase cycle requires explanations that remain complete without narration or music.",
+  "audience": "Beginning algorithms and data-structures learners",
+  "assumed_knowledge": [
+    "graphs contain nodes and weighted edges",
+    "a path cost is the sum of its edge weights",
+    "a priority queue can return a smallest key"
+  ],
+  "central_message": "Dijkstra repeatedly settles the smallest tentative distance and relaxes its outgoing edges.",
+  "takeaway": "With non-negative weights, the smallest unsettled distance cannot be improved later; predecessors recover the route.",
+  "platform": "website showcase and bundled desktop example",
+  "orientation": "landscape",
+  "aspect_ratio": "16:9",
+  "resolution_master": "1920x1080",
+  "duration_target_seconds": {
+    "minimum": 50,
+    "maximum": 70
+  },
+  "language": "English",
+  "scientific_depth": "introductory single-source shortest paths, relaxation, predecessor reconstruction, and negative-edge boundary",
+  "visual_direction": "dark execution dashboard with stable graph geometry and semantic state colors",
+  "tone": "precise, inspectable, procedural",
+  "pacing": "one complete relaxation cycle followed by accelerated verified snapshots",
+  "audio": {
+    "final_track": "none",
+    "must_remain_understandable_without_sound": true
+  },
+  "constraints": [
+    "offline and deterministic",
+    "alphabetical tie-breaking",
+    "visible frontier means best current entry per unsettled node",
+    "do not claim validity for negative edge weights"
+  ],
+  "success_criteria": [
+    "all displayed values match the generated trace",
+    "accepted and rejected relaxations are visually distinct",
+    "the final path and cost are correct",
+    "the negative-edge counterexample is numerically valid",
+    "graph geometry remains fixed across snapshots"
+  ],
+  "readiness": {
+    "status": "ready",
+    "missing_fields": []
+  },
+  "last_updated": "2026-07-27"
+}

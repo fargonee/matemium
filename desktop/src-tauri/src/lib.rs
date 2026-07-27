@@ -99,6 +99,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::project_list,
+            commands::example_list,
+            commands::example_open_source,
+            commands::example_create_copy,
             commands::project_create,
             commands::project_open,
             commands::project_save,
@@ -109,6 +112,8 @@ pub fn run() {
             commands::project_import_media,
             commands::project_delete_media,
             commands::project_delete,
+            commands::project_export_archive,
+            commands::project_import_archive,
             commands::sidecar_ping,
             commands::sidecar_configure_assets,
             commands::get_asset_status,

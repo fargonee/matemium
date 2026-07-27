@@ -8,13 +8,14 @@ representation consumed by `CanvasScene`.
 
 ```python
 builder = CanvasBuilder(title="My Explanation")
-tape = builder.add_tape("main")
-# author content and actions
+builder.add_heading("A clear question")  # root tape is automatic
+# author more content and actions
 super().__init__(dsl=builder.build(), **kwargs)
 ```
 
-Most builder methods are chainable and return the builder rather than an element
-identifier. Pass an explicit `id=` when a later action must reference an element.
+Most text, layout, camera, and timeline methods are chainable. The generic data
+visual methods and world-object placement methods return stable IDs because
+later actions address them.
 
 ## Content
 
@@ -28,14 +29,20 @@ identifier. Pass an explicit `id=` when a later action must reference an element
 | `add_3d(equation, ...)` | Mathematical 3D surface |
 | `add_solid(shape, ...)` | Generic volumetric solid |
 | `add_raw(element)` | Low-level escape hatch |
+| `add_data_path(points, ...)` | Sampled trajectory, contour, route, boundary, or vector |
+| `add_data_plot(series, markers=..., ...)` | Axes with named sampled series and markers |
+| `add_diagram(nodes, edges, ...)` | Named node-edge structure with explicit positions |
 
 Tape builders expose the corresponding content methods while binding elements
 to their tape.
 
+`add_data_path`, `add_data_plot`, and `add_diagram` return the created element
+ID. Text and math methods return the builder.
+
 ## Inline runs
 
 ```python
-tape.add_text([
+builder.add_text([
     "The ",
     builder.run("active region", color="#8d82ff", highlight=True),
     " remains searchable.",
@@ -49,13 +56,54 @@ font size, and opacity.
 
 | Method | Purpose |
 | --- | --- |
-| `add_tape(name)` | Create and return a `TapeBuilder` |
+| `add_tape(name)` | Create an additional tape and return a `TapeBuilder` |
 | `add_flex_row(items, ...)` | Lay independently addressable items in a row |
 | `add_flex_column(items, ...)` | Lay independently addressable items in a column |
 | `text_spec(...)` | Text item specification for flex |
 | `math_spec(...)` | Math item specification for flex |
 | `element_spec(...)` | Custom element specification for flex |
 | `last_flex_ids` | IDs produced by the most recent flex container |
+
+## Generic visual schemas
+
+All coordinates contain two or three finite numbers.
+
+| Kind | Required data | Common options | Semantic parts |
+| --- | --- | --- | --- |
+| `DataPath` | `points` with at least two coordinates | `smooth`, `closed`, `arrow`, `color`, `stroke_width` | `path` |
+| `DataPlot` | non-empty `series`; each series has unique `id` and at least two `points` | `markers`, `x_range`, `y_range`, `width`, `height`, `tips`, `smooth` | `axes`, `series:<id>`, `marker:<id>` |
+| `Diagram` | non-empty unique-ID `nodes`; edges reference known node IDs | node shape/size/style; edge direction/label/style | `node:<id>`, `edge:<id>`, `edge-label:<id>` |
+
+For complete examples and field details, see
+[Data visuals and transitions](/authoring/data-visuals-and-transitions/).
+
+## State and morphing
+
+| Method | Purpose |
+| --- | --- |
+| `add_state_transition(patches, run_time=..., lag_ratio=..., rate_func=...)` | Apply synchronized allowlisted changes to elements or semantic parts |
+| `add_element_morph(element_id, target, run_time=..., match_shapes=...)` | Recompile a target `CanvasElement` and replace a registered visual |
+
+A state patch uses:
+
+```python
+{
+    "target_id": "control_loop::node:sensor",
+    "changes": {"fill_color": "#ffdd66", "scale": 1.08},
+}
+```
+
+Allowlisted changes are `color`, `fill_color`, `fill_opacity`,
+`stroke_color`, `stroke_opacity`, `stroke_width`, `opacity`, `scale`, `shift`,
+and `position`.
+
+Semantic target syntax is:
+
+```text
+element_id::part_id
+```
+
+The target of a morph is a `CanvasElement`, not another builder call.
 
 ## Camera and observation
 
@@ -64,24 +112,42 @@ font size, and opacity.
 | `add_camera_focus(id, ...)` | Isolate or overlay-focus an existing element |
 | `add_camera_move(dy, ...)` | Legacy explicit tape movement |
 | `add_camera_keyframe(target=..., ...)` | General 3D observation keyframe |
-| `scroll_tape(local_y, ...)` | Enter tape-scroll mode explicitly |
-| `observe_object(target, ...)` | Observe a world object |
+| `observe_object(target, ...)` | Experimental world-object observation |
 | `add_camera_inspect(id, path=..., ...)` | Inspect a 3D object along a path |
+
+Normal root-tape content scrolls and reveals automatically. Although a
+`scroll_tape()` method remains in the builder source, it is not part of the
+current usable contract because its `TapeScroll` target type is absent from the
+runtime DSL.
 
 ## 3D objects
 
 | Method | Purpose |
 | --- | --- |
-| `add_object(kind, ...)` | Register a generic world object |
+| `add_object(kind, ...)` | Experimental registered/free world object |
 | `add_solid(shape, ...)` | Place a built-in volumetric solid |
 | `add_solid_lift(id, ...)` | Raise a solid above its tape |
 | `solid_label(...)` | Create a camera-facing label specification |
 | `add_3d(equation, ...)` | Place a mathematical surface in tape flow |
 
+## Return values
+
+| Methods | Return |
+| --- | --- |
+| Text, math, flex, camera, state, morph, and solid actions | `CanvasBuilder` |
+| Corresponding tape-forwarded chainable actions | underlying builder result |
+| `add_data_path`, `add_data_plot`, `add_diagram` | element ID string |
+| `add_tape` | `TapeBuilder` |
+| `add_object`, `add_world_object`, `add_relative` | object/element ID string |
+| `run` and `*_spec` helpers | serializable dict |
+
+`add_solid()` is chainable and does not return its ID. Pass an explicit `id=`
+when later actions need to address the solid.
+
 ## Focus example
 
 ```python
-tape.add_math(r"E = mc^2", id="energy")
+builder.add_math(r"E = mc^2", id="energy")
 
 builder.add_camera_focus(
     "energy",
@@ -94,6 +160,30 @@ builder.add_camera_focus(
 )
 ```
 
+## Validation behavior
+
+`CanvasScene` runs strict structural validation by default before rendering.
+Registered data schemas, semantic-part targets, state properties, and morph
+targets are checked. The desktop `check_project` command returns these errors
+as structured diagnostics.
+
+`strict_validation=False` exists only for checking and engine debugging; it is
+not a production-authoring workaround.
+
+Unknown visual kinds currently validate as warnings for extension
+compatibility. A warning is not evidence that the kind can render.
+
+## Capability maturity
+
+- Production: root-tape content, style/flex, rich text, sampled paths/plots,
+  semantic diagrams, state transitions, morphs, focus, and both orientations.
+- Specialized: equation surfaces and solid inspection; always preview them in
+  the delivery orientation.
+- Experimental: multiple-tape choreography and the free-world object/camera
+  APIs.
+- Not yet generic: timed traversal of sampled paths/plots, reactive shared
+  clocks, arbitrary physical tape transforms, and timed audio/media.
+
 ## Internal API boundary
 
 `SheetDSL`, raw canvas elements, and JSON loading are intended for engine tests,
@@ -102,3 +192,5 @@ reachable through `CanvasBuilder`.
 
 For exact signatures in the current source, see
 [`canvas/builder.py`](https://github.com/fargonee/math/blob/main/canvas/builder.py).
+The repository also maintains a source-aligned
+[`AUTHORING_API.md`](https://github.com/fargonee/math/blob/main/AUTHORING_API.md).

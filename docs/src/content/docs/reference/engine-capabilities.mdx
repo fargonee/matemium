@@ -1,0 +1,93 @@
+---
+title: Engine capabilities
+description: See which Matemium authoring and rendering capabilities are mature, specialized, experimental, or not yet implemented.
+---
+
+This page is the public maturity snapshot for the engine revision dated
+2026-07-27. A method existing in source is not, by itself, proof that it is a
+production authoring contract.
+
+## Production authoring
+
+These are the preferred tools for real projects:
+
+- Automatic root-tape layout and lazy reveal
+- Plain and rich-run text
+- LaTeX math
+- CSS-like width, height, alignment, wrapping, and margins
+- Flex rows and columns with independently addressable items
+- `DataPath` for sampled paths, trajectories, contours, routes, and vectors
+- `DataPlot` for named sampled series and markers
+- `Diagram` for explicit semantic node-edge structures
+- `StateTransition` for synchronized allowlisted property changes
+- `ElementMorph` for recompiled content or geometry
+- Isolate and overlay camera focus
+- Portrait 9:16 and landscape 16:9 settings
+- Strict project/DSL checking before render
+
+These capabilities still require an actual preview. Structural validation does
+not prove legibility, pacing, camera quality, or subject accuracy.
+
+## Specialized capabilities
+
+These are implemented but need closer visual testing:
+
+- Equation-backed mathematical surfaces
+- Tape-local cube/sphere and multipart solids
+- Solid lift, rotation paths, labels, and camera inspection
+- Full-tape PNG/PDF export
+- Reel cutting
+- Legacy grid-board and quadratic helpers
+
+The legacy grid/quadratic methods remain for compatibility. New projects should
+prefer generic visuals and project-local helpers.
+
+## Experimental capabilities
+
+Use these only when a project genuinely needs them and can provide render
+evidence:
+
+- Additional tapes and automatic context switching
+- Free world objects through `add_object()` / `add_world_object()`
+- General camera keyframes and `observe_object()`
+- Relative world placement
+
+The structures and some tests exist, but the world-camera model and authoring
+ergonomics are not yet a flagship-safe default.
+
+## Not currently available
+
+- `scroll_tape()` / `TapeScroll`: the builder method references a target type
+  that is absent from the current DSL
+- Arbitrary physical transforms for tapes
+- Generic timed traversal or cursor animation over `DataPath` / `DataPlot`
+- Shared reactive clocks and declarative data bindings
+- Timed audio/media tracks in the canvas timeline
+- Automatic subject-specific simulation or graph layout
+- Production builders for every nominal Manim primitive accepted by historical
+  DSL loading
+
+Keep these as explicit limitations. Do not imitate them with lesson-specific
+branches in the engine and then advertise the workaround as a general feature.
+
+## Evidence levels
+
+Use precise language:
+
+| Level | What it establishes |
+| --- | --- |
+| Declared | A method, class, or document exists |
+| Importable | The scene source imports and instantiates |
+| Structurally valid | The compiled DSL passes checks |
+| Renderable | A real render completes |
+| Visually accepted | The output was watched and inspected |
+| Domain reviewed | Facts, equations, data, and causal claims were checked |
+| Production ready | Relevant tests, packaging, documentation, and final media are accepted |
+
+Never promote a capability based only on a lower evidence level.
+
+## Related reference
+
+- [CanvasBuilder reference](/reference/canvasbuilder/)
+- [Data visuals and transitions](/authoring/data-visuals-and-transitions/)
+- [Render and visual repair](/production/render-and-repair/)

@@ -67,6 +67,13 @@ class MobjectRegistry:
     def get_entry(self, uid: str) -> Optional[RegistryEntry]:
         return self._store.get(uid)
 
+    def replace(self, uid: str, mobject: Mobject) -> None:
+        """Replace a rendered object while preserving canonical registry metadata."""
+        entry = self._store.get(uid)
+        if entry:
+            entry.mobject = mobject
+            entry.active_updaters.clear()
+
     def move_to_canvas(
         self, uid: str, new_y: float, new_pos: Tuple[float, float, float]
     ) -> None:
