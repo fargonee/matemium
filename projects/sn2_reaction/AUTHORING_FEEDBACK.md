@@ -1,50 +1,55 @@
-# Authoring feedback — SN2 Reaction
+# Authoring feedback — SN2 Reaction flagship reauthoring
 
-## Current evidence
+## Outcome
 
-- `Diagram` expresses reactants, a transition state, products, and the steric
-  comparison through stable semantic node and edge identities.
-- `ElementMorph` preserves registered molecular and plot objects while their
-  states change.
-- `StateTransition` addresses the nucleophile, leaving bond, energy profile,
-  and progress marker without reaching into renderer internals.
-- `DataPlot` presents a deterministic one-barrier qualitative energy profile.
-- Automatic root-tape camera travel carries the portrait narrative, and
-  `CameraFocus(mode="isolate")` closes on the transition-state signature.
-- `check_project` passes with 33 authored timeline items and no diagnostics.
+The project is no longer a sequence of explanatory slides around a molecule. It
+is one continuous, project-local 3D reaction world observed in several ways,
+with one short tape reserved for the final synthesis.
 
-## Engine changes required
+- Conventional, persistent atom identities are introduced in the world: C*, O,
+  H, and Br.
+- A locked side view establishes the C—Br axis, backside and leaving-group
+  sides, the attack arrow, and the approximately 180° approach before reaction
+  progress begins.
+- Dashed, labelled C—O and C—Br partial bonds change together through a frozen
+  transition-state beat.
+- A fixed reference plane and persistent substituent labels separate Walden
+  inversion from camera rotation; reactant and product are then compared side
+  by side under the same camera.
+- The energy curve and molecule are generated from the same `progress` value.
+  Its marker reaches the labelled maximum with the transition-state geometry.
+- Mobile copy is limited to short, high-contrast labels and one concise final
+  statement.
 
-None. The project uses general diagrams, sampled plots, semantic addressing,
-state transitions, element morphs, rich text, math, and camera focus. No
-chemistry-specific behavior was added to the engine.
+## Engine boundary
 
-## Authoring and visual findings
+No engine behavior changed. `SN2ReactionWorld` remains an experimental,
+project-local registered object composed from existing Manim and Matemium
+primitives. It demonstrates a serious authoring technique, not a generic
+molecular-dynamics or reaction-clock feature.
 
-- A rich-text newline did not create two independently laid-out title lines.
-  Two normal headings were the robust authoring method.
-- Overlay focus was inappropriate for the dense molecular panel because it
-  visibly duplicated the diagram over nearby copy. Removing that project-level
-  treatment produced a clearer result; this was not evidence for a core patch.
-- The portable MathTex rate law works without `mhchem`. It is explicitly
-  labeled as the standard elementary case because SN2 classification alone
-  does not guarantee observed second-order kinetics in every system.
+## Evidence
 
-## Honest remaining limitations
+- Strict DSL validation: 23 timeline items, one root world, one closing tape.
+- Focused flagship tests, Python compilation, and Ruff checks pass.
+- Production master:
+  `outputs/sn2_reaction/media/videos/1920p30/SN2ReactionFlagship1080p30.mp4`.
+- Master format: 1080×1920 portrait, 30 fps, H.264, approximately 29.4 seconds,
+  mute by design.
+- Full-resolution frames were inspected for atom identification, alignment,
+  transition-state bonds, energy synchronization, inversion comparison, and
+  final copy. A clipped edge label found during inspection was shortened to
+  `LG SIDE` and the master was regenerated.
 
-- Molecular and energy states are coordinated in three stages, not bound to a
-  continuous shared progress clock.
-- The molecular view is a stable 2D teaching projection, not a 3D optimized
-  structure, orbital calculation, or molecular-dynamics simulation.
-- A general target-bound curved-arrow abstraction would be valuable across
-  chemistry, algorithms, circuits, and causal diagrams, but this project did
-  not justify a chemistry-only implementation.
-- Preview acceptance does not replace a final 1080×1920 render or independent
-  chemistry sign-off.
+## Honest limitations
 
-## Generalizable maturity conclusion
+- Geometry and energy are a deterministic authored teaching model, not a
+  quantum-chemical calculation or molecular-dynamics simulation.
+- The energy curve is qualitative and illustrative, not a universal energy
+  profile for all SN2 reactions.
+- Independent organic-chemistry sign-off is still pending.
 
-The current engine can produce a strong microscopic mechanism explanation from
-semantic graphs, registered morph targets, and deterministic sampled data.
-Future shared-clock and bound-annotation work should be introduced only through
-general contracts exercised by several projects.
+## Readiness
+
+Production master rendered and visually inspected; suitable as a Matemium
+flagship candidate. It is not labelled independently domain-approved.

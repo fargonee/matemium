@@ -74,6 +74,36 @@ export interface ListScenesResult {
   workspace: string;
 }
 
+export interface TapeSummary {
+  id: string;
+  title: string;
+  element_count: number;
+  frame_width: number;
+  frame_height: number;
+  content_span: number;
+  is_root: boolean;
+}
+
+export interface ListTapesResult {
+  tapes: TapeSummary[];
+  default_tape_id?: string | null;
+  workspace: string;
+  scene: string;
+}
+
+export type TapeExportFormat = "png" | "pdf";
+
+export interface TapeExportResult {
+  path: string;
+  format: TapeExportFormat;
+  workspace: string;
+  scene: string;
+  tape_id: string;
+  pixel_width?: number | null;
+  pixel_height?: number | null;
+  size_bytes: number;
+}
+
 export type VideoOrientation = "portrait" | "landscape";
 
 export interface RenderResult {
@@ -308,6 +338,7 @@ export type OutputKind =
   | "tex"
   | "text"
   | "image"
+  | "document"
   | "other";
 
 export type CacheKind =
@@ -415,6 +446,8 @@ export interface PreviewData {
   // Phase 5/7: object graph + observations for full 3D preview
   root_objects?: any[];
   root_tape?: any;
+  tapes?: any[];
+  element_tape_ids?: Record<string, string>;
   observations?: any[];  // list of camera keyframes/observations for replay
 }
 

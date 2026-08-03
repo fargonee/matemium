@@ -12,6 +12,7 @@ import type {
   Conversation,
   LintResult,
   ListScenesResult,
+  ListTapesResult,
   MediaPreviewResult,
   LocalModelCatalogEntry,
   OpenRouterConnectStart,
@@ -24,6 +25,8 @@ import type {
   ProjectSummary,
   RenderResult,
   Settings,
+  TapeExportFormat,
+  TapeExportResult,
   TokenResponse,
   VideoOrientation,
   AgentRunState,
@@ -126,6 +129,33 @@ export async function sidecarCheck(
 export async function sidecarListScenes(projectId: string): Promise<ListScenesResult> {
   return invoke<ListScenesResult>("sidecar_list_scenes", {
     params: { projectId },
+  });
+}
+
+export async function sidecarListTapes(
+  projectId: string,
+  scene?: string,
+): Promise<ListTapesResult> {
+  return invoke<ListTapesResult>("sidecar_list_tapes", {
+    params: { projectId, scene: scene ?? null },
+  });
+}
+
+export async function sidecarExportTape(
+  projectId: string,
+  tapeId: string,
+  scene?: string,
+  format: TapeExportFormat = "png",
+  highResHeight?: number | null,
+): Promise<TapeExportResult> {
+  return invoke<TapeExportResult>("sidecar_export_tape", {
+    params: {
+      projectId,
+      scene: scene ?? null,
+      tapeId,
+      format,
+      highResHeight: highResHeight ?? null,
+    },
   });
 }
 

@@ -129,8 +129,8 @@ Quick start:
         "-q",
         "--quality",
         default="low",
-        choices=["preview", "draft", "low", "medium", "high", "final"],
-        help="preview | draft | low | medium | high | final",
+        choices=["fast_preview", "preview", "draft", "low", "medium", "high", "final"],
+        help="fast_preview | preview | draft | low | medium | high | final",
     )
     p_demo.add_argument("-o", "--output", default=None)
     p_demo.add_argument("-r", "--resolution", default=None)
@@ -143,8 +143,8 @@ Quick start:
         "-q",
         "--quality",
         default="low",
-        choices=["preview", "draft", "low", "medium", "high", "final"],
-        help="preview | draft | low | medium | high | final",
+        choices=["fast_preview", "preview", "draft", "low", "medium", "high", "final"],
+        help="fast_preview | preview | draft | low | medium | high | final",
     )
     p_render.add_argument("-o", "--output", default=None)
     p_render.add_argument("-r", "--resolution", default=None)

@@ -339,9 +339,9 @@ Dependencies: Python 3.11+, Manim Community Edition, Pillow. Desktop also needs 
 ## What is done vs. planned
 
 The authoritative method-by-method maturity matrix is
-[`AUTHORING_API.md`](AUTHORING_API.md). In particular, historical world-model
-documents mention `TapeScroll`, but the current DSL does not define that target;
-`scroll_tape()` must not be used until the gap is repaired.
+[`AUTHORING_API.md`](AUTHORING_API.md). `TapeScroll` is a current serialized
+target: `scroll_tape()` selects one camera-facing tape and its local position.
+World camera actions open that tape and restore the free 3D world.
 
 ### Engine (implemented)
 

@@ -13,9 +13,8 @@ from typing import Any, Iterator, List, Literal, Optional, Tuple, Union
 from manim import (
     AnimationGroup,
     DEGREES,
-    DOWN,
     FadeIn,
-    MathTex,
+    FadeOut,
     Mobject,
     OUT,
     RIGHT,
@@ -25,18 +24,9 @@ from manim import (
     TransformMatchingShapes,
     UP,
     UR,
-    VGroup,
-    WHITE,
     ValueTracker,
-    tempconfig,
 )
 from manim.utils.rate_functions import linear, smooth
-
-# For static export
-try:
-    from PIL import Image
-except ImportError:
-    Image = None  # type: ignore
 
 
 from .animations import FLASH_AND_SCALE, get_entry_animation
@@ -56,6 +46,7 @@ from .dsl import (
     SolidLift,
     SolidRotate,
     StateTransition,
+    TapeScroll,
     TimelineItem,
     TransformElement,
     TapeObject,
@@ -63,7 +54,7 @@ from .dsl import (
     WorldTransform,
 )
 from .solids import place_solid_on_tape
-from .coords import local_to_world_point, _rotation_matrix_from_euler_deg
+from .coords import local_to_world_point
 from .focus import FocusEngine
 from .generic_visuals import resolve_semantic_part
 from .inspect_engine import InspectEngine
@@ -222,17 +213,23 @@ class CanvasScene(ThreeDScene):
         self.root_tape = getattr(dsl, "root_tape", None)
         # Phase 8
         self._world_objects: dict[str, Mobject] = {}
+        self._world_transforms: dict[str, WorldTransform] = {}
         # Phase 2/8 (clarified model): explicit observation mode
         self._observation_mode: ObservationMode = ObservationMode.NORMAL_3D
         self._active_scroll_tape: Optional["TapeObject"] = None
-        self._tape_containers: dict[str, Mobject] = {}  # tape_id -> container VGroup for transformed tape content
         self._tape_content_ids: set[str] = set()
         self._element_tape_map: dict[str, "TapeObject"] = {}  # elem_id -> owning tape (for correct WT even if revealed out of order)
         # Dimming for tape-scroll focus
         self._dimmed_opacities: dict[str, float] = {}
         self._current_dim_tape_id: Optional[str] = None
         self._current_dim_opacity: float = 0.15
-        all_tapes = getattr(self.dsl, 'tapes', []) or []
+        all_tapes = [
+            tape
+            for tape in (
+                [self.root_tape] + list(getattr(self.dsl, "tapes", []) or [])
+            )
+            if tape is not None
+        ]
         for t in all_tapes:
             if t and getattr(t, "local_elements", None):
                 for el in t.local_elements:
@@ -256,6 +253,12 @@ class CanvasScene(ThreeDScene):
         self.camera.set_phi(0)
         self.camera.set_theta(-np.pi/2)
         self.camera.set_gamma(0)
+
+        # Build persistent free-world objects before timeline actions target
+        # them. Tapes are camera-facing presentation contexts, not world-space
+        # containers, and their content remains lazy.
+        for world_object in getattr(self.dsl, "root_objects", []) or []:
+            self._build_world_object(world_object)
 
         # Phase 2/8: build world object structure (transforms) early for 3D placement.
         # Content is kept lazy (revealed on timeline) to preserve narrative "writing".
@@ -333,9 +336,7 @@ class CanvasScene(ThreeDScene):
                 i += 1
 
     def _focus_on_group(self, elements: List[CanvasElement]) -> None:
-        """Pan once to the centroid of a flex group before combined reveal.
-        Phase 2/8: support 3D centering for posed tapes in scroll mode.
-        """
+        """Pan once to the centroid of a flex group in its foreground tape."""
         if not self.camera_ctl or not elements:
             return
         # Auto for tape content (even without explicit prior TapeScroll keyframe).
@@ -409,7 +410,17 @@ class CanvasScene(ThreeDScene):
                 self._handle_element_reveal(elem, play_animation=False)
             return
 
-        if any(e.id in getattr(self, "_tape_content_ids", set()) for e in elements):
+        active_tape = next(
+            (
+                self._element_tape_map.get(element.id)
+                for element in elements
+                if element.id in self._tape_content_ids
+            ),
+            None,
+        )
+        if active_tape is not None:
+            target_y = sum(float(e.canvas_position[1]) for e in elements) / len(elements)
+            self._activate_tape_context(active_tape, local_y=target_y)
             self._focus_on_group(elements)
 
         tilt_pitch = next(
@@ -434,26 +445,6 @@ class CanvasScene(ThreeDScene):
                 elif self.camera_ctl.is_tilted:
                     self.camera_ctl.return_to_sheet(run_time=0.6)
 
-        # Compute container for tape content groups so posed tape's world transform applies to children.
-        # Use owning tape per-element when possible so that content of secondary/rotated tapes
-        # gets the correct pose even in mixed timeline order.
-        container = None
-        active_for_flex = None
-        has_tape_pose_flex = False
-        if any(e.id in getattr(self, "_tape_content_ids", set()) for e in elements):
-            # Pick the owning tape of the first tape-content elem in the group
-            for e in elements:
-                if e.id in self._element_tape_map:
-                    active_for_flex = self._element_tape_map[e.id]
-                    break
-            if not active_for_flex:
-                active_for_flex = getattr(self, "_active_scroll_tape", None)
-            if active_for_flex:
-                container = self._tape_containers.get(getattr(active_for_flex, "id", None))
-                has_tape_pose_flex = bool( getattr(active_for_flex, "world_transform", None) )
-        else:
-            active_for_flex = getattr(self, "_active_scroll_tape", None)
-
         prepared: List[Tuple[CanvasElement, Mobject, bool]] = []
         for elem in elements:
             mob = self.registry.get(elem.id)
@@ -462,46 +453,26 @@ class CanvasScene(ThreeDScene):
                 mob = self._build_mobject(elem)
                 if mob is None:
                     continue
-            if has_tape_pose_flex and active_for_flex:
-                local_pt = tuple(elem.canvas_position[:3])
-                wpos = local_to_world_point(local_pt, active_for_flex.world_transform)
-                pos = np.array(wpos, dtype=float)
-                mob.move_to(pos)
-                # Orient to the tape plane (same as single element path)
-                rx, ry, rz = active_for_flex.world_transform.rotation.as_tuple()
-                if abs(rx) > 1e-9:
-                    mob.rotate(rx * DEGREES, axis=RIGHT)
-                if abs(ry) > 1e-9:
-                    mob.rotate(ry * DEGREES, axis=UP)
-                if abs(rz) > 1e-9:
-                    mob.rotate(rz * DEGREES, axis=OUT)
-                if abs(rx) > 1e-9 or abs(ry) > 1e-9 or abs(rz) > 1e-9:
-                    R = _rotation_matrix_from_euler_deg(rx, ry, rz)
-                    y_axis = R @ np.array([0., 1., 0.])
-                    mob.rotate(180 * DEGREES, axis=y_axis)
+            pos = np.array(elem.canvas_position, dtype=float)
+            if elem.type == "Solid3D":
+                place_solid_on_tape(mob, tuple(pos), elem.content)
+                pos = mob.get_center()
             else:
-                pos = np.array(elem.canvas_position, dtype=float)
-                if elem.type == "Solid3D":
-                    place_solid_on_tape(mob, tuple(pos), elem.content)
-                    pos = mob.get_center()
-                else:
-                    mob.move_to(pos)
+                mob.move_to(pos)
             self.registry.register(elem.id, mob, pos[1], tuple(pos))
             prepared.append((elem, mob, first_time))
 
-        # Add first-time items to container (for transform inheritance on posed tapes) or scene.
-        # Add before playing entry anim (matches _handle_element_reveal pattern).
-        # For posed tape: use world pos (already set) + add direct to avoid double transform.
+        # Add before playing entry animations.
         for elem, mob, first_time in prepared:
-            if first_time:
-                if has_tape_pose_flex:
-                    if mob not in getattr(self, "mobjects", []):
-                        self.add(mob)
-                elif container is not None:
-                    container.add(mob)
-                elif not (getattr(self, "_world_objects", None) and elem.id in getattr(self, "_world_objects", {})):
-                    if mob not in getattr(self, "mobjects", []):
-                        self.add(mob)
+            if (
+                first_time
+                and not (
+                    getattr(self, "_world_objects", None)
+                    and elem.id in getattr(self, "_world_objects", {})
+                )
+                and mob not in getattr(self, "mobjects", [])
+            ):
+                self.add(mob)
 
         anims = []
         run_time = 0.6
@@ -529,18 +500,15 @@ class CanvasScene(ThreeDScene):
         rate = self._get_rate_func(move.rate_func)
 
         # Legacy CameraMove treated as tape-scroll for compat (on root tape)
-        self._observation_mode = ObservationMode.TAPE_SCROLL
-        self._active_scroll_tape = None
-        if self.camera_ctl:
+        switched_context = self._active_scroll_tape is not self.root_tape
+        self._activate_tape_context(
+            self.root_tape,
+            local_y=target_y,
+            run_time=min(0.7, move.run_time),
+        )
+        if self.camera_ctl and not switched_context:
             self.camera_ctl.tape_center_x = 0.0
             self.camera_ctl._x.set_value(0.0)
-            if self.root_tape and getattr(self.root_tape, "world_transform", None):
-                try:
-                    phi, theta, gamma = get_tape_straight_above_angles(self.root_tape.world_transform)
-                    self.camera_ctl._view_mode = "inspect"
-                    self.camera_ctl.camera.use_orthographic_projection = True
-                except Exception:
-                    pass
 
         # Pause far updaters before big camera travel
         if self.camera_ctl:
@@ -555,17 +523,35 @@ class CanvasScene(ThreeDScene):
         Only TapeScroll (or legacy) activates internal tape mechanisms.
         """
         target = kf.target
+        entered_from_tape = self._observation_mode == ObservationMode.TAPE_SCROLL
 
-        # Restore dimming when leaving tape-scroll mode
-        if self._observation_mode == ObservationMode.TAPE_SCROLL:
-            restore_anims = self._get_restore_animations()
-            if restore_anims:
-                self.play(*restore_anims, run_time=1.0)
+        if isinstance(target, TapeScroll):
+            tapes = [self.root_tape] + list(getattr(self.dsl, "tapes", []) or [])
+            tape = next(
+                (candidate for candidate in tapes if candidate and candidate.id == target.tape_id),
+                None,
+            )
+            if tape is None:
+                raise ValueError(f"Unknown tape {target.tape_id!r}")
 
-        self._observation_mode = ObservationMode.NORMAL_3D
-        self._active_scroll_tape = None
-        if self.camera_ctl:
-            pass
+            switched_context = self._active_scroll_tape is not tape
+            self._activate_tape_context(
+                tape,
+                local_y=float(target.local_y),
+                run_time=min(0.7, kf.duration),
+            )
+            if self.camera_ctl and not switched_context:
+                self.camera_ctl.observe_target(
+                    target,
+                    run_time=kf.duration,
+                    rate_func=self._get_rate_func(kf.rate_func),
+                    tape=tape,
+                )
+            return
+
+        tape = None
+        target_transform = None
+        target_pos_world = None
 
         if isinstance(target, ObjectAnchor):
             obj_id = target.object_id
@@ -583,9 +569,9 @@ class CanvasScene(ThreeDScene):
                         target_pos_world = local_to_world_point(local_pt, target_transform)
                     else:
                         target_pos_world = local_pt
-                        
+
             kind = getattr(elem, 'type', None) if elem else None
-            if kind and kind in _OBJECT_KINDS:
+            if not entered_from_tape and kind and kind in _OBJECT_KINDS:
                 obs_fn = _OBJECT_KINDS[kind].get("observe")
                 if obs_fn:
                     try:
@@ -601,13 +587,23 @@ class CanvasScene(ThreeDScene):
                         pass  # fall through to default
 
         if self.camera_ctl:
+            if entered_from_tape:
+                initial_pose = self.camera_ctl.resolve_observation_pose(
+                    target,
+                    tape=None,
+                    target_transform=target_transform,
+                    target_pos_world=target_pos_world,
+                )
+                self._enter_world_context(initial_pose=initial_pose)
+                return
+            self._enter_world_context()
             self.camera_ctl.observe_target(
                 target,
                 run_time=getattr(kf, "duration", getattr(kf, "run_time", 2.0)),
                 rate_func=self._get_rate_func(getattr(kf, "rate_func", "smooth")),
                 tape=None,
-                target_transform=None,
-                target_pos_world=None,
+                target_transform=target_transform,
+                target_pos_world=target_pos_world,
             )
 
     # ------------------- Tape-scroll dimming helpers -------------------
@@ -623,70 +619,196 @@ class CanvasScene(ThreeDScene):
             ids.add(tape.id)
         return ids
 
+    def _all_context_mobjects(self) -> dict[str, Mobject]:
+        all_mobs: dict[str, Mobject] = {}
+        if self.registry:
+            for uid, entry in list(self.registry._store.items()):
+                if entry.mobject:
+                    all_mobs[uid] = entry.mobject
+        for uid, mob in list(getattr(self, "_world_objects", {}).items()):
+            if mob:
+                all_mobs[uid] = mob
+        return all_mobs
+
+    def _protected_context_mobjects(self) -> set[Mobject]:
+        """Runtime sentinels that must survive every presentation-context cut."""
+        dummy = getattr(getattr(self, "camera_ctl", None), "_dummy", None)
+        return {dummy} if dummy is not None else set()
+
+    def _active_tape_mobjects(self, active_tape) -> set[Mobject]:
+        active_ids = self._get_active_ids(active_tape)
+        return {
+            mob
+            for uid, mob in self._all_context_mobjects().items()
+            if uid in active_ids
+        }
+
     def _get_context_switch_animations(self, active_tape) -> list:
-        """Returns a list of animations to fade in the active tape and fade out everything else."""
+        """Close the active tape over the camera and hide every other context."""
         if not active_tape:
             return []
         active_ids = self._get_active_ids(active_tape)
         self._current_dim_tape_id = getattr(active_tape, "id", None)
         self._current_dim_opacity = 0.0
         anims = []
+        seen: set[Mobject] = set()
         
-        from manim import FadeOut, FadeIn
-        
-        all_mobs = {}
-        if self.registry:
-            for uid, entry in list(self.registry._store.items()):
-                if entry.mobject: all_mobs[uid] = entry.mobject
-        for uid, mob in list(getattr(self, "_world_objects", {}).items()):
-            if mob: all_mobs[uid] = mob
-
-        for uid, mob in all_mobs.items():
+        for uid, mob in self._all_context_mobjects().items():
+            seen.add(mob)
             if uid in active_ids:
                 if uid in self._dimmed_opacities:
                     self._dimmed_opacities.pop(uid)
                     if mob not in getattr(self, "mobjects", []):
-                        self.add(mob)
                         anims.append(FadeIn(mob))
             else:
                 if uid not in self._dimmed_opacities:
                     self._dimmed_opacities[uid] = 1.0
                 if mob in getattr(self, "mobjects", []):
                     anims.append(FadeOut(mob))
-                    # Manim's FadeOut will automatically remove it from the scene at the end of the animation
+        protected = self._protected_context_mobjects()
+        for mob in list(getattr(self, "mobjects", [])):
+            if mob not in seen and mob not in protected:
+                anims.append(FadeOut(mob))
         return anims
 
-    def _get_restore_animations(self) -> list:
-        """Returns a list of animations to restore all hidden/dimmed objects."""
-        from manim import FadeIn
+    def _enforce_tape_context(self, active_tape) -> None:
+        """Make tape isolation true even if Manim leaves faded objects present.
+
+        The animation layer is best-effort: with complex 3D groups/updaters a
+        ``FadeOut`` can fail to fully remove the object from the scene graph.
+        The presentation model is stricter than that. While a camera-facing tape
+        is selected, only already-built content owned by that tape may remain in
+        ``scene.mobjects``; free-world objects and other tape contexts are hard
+        removed after the transition.
+        """
+        active_mobs = self._active_tape_mobjects(active_tape)
+        protected = self._protected_context_mobjects()
+        for mob in list(getattr(self, "mobjects", [])):
+            if mob not in active_mobs and mob not in protected:
+                self.remove(mob)
+        for mob in active_mobs:
+            if mob not in getattr(self, "mobjects", []):
+                self.add(mob)
+
+    def _enforce_world_context(self) -> None:
+        """Show free-world objects and keep every tape context closed."""
+        world_mobs = set(getattr(self, "_world_objects", {}).values())
+        protected = self._protected_context_mobjects()
+        for mob in list(getattr(self, "mobjects", [])):
+            if mob not in world_mobs and mob not in protected:
+                self.remove(mob)
+        for mob in world_mobs:
+            if mob not in getattr(self, "mobjects", []):
+                self.add(mob)
+
+    def _play_tape_context_switch(
+        self,
+        active_tape,
+        *,
+        run_time: float,
+        local_y: float = 0.0,
+    ) -> None:
+        """Fade out, cut to a tape pose, then fade in the selected context."""
+        animations = self._get_context_switch_animations(active_tape)
+        outgoing = [animation for animation in animations if isinstance(animation, FadeOut)]
+        incoming = [animation for animation in animations if isinstance(animation, FadeIn)]
+        phases = int(bool(outgoing)) + int(bool(incoming))
+        phase_time = run_time / max(phases, 1)
+        if outgoing:
+            self.play(*outgoing, run_time=phase_time)
+        active_mobs = self._active_tape_mobjects(active_tape)
+        protected = self._protected_context_mobjects()
+        for mob in list(getattr(self, "mobjects", [])):
+            if mob not in active_mobs and mob not in protected:
+                self.remove(mob)
+        if self.camera_ctl:
+            self.camera_ctl.snap_to_sheet(target_y=local_y)
+        if incoming:
+            self.play(*incoming, run_time=phase_time)
+        self._enforce_tape_context(active_tape)
+
+    def _activate_tape_context(
+        self,
+        active_tape,
+        *,
+        local_y: float,
+        run_time: float = 0.7,
+    ) -> bool:
+        """Select a tape once and return whether a presentation cut occurred."""
+        if active_tape is None:
+            return False
+        switched = self._active_scroll_tape is not active_tape
+        self._observation_mode = ObservationMode.TAPE_SCROLL
+        self._active_scroll_tape = active_tape
+        self._current_focused_tape_id = getattr(active_tape, "id", None)
+        if switched:
+            self._play_tape_context_switch(
+                active_tape,
+                run_time=run_time,
+                local_y=local_y,
+            )
+            self._just_transitioned = True
+        return switched
+
+    def _get_world_context_animations(self) -> list:
+        """Open the foreground tape and restore only free-world content.
+
+        Previously revealed tapes stay hidden. Restoring every dimmed object
+        caused the unreadable pile-up captured in the orbital bug screenshot.
+        """
         anims = []
-        for uid, orig in list(self._dimmed_opacities.items()):
-            mob = self.registry.get(uid) if self.registry else None
-            if mob is None:
-                mob = getattr(self, "_world_objects", {}).get(uid)
-            if mob is not None:
-                if mob not in getattr(self, "mobjects", []):
-                    self.add(mob)
-                    anims.append(FadeIn(mob))
+        tape_ids = set(self._tape_content_ids)
+        for uid, mob in self._all_context_mobjects().items():
+            if uid in tape_ids:
+                if mob in getattr(self, "mobjects", []):
+                    anims.append(FadeOut(mob))
+            elif mob not in getattr(self, "mobjects", []):
+                anims.append(FadeIn(mob))
+
         self._dimmed_opacities.clear()
         self._current_dim_tape_id = None
         self._current_dim_opacity = 0.15
         return anims
+
+    def _enter_world_context(self, *, initial_pose=None, run_time: float = 0.7) -> None:
+        """Fade out the tape, cut the camera, then reveal the free 3D world."""
+        if self._observation_mode == ObservationMode.TAPE_SCROLL:
+            animations = self._get_world_context_animations()
+            outgoing = [animation for animation in animations if isinstance(animation, FadeOut)]
+            incoming = [animation for animation in animations if isinstance(animation, FadeIn)]
+            phases = int(bool(outgoing)) + int(bool(incoming))
+            phase_time = run_time / max(phases, 1)
+            if outgoing:
+                self.play(*outgoing, run_time=phase_time)
+            for uid, mob in self._all_context_mobjects().items():
+                if uid in self._tape_content_ids and mob in getattr(self, "mobjects", []):
+                    self.remove(mob)
+            self._observation_mode = ObservationMode.NORMAL_3D
+            if initial_pose is not None and self.camera_ctl:
+                self.camera_ctl.snap_to_pose(initial_pose)
+            if incoming:
+                self.play(*incoming, run_time=phase_time)
+            self._enforce_world_context()
+        self._observation_mode = ObservationMode.NORMAL_3D
+        self._active_scroll_tape = None
+        self._current_focused_tape_id = None
+
+    # Backward-compatible internal name used by older tests.
+    def _get_restore_animations(self) -> list:
+        return self._get_world_context_animations()
 
     def _should_auto_focus(self, elem: CanvasElement) -> bool:
         """Overlays (e.g. grid marks) stay on an already-framed board — no re-pan."""
         return elem.auto_focus and elem.type != "GridMark"
 
     def _focus_on_element(self, elem: CanvasElement) -> None:
-        """Pan the viewport so the element reveals at the center of the frame.
-        Phase 2/8: In tape-scroll-mode for tape content, center the view.
-        For posed/rotated tapes, directly animate the 3D camera (inspect mode) to the element's world position.
-        """
+        """Pan within the active camera-facing tape."""
         if getattr(self, "_just_transitioned", False):
             setattr(self, "_just_transitioned", False)
             return
         if not self.camera_ctl or not self._should_auto_focus(elem):
             return
+
         # Automatic scrolling for tape content: always center the camera on reveal for tape elements
         # (the classic sheet behavior the user wants, without manual scroll_tape between items).
         # Non-tape content with world pos still skips.
@@ -721,38 +843,10 @@ class CanvasScene(ThreeDScene):
         active_tape = self._element_tape_map.get(elem.id)
         
         if is_tape_content and play_animation and active_tape:
-            tape_id = getattr(active_tape, "id", None)
-            current_focused = getattr(self, "_current_focused_tape_id", None)
-            
-            if tape_id != current_focused and self.camera_ctl:
-                self._current_focused_tape_id = tape_id
-                self._observation_mode = ObservationMode.TAPE_SCROLL
-                self._active_scroll_tape = active_tape
-                
-                # Get the animations to fade in the tape and fade out everything else
-                fade_anims = self._get_context_switch_animations(active_tape)
-                
-                el_local_y = getattr(elem, "canvas_position", (0, 0, 0))[1]
-                
-                # We want a smooth camera transition back to the 2D plane if we were in 3D
-                if self.camera_ctl._view_mode == "inspect":
-                    # Sync trackers so the transition starts from the current frame center
-                    self.camera_ctl._x.set_value(self.camera.frame_center[0])
-                    self.camera_ctl._y.set_value(self.camera.frame_center[1])
-                
-                self.camera_ctl._view_mode = "sheet"
-                self.camera.use_orthographic_projection = True
-                
-                cam_anims = [
-                    self.camera_ctl._phi.animate(rate_func=smooth).set_value(0.0),
-                    self.camera_ctl._theta.animate(rate_func=smooth).set_value(-90.0),
-                    self.camera_ctl._gamma.animate(rate_func=smooth).set_value(0.0),
-                    self.camera_ctl._x.animate(rate_func=smooth).set_value(0.0),
-                    self.camera_ctl._y.animate(rate_func=smooth).set_value(el_local_y)
-                ]
-                
-                self.play(*(fade_anims + cam_anims), run_time=1.5)
-                setattr(self, "_just_transitioned", True)
+            self._activate_tape_context(
+                active_tape,
+                local_y=float(getattr(elem, "canvas_position", (0, 0, 0))[1]),
+            )
 
         # --- END AUTO-TRANSITION ---
 
@@ -770,17 +864,8 @@ class CanvasScene(ThreeDScene):
         pos = None
         # Hoist for use in placement and add logic
         is_tape_content = elem.id in getattr(self, "_tape_content_ids", set())
-        # Prefer the owning tape for this element (from map), fallback to current active/root.
-        # This ensures secondary tapes' content get their own rotation/pose applied, even if
-        # revealed before a scroll_tape/observe for that tape.
         owning_tape = self._element_tape_map.get(elem.id)
         active_tape = owning_tape or getattr(self, "_active_scroll_tape", None)
-        has_tape_pose = bool(
-            is_tape_content and active_tape and getattr(active_tape, "world_transform", None)
-        )
-        container = None
-        if is_tape_content and active_tape:
-            container = self._tape_containers.get(getattr(active_tape, "id", None))
 
         if first_time:
             # Lazy instantiation - the key "not pre-written" behavior
@@ -790,46 +875,17 @@ class CanvasScene(ThreeDScene):
                 return
             wt = getattr(elem, 'world_transform', None)
 
-            # Position using world coords for posed tape content so visual position exactly matches
-            # the wpos used for camera focus. This fixes the 3D<->tape coord transition that was
-            # causing residual edge tilt.
-            if has_tape_pose:
-                local_pt = tuple(getattr(elem, 'canvas_position', (0.0, 0.0, 0.0))[:3])
-                from .coords import local_to_world_point
-                wpos = local_to_world_point(local_pt, active_tape.world_transform)
-                pos = np.array(wpos, dtype=float)
-                mob.move_to(pos)
-                # Orient the mobject to lie on the tape's rotated plane.
-                rx, ry, rz = active_tape.world_transform.rotation.as_tuple()
-                if abs(rx) > 1e-9:
-                    mob.rotate(rx * DEGREES, axis=RIGHT)
-                if abs(ry) > 1e-9:
-                    mob.rotate(ry * DEGREES, axis=UP)
-                if abs(rz) > 1e-9:
-                    mob.rotate(rz * DEGREES, axis=OUT)
-                # For non-default (rotated) tapes, flip the facing so the front of the content
-                # faces the correct side (the side the straight-above camera looks from).
-                # This prevents inverted/backface view. Default tape (no rotation) is unaffected.
-                if abs(rx) > 1e-9 or abs(ry) > 1e-9 or abs(rz) > 1e-9:
-                    R = _rotation_matrix_from_euler_deg(rx, ry, rz)
-                    y_axis = R @ np.array([0., 1., 0.])
-                    mob.rotate(180 * DEGREES, axis=y_axis)
-            elif container is not None:
-                local_pos = getattr(elem, 'canvas_position', (0.0, 0.0, 0.0))
-                pos = np.array(local_pos, dtype=float)
-                mob.move_to(pos)
+            has_explicit_world_position = bool(
+                not is_tape_content
+                and wt
+                and hasattr(wt, "position")
+                and any(abs(float(value)) > 1e-12 for value in wt.position.as_tuple())
+            )
+            if has_explicit_world_position:
+                p = wt.position
+                pos = np.array(p.as_tuple() if hasattr(p, 'as_tuple') else p, dtype=float)
             else:
-                has_explicit_world_position = bool(
-                    not is_tape_content
-                    and wt
-                    and hasattr(wt, "position")
-                    and any(abs(float(value)) > 1e-12 for value in wt.position.as_tuple())
-                )
-                if has_explicit_world_position:
-                    p = wt.position
-                    pos = np.array(p.as_tuple() if hasattr(p, 'as_tuple') else p, dtype=float)
-                else:
-                    pos = np.array(elem.canvas_position, dtype=float)
+                pos = np.array(elem.canvas_position, dtype=float)
                 if elem.type == "Solid3D":
                     place_solid_on_tape(mob, tuple(pos), elem.content)
                     pos = mob.get_center()
@@ -871,11 +927,9 @@ class CanvasScene(ThreeDScene):
         # === Animated reveal path (the main video "as it scrolls" case) ===
         # Scroll so new content appears at the viewport center (not drifting to the bottom).
         # Phase 2/8: sheet focus / pan only in tape-scroll-mode for tape content.
-        # Always focus tape content when in scroll mode (even if they have composed world_transform from pose).
-        # This is what drives the camera to center new elements on the (rotated) tape plane.
         is_tape_content = elem.id in getattr(self, "_tape_content_ids", set())
-        # Always auto-focus tape content so the camera automatically scrolls/centers on new elements
-        # in tape mode (just like classic sheet). The has_world_pos skip is only for free 3D objects.
+        # Tape elements scroll in local 2D coordinates. Free-world objects with
+        # explicit positions remain under cinematic camera control.
         do_focus = first_time and self._should_auto_focus(elem)
         if do_focus:
             if is_tape_content or not (wt and getattr(wt, 'position', None) and any(getattr(wt.position, 'x', 0) or getattr(wt.position, 'y', 0) or getattr(wt.position, 'z', 0) for _ in [1])):
@@ -883,8 +937,7 @@ class CanvasScene(ThreeDScene):
 
         # Camera mode adjustments (tilt/return) only apply in tape-scroll mode for tape content.
         # In normal 3D observation, leave the camera as the keyframe set it.
-        # Use tape context for tape_content too so auto-focus on initial posed tape content
-        # does not get snapped back by return_to_sheet.
+        # Tape content always uses the flat, camera-facing presentation camera.
         is_tape_ctx = getattr(self, "_observation_mode", ObservationMode.NORMAL_3D) == ObservationMode.TAPE_SCROLL or is_tape_content
         if self.camera_ctl:
             if is_tape_ctx:
@@ -908,14 +961,7 @@ class CanvasScene(ThreeDScene):
             # first would make it pop in instantly (final state). The entry animation
             # (Write / FadeIn) is what introduces it with effect. This fixes the
             # "appears without animation, then re-animated" symptom.
-            # Phase 2/8: for tape content on transformed tape, add to the prebuilt container
-            # so it inherits the tape's world transform. Content stays lazy.
-            # Add to container (for posed tape content) or to scene
-            # For posed tape content we placed at absolute world pos; add directly to scene
-            # to avoid the container's transform being applied on top of world pos.
-            if container is not None and not has_tape_pose:
-                container.add(mob)
-            elif not (getattr(self, '_world_objects', None) and elem.id in self._world_objects):
+            if not (getattr(self, '_world_objects', None) and elem.id in self._world_objects):
                 # avoid double add for prebuilts
                 self.add(mob)
 
@@ -1042,7 +1088,7 @@ class CanvasScene(ThreeDScene):
         RotationEngine(self).apply(action, mob)
 
     def _handle_camera_inspect(self, inspect: CameraInspect) -> None:
-        """Keyframe inspect path around a 3D target."""
+        """Open the foreground tape, then inspect a free 3D target."""
         spec = self._element_specs.get(inspect.element_id)
         mob = self.registry.get(inspect.element_id)
         if spec is None or mob is None or self.camera_ctl is None:
@@ -1154,24 +1200,66 @@ class CanvasScene(ThreeDScene):
         target = self._build_mobject(morph.target)
         if target is None:
             raise ValueError(f"Morph target kind {morph.target.type!r} did not build a mobject")
-        target.move_to(source.get_center())
-        animation_cls = TransformMatchingShapes if morph.match_shapes else Transform
-        self.play(
-            animation_cls(source, target),
-            run_time=morph.run_time,
-            rate_func=self._get_rate_func(morph.rate_func),
-        )
+        world_transform = self._world_transforms.get(morph.element_id)
+        if world_transform is not None:
+            # Registered world builders author their geometry in local coordinates.
+            # Preserve that local origin across state changes instead of aligning
+            # visual bounding-box centers. Bounding boxes can move dramatically
+            # when an asymmetric path or annotation is added, which used to pull
+            # stable geometry (and especially 3D surfaces) sideways during morphs.
+            self._apply_world_transform(target, world_transform)
+        else:
+            target.move_to(source.get_center())
+        source_was_visible = source in getattr(self, "mobjects", [])
+        if source_was_visible:
+            animation_cls = TransformMatchingShapes if morph.match_shapes else Transform
+            self.play(
+                animation_cls(source, target),
+                run_time=morph.run_time,
+                rate_func=self._get_rate_func(morph.rate_func),
+            )
         # Keep the freshly compiled target so its semantic part registry is authoritative.
         self.remove(source)
-        self.add(target)
+        if source_was_visible:
+            self.add(target)
         self.registry.replace(morph.element_id, target)
         self._element_specs[morph.element_id] = morph.target
+        if morph.element_id in self._world_objects:
+            self._world_objects[morph.element_id] = target
 
     # --------------------------- Builders & Behaviors ------------------------
 
     def _build_mobject(self, elem: CanvasElement) -> Mobject | None:
         """Create the Manim mobject via the shared measure/build pipeline."""
         return build_mobject(elem, surface_factory=self._make_default_surface)
+
+    @staticmethod
+    def _apply_world_transform(mob: Mobject, wt: WorldTransform) -> None:
+        """Apply a world pose around the builder's local origin.
+
+        ``Mobject.move_to`` aligns bounding-box centers, not object-space
+        origins. That distinction matters for asymmetric registered objects:
+        changing a long trajectory, callout, or tail must not move the central
+        solid. World transforms therefore translate local coordinates directly
+        and rotate/scale around the translated origin.
+        """
+        pos = np.array(
+            wt.position.as_tuple()
+            if hasattr(wt.position, "as_tuple")
+            else getattr(wt, "position", (0.0, 0.0, 0.0)),
+            dtype=float,
+        )
+        mob.shift(pos)
+        if hasattr(mob, "rotate") and wt.rotation:
+            rx, ry, rz = wt.rotation.as_tuple()
+            if abs(rx) > 1e-9:
+                mob.rotate(rx * DEGREES, axis=RIGHT, about_point=pos)
+            if abs(ry) > 1e-9:
+                mob.rotate(ry * DEGREES, axis=UP, about_point=pos)
+            if abs(rz) > 1e-9:
+                mob.rotate(rz * DEGREES, axis=OUT, about_point=pos)
+        if abs(float(wt.scale) - 1.0) > 1e-9:
+            mob.scale(float(wt.scale), about_point=pos)
 
     def _build_world_object(self, wo: WorldObject) -> None:
         """Phase 8: build a WorldObject in world space."""
@@ -1183,44 +1271,15 @@ class CanvasScene(ThreeDScene):
             if mob:
                 wt = wo.transform or WorldTransform()
                 pos = wt.position.as_tuple() if hasattr(wt.position, 'as_tuple') else getattr(wt, 'position', (0,0,0))
-                mob.move_to(pos)
-                # apply rotation if 3D support
-                if hasattr(mob, 'rotate') and wt.rotation:
-                    # simple apply, manim 3d rotation
-                    pass  # extend as needed
+                self._apply_world_transform(mob, wt)
                 self.add(mob)
                 self._world_objects[wo.id] = mob
+                self._world_transforms[wo.id] = wt
                 self.registry.register(wo.id, mob, pos[1] if len(pos)>1 else 0, pos)
                 if wo.element:
                     self._element_specs[wo.id] = wo.element
         for child in wo.children:
             self._build_world_object(child)
-
-    def _build_tape_container(self, tape: TapeObject) -> None:
-        """Phase 2: build tape container (transformed in world) early.
-        Tape content is instantiated lazily in _handle_element_reveal only when reached.
-        This preserves the narrative writing feel even for positioned/rotated tapes.
-        """
-        if not tape:
-            return
-        tape_group = VGroup()
-        wt = tape.world_transform or WorldTransform()
-        pos = wt.position.as_tuple() if hasattr(wt.position, 'as_tuple') else (0.0, 0.0, 0.0)
-        tape_group.move_to(pos)
-
-        # Apply rotation (basic per-axis for container)
-        rx, ry, rz = wt.rotation.as_tuple() if hasattr(wt.rotation, 'as_tuple') else (0.0, 0.0, 0.0)
-        if abs(rx) > 1e-9:
-            tape_group.rotate(rx * DEGREES, axis=RIGHT)
-        if abs(ry) > 1e-9:
-            tape_group.rotate(ry * DEGREES, axis=UP)
-        if abs(rz) > 1e-9:
-            tape_group.rotate(rz * DEGREES, axis=OUT)
-
-        self.add(tape_group)
-        self._world_objects[tape.id] = tape_group
-        self._tape_containers[tape.id] = tape_group
-        self.registry.register(tape.id, tape_group, pos[1] if len(pos) > 1 else 0, pos)
 
     def _make_default_surface(self, equation: str | None = None):
         """Render-quality 3D surface parsed from the element equation."""
@@ -1252,320 +1311,31 @@ class CanvasScene(ThreeDScene):
         margin: float = 1.2,
         title: str | None = None,
         camera_preset: Literal["top_down", "isometric", "auto"] = "isometric",
-        full_tape: bool = False,  # NEW: when True, the output image uses the natural aspect of the written content (no forced portrait/landscape from video settings). This makes full-tape screenshots trivial as you described.
+        full_tape: bool = False,
+        tape_id: str | None = None,
     ) -> Path:
-        """Export a clean static screenshot of the *entire* revealed canvas.
+        """Export a clean static document of a complete tape.
 
-        This is designed for serious learners who want to study the full sheet
-        after (or instead of) watching the video.
-
-        - Collects all revealed elements (lazy system means only what was shown).
-        - Applies pre-defined static states from the DSL (static_phi, static_theta, etc.)
-          so 3D elements have a clean, study-friendly pose instead of mid-animation rotation.
-        - Computes the full vertical bounding box.
-        - Produces a high-quality full-view image of the "infinite sheet".
-        - Supports PNG (best quality, efficient) and PDF (document-style, great for printing/studying).
-
-        Args:
-            filename: Output path (extension will be adjusted based on format).
-            format: "png" (recommended for quality) or "pdf" (document style).
-            high_res_height: Target height in pixels for the export (None = use current render height scaled to content).
-            margin: Extra margin around the content (in Manim units).
-            title: Optional title embedded in PDF.
-            camera_preset: How to view 3D content statically ("isometric" is usually nicest for study).
-            full_tape: When True, the output PNG/PDF uses the natural aspect ratio of the written content (the "entire tape" you described). No forced portrait/landscape cropping from the video settings. Perfect for study screenshots of the full sheet.
-
-        Returns:
-            Path to the saved file.
+        The tape is rebuilt in local document coordinates and rendered through
+        fresh orthographic cameras.  The live video camera, renderer, world
+        transforms, and mobject updaters are never reused.  ``camera_preset`` is
+        retained for API compatibility but does not affect a 2D tape document.
         """
-        if Image is None:
-            raise RuntimeError("Pillow (PIL) is required for sheet export. It should be in the venv.")
+        from .tape_export import export_tape_document
 
-        filename = Path(filename)
-        if format == "pdf":
-            out_path = filename.with_suffix(".pdf")
-        else:
-            out_path = filename.with_suffix(".png")
-
-        print(f"[export] Preparing full static sheet export ({format.upper()})...")
-
-        # Phase 8: 3D world support (incl. multiple tapes)
-        has_tapes = bool(getattr(self, 'root_tape', None) or getattr(self.dsl, 'additional_tapes', None))
-        is_3d = bool(getattr(self, '_world_objects', None) or has_tapes)
-        if is_3d and camera_preset == "auto":
-            camera_preset = "isometric"
-
-        # 1. Get all revealed mobjects + their specs
-        entries = list(self.registry._store.values())
-        if not entries:
-            print("[export] No elements revealed yet. Nothing to export.")
-            return out_path
-
-        mobs_with_specs = []
-        for uid, entry in self.registry._store.items():
-            spec = self._element_specs.get(uid)
-            mobs_with_specs.append((entry.mobject, spec, uid))
-
-        # 2. Compute tight bounding box from ONLY the active visible mobjects.
-        # This is the critical fix for the "defective auto-crop" reported.
-        # We explicitly build a VGroup of real content (excluding any invisible anchors or extra camera padding).
-        content_mobs = [m for m, spec, uid in mobs_with_specs if uid != "__title__"]  # title added separately
-
-        min_x = float("inf")
-        max_x = float("-inf")
-        min_y = float("inf")
-        max_y = float("-inf")
-
-        for mob in content_mobs:
-            try:
-                bb = mob.get_bounding_box()
-                min_x = min(min_x, bb[0][0])
-                max_x = max(max_x, bb[2][0])
-                min_y = min(min_y, bb[0][1])
-                max_y = max(max_y, bb[2][1])
-            except Exception:
-                left = mob.get_left()[0]
-                right = mob.get_right()[0]
-                bottom = mob.get_bottom()[1]
-                top = mob.get_top()[1]
-                min_x = min(min_x, left)
-                max_x = max(max_x, right)
-                min_y = min(min_y, bottom)
-                max_y = max(max_y, top)
-
-        content_width = max_x - min_x
-        content_height = max_y - min_y
-        center_x = (min_x + max_x) / 2
-        center_y = (min_y + max_y) / 2
-
-        # If title provided, create it as a proper Manim Text above the content
-        # so it participates in bounding box and feels integrated into the sheet
-        title_mob = None
-        if title:
-            try:
-                from manim import Text
-                title_mob = Text(title, font_size=48, color=WHITE).scale(0.7)
-                title_y = max_y + 1.2
-                title_mob.move_to([center_x, title_y, 0])
-                # Add to the list for later cleanup, but include in content for framing
-                mobs_with_specs.append((title_mob, None, "__title__"))
-                content_mobs.append(title_mob)  # so it affects the final tight bb
-                # Recompute bb with title included
-                t_left = title_mob.get_left()[0]
-                t_right = title_mob.get_right()[0]
-                t_bottom = title_mob.get_bottom()[1]
-                t_top = title_mob.get_top()[1]
-                min_x = min(min_x, t_left)
-                max_x = max(max_x, t_right)
-                min_y = min(min_y, t_bottom)
-                max_y = max(max_y, t_top)
-                content_width = max_x - min_x
-                content_height = max_y - min_y
-                center_x = (min_x + max_x) / 2
-                center_y = (min_y + max_y) / 2
-            except Exception:
-                title_mob = None
-
-        # 3. Freeze to static states (critical for 2D/3D)
-        # We apply static poses for the screenshot. Restore is best-effort only.
-        for mob, spec, uid in mobs_with_specs:
-            if spec is None:
-                continue
-
-            # Apply pre-defined static state from DSL (user can define clean pose for study)
-            try:
-                if spec.static_scale != 1.0:
-                    mob.scale(spec.static_scale)
-
-                if spec.static_opacity != 1.0 and hasattr(mob, "set_opacity"):
-                    mob.set_opacity(spec.static_opacity)
-
-                # 3D static pose - this is the key for "static state of 3D elements"
-                if spec.static_phi is not None or spec.static_theta is not None:
-                    phi = spec.static_phi if spec.static_phi is not None else 30
-                    theta = spec.static_theta if spec.static_theta is not None else -60
-                    mob.rotate(phi * DEGREES, axis=UP)
-                    mob.rotate(theta * DEGREES, axis=RIGHT)  # approximate good view for study
-
-                # Global fallback for 3D content if no per-element static defined
-                # Also apply to standalone 2D texts (like the tagline) so they get oriented the same as the 3D view.
-                # This makes them appear perfectly front-on and horizontal ("0 angle", no climbing/tilt) like the saddle formula.
-                elif camera_preset != "auto" and (self._is_3d_like(mob) or isinstance(mob, (Text, MathTex))):
-                    if camera_preset == "top_down":
-                        mob.rotate(0 * DEGREES, axis=UP)
-                    elif camera_preset == "isometric":
-                        mob.rotate(25 * DEGREES, axis=UP)
-                        mob.rotate(-35 * DEGREES, axis=RIGHT)
-            except Exception:
-                pass  # best effort for complex mobjects
-
-        # Post-process for better export aesthetics (addresses overlap and uneven spacing)
-        # Nudge text containing "remembers" clear of 3D surfaces
-        for mob, spec, uid in mobs_with_specs:
-            if mob is not None:
-                try:
-                    text_content = ""
-                    if hasattr(mob, "get_tex_string"):
-                        text_content = mob.get_tex_string()
-                    elif hasattr(mob, "get_text"):
-                        text_content = mob.get_text()
-                    if "remembers" in str(text_content).lower():
-                        mob.shift(DOWN * 0.7)
-                except Exception:
-                    pass
-
-        # 4. Temporarily reconfigure camera to tightly frame the *full content* (not forced to original canvas aspect)
-        # This is the deep fix for the defective auto-crop / massive empty black block.
-        orig_center = self.camera.frame_center.copy()
-        orig_frame_h = self.camera.frame_height
-        orig_frame_w = self.camera.frame_width
-        orig_ortho = getattr(self.camera, "use_orthographic_projection", True)
-
-        if full_tape:
-            # Full tape mode (your clarified desired behavior): the static screenshot is the entire written tape
-            # in its natural shape. No forced portrait (9:16) or landscape (16:9) aspect from the video viewport.
-            # This makes "generating the tape but without cropping it to portrait or landscape formats" trivial.
-            total_width = content_width + 2 * margin
-            total_height = content_height + 2 * margin
-        else:
-            # Classic behavior (respects original canvas_settings aspect for the sheet image, like video)
-            total_height = content_height + 2 * margin
-            total_width = max(content_width + 2 * margin, total_height * (self.settings.frame_width / self.settings.frame_height))
-
-        self.camera.use_orthographic_projection = True
-        self.camera.frame_center = np.array([center_x, center_y, 0])
-        self.camera.frame_height = total_height
-        self.camera.frame_width = total_width
-
-        # 5. High-quality capture with independent resolution for the static export
-        # (decoupled from the animation render resolution)
-        target_height = high_res_height or 2160  # nice default for study images (can be 4K tall)
-        aspect = total_width / total_height if total_height > 0 else 1.0
-        target_width = int(target_height * aspect)
-
-        # Use tempconfig to boost the pixel buffer for this snapshot only.
-        # Explicitly disable any video writing to avoid conflicts with a previously active file_writer
-        # (this was causing the avcodec_open2 crash in background threads).
-        with tempconfig({
-            "pixel_width": max(target_width, 100),
-            "pixel_height": max(target_height, 100),
-            "background_color": self.settings.background_color,
-            "write_to_movie": False,
-            "save_last_frame": False,
-            "format": "png",  # not relevant but harmless
-        }):
-            self.wait(0.001)
-            self.renderer.update_frame(self)
-
-            # Billboard standalone 2D texts (tagline) to face the camera perfectly.
-            # This ensures "very front look with 0 angle", perfectly horizontal, no climbing/tilt in the final image.
-            # Applied here (after 3D poses and camera view are set) so the text plane is parallel to the view.
-            for mob in self.mobjects:
-                if isinstance(mob, (Text, MathTex)):
-                    # Skip if it's inside a 3D VGroup (those labels stay with their surface rotation and look "fine")
-                    # Top-level tagline Text will be billboarded.
-                    if not any(self._is_3d_like(sub) for sub in getattr(mob, "submobjects", [])):
-                        phi = self.camera.get_phi()
-                        theta = self.camera.get_theta()
-                        mob.rotate(-phi, axis=RIGHT)
-                        mob.rotate(-theta, axis=UP)
-
-            img = self.renderer.camera.get_image()
-            if not isinstance(img, Image.Image):
-                arr = np.array(img)
-                img = Image.fromarray(arr)
-
-        # Clean up temporary title mobject (if added for integrated layout)
-        if 'title_mob' in locals() and title_mob is not None and title_mob in getattr(self, "mobjects", []):
-            self.remove(title_mob)
-
-        # Final tight PIL crop to the actual rendered content (eliminates wasted black space / black void)
-        try:
-            img = self._auto_crop_to_content(img, bg_threshold=25, padding=20)
-        except Exception:
-            pass  # best effort
-
-        # 6. Optional nice title banner (now added after tight crop for better integration)
-        if title:
-            try:
-                from PIL import ImageDraw, ImageFont
-                banner_h = 70
-                banner = Image.new('RGB', (img.width, banner_h), (15, 15, 15))
-                draw = ImageDraw.Draw(banner)
-                try:
-                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 32)
-                except:
-                    font = ImageFont.load_default()
-                draw.text((25, 18), title, fill=(230, 230, 230), font=font)
-
-                # Add a subtle separator line
-                draw.rectangle([0, banner_h-3, img.width, banner_h], fill=(60, 60, 60))
-
-                final = Image.new('RGB', (img.width, img.height + banner_h), (0,0,0))
-                final.paste(banner, (0, 0))
-                final.paste(img, (0, banner_h))
-                img = final
-            except Exception:
-                pass
-
-        # 8. Save
-        if format == "pdf":
-            save_kwargs = {"resolution": 200.0}
-            if title:
-                save_kwargs["title"] = title
-            img.save(out_path, "PDF", **save_kwargs)
-        else:
-            img.save(out_path, "PNG", optimize=True)
-
-        print(f"[export] Full sheet saved to {out_path}")
-
-        # 8. Restore camera (we leave mobject static poses as-is since export is usually final)
-        self.camera.frame_center = orig_center
-        self.camera.frame_height = orig_frame_h
-        self.camera.frame_width = orig_frame_w
-        self.camera.use_orthographic_projection = orig_ortho
-
-        return out_path
-
-    def _is_3d_like(self, mob: Mobject) -> bool:
-        """Heuristic to detect 3D content."""
-        return any(
-            hasattr(m, "get_z") or "3d" in type(m).__name__.lower() or "surface" in type(m).__name__.lower()
-            for m in [mob] + list(getattr(mob, "submobjects", []))
+        print(f"[export] Preparing isolated tape export ({format.upper()})...")
+        output = export_tape_document(
+            self.dsl,
+            filename,
+            format=format,
+            tape_id=tape_id,
+            high_res_height=high_res_height,
+            margin=margin,
+            title=title,
+            natural_aspect=full_tape,
         )
-
-    def _auto_crop_to_content(self, img: "Image.Image", bg_threshold: int = 15, padding: int = 30) -> "Image.Image":
-        """Crop the image to the actual non-background content area + padding.
-
-        This is the key fix for eliminating the massive empty black space in exports.
-        It makes the output a tight, usable study sheet instead of mostly void.
-        """
-        import numpy as np
-
-        arr = np.array(img)
-        if arr.ndim == 3:
-            # For RGB, consider a pixel "content" if any channel differs from black by > threshold
-            mask = np.any(arr > bg_threshold, axis=2)
-        else:
-            mask = arr > bg_threshold
-
-        if not np.any(mask):
-            return img
-
-        # Find bounding box of content
-        rows = np.any(mask, axis=1)
-        cols = np.any(mask, axis=0)
-        y_min, y_max = np.where(rows)[0][[0, -1]]
-        x_min, x_max = np.where(cols)[0][[0, -1]]
-
-        # Add padding, clamp to image bounds
-        h, w = arr.shape[:2]
-        y_min = max(0, y_min - padding)
-        y_max = min(h - 1, y_max + padding)
-        x_min = max(0, x_min - padding)
-        x_max = min(w - 1, x_max + padding)
-
-        return img.crop((x_min, y_min, x_max + 1, y_max + 1))
+        print(f"[export] Tape saved to {output}")
+        return output
 
     def _get_rate_func(self, name: str):
         name = (name or "smooth").lower()

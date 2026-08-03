@@ -2,74 +2,57 @@
   "schema_version": 1,
   "project_slug": "sn2_reaction",
   "production_path": "mute_video",
-  "current_phase": "mute_delivery",
+  "current_phase": "domain_signoff",
   "phases": [
     {
       "id": "description",
       "label": "Creative description",
       "status": "complete",
-      "evidence": [
-        "brief/description.md"
-      ]
+      "evidence": ["brief/description.md"]
     },
     {
       "id": "passport",
       "label": "Passport and mute path",
       "status": "complete",
-      "evidence": [
-        "brief/passport.json"
-      ]
-    },
-    {
-      "id": "tape_content",
-      "label": "Visible content",
-      "status": "complete",
-      "evidence": [
-        "brief/tapes/main.md"
-      ]
-    },
-    {
-      "id": "orchestration",
-      "label": "Visual orchestration",
-      "status": "complete",
-      "evidence": [
-        "brief/orchestration.md"
-      ]
+      "evidence": ["brief/passport.json"]
     },
     {
       "id": "authoring",
-      "label": "Scene and helper authoring",
+      "label": "Continuous-world reauthoring",
       "status": "complete",
       "evidence": [
         "scenes.py",
         "helpers.py",
-        "successful check_project with 33 authored timeline items and no diagnostics"
+        "strict DSL validation: 23 timeline items, one root world, one tape"
       ]
     },
     {
-      "id": "render_repair",
-      "label": "Preview render and visual repair",
+      "id": "visual_repair",
+      "label": "Mobile visual repair",
       "status": "complete",
       "evidence": [
-        "two preview iterations rendered at 540x960",
-        "contact sheets and full-resolution frames exposed and repaired a collapsed two-line title and a duplicated overlay-focus molecular view",
-        "rate-law copy was qualified as the standard elementary case during domain review",
-        "accepted preview duration 53.131 seconds with 62 rendered animations",
-        "accepted MP4 contains one H.264 video stream and no audio stream"
+        "full-resolution inspection of identity, alignment, transition-state, energy, inversion, and finale frames",
+        "edge-clipped alignment label shortened and moved inward before final regeneration"
       ]
     },
     {
       "id": "mute_delivery",
-      "label": "Validated mute-video delivery",
-      "status": "pending",
+      "label": "1080x1920 mute-video delivery",
+      "status": "complete",
       "evidence": [
-        "authoring-stage portrait preview accepted",
-        "final-quality 1080x1920 master remains required before public showcase delivery"
+        "outputs/sn2_reaction/media/videos/1920p30/SN2ReactionFlagship1080p30.mp4",
+        "H.264, 1080x1920, 30 fps, approximately 29.4 seconds"
       ]
+    },
+    {
+      "id": "domain_signoff",
+      "label": "Independent chemistry sign-off",
+      "status": "pending",
+      "evidence": ["brief/domain-review.md"]
     }
   ],
   "invalidated_phases": [],
   "blockers": [],
-  "next_action": "Render and inspect the 1080x1920 final-quality master when the showcase export cycle begins.",
-  "last_updated": "2026-07-27"
+  "next_action": "Obtain independent organic-chemistry review before claiming domain approval.",
+  "last_updated": "2026-08-03"
 }

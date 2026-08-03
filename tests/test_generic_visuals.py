@@ -57,6 +57,59 @@ def test_data_plot_builds_named_series_and_marker():
     assert resolve_semantic_part(mobject, "marker:cursor") is not None
 
 
+def test_data_plot_rendered_height_stays_inside_resolved_layout_box():
+    builder = CanvasBuilder(title="Plot sizing")
+    plot_id = builder.add_data_plot(
+        [{"id": "signal", "points": [[-3, -1], [0, 0], [3, 1]]}],
+        id="plot",
+        width=7.6,
+        height=3.8,
+        style={"width": 11.5, "height": 3.8},
+    )
+    plot = next(item for item in builder.dsl.timeline if getattr(item, "id", None) == plot_id)
+
+    mobject = build_mobject(plot)
+
+    assert mobject is not None
+    assert mobject.width <= plot.layout.width + 1e-6
+    assert mobject.width >= plot.layout.width * 0.95
+    assert mobject.height <= plot.layout.height + 1e-6
+
+
+def test_data_plot_keeps_reserved_gaps_to_vertical_neighbors():
+    builder = CanvasBuilder(title="Plot spacing")
+    builder.add_text("before", id="before", style={"margin-bottom": 0.6})
+    builder.add_data_plot(
+        [{"id": "signal", "points": [[-3, -1], [0, 0], [3, 1]]}],
+        id="plot",
+        width=7.6,
+        height=3.8,
+        style={
+            "width": 11.5,
+            "height": 3.8,
+            "margin-top": 0.4,
+            "margin-bottom": 0.5,
+        },
+    )
+    builder.add_math("y=x", id="after")
+    elements = {
+        item.id: item
+        for item in builder.dsl.timeline
+        if isinstance(item, CanvasElement)
+    }
+    rendered = {}
+    for element_id in ("before", "plot", "after"):
+        mobject = build_mobject(elements[element_id])
+        assert mobject is not None
+        mobject.move_to(elements[element_id].canvas_position)
+        rendered[element_id] = mobject
+
+    gap_above = rendered["before"].get_bottom()[1] - rendered["plot"].get_top()[1]
+    gap_below = rendered["plot"].get_bottom()[1] - rendered["after"].get_top()[1]
+    assert gap_above >= 0.6 + 0.4 - 1e-6
+    assert gap_below >= 0.5 - 1e-6
+
+
 def test_diagram_builds_named_nodes_and_edges():
     element = CanvasElement(
         id="system",

@@ -739,12 +739,13 @@ export function ProjectsLanding({
             <div className="example-library-header-modern">
               <div>
                 <p className="example-library-kicker-modern">
-                  Eleven flagship projects · authoring begins here
+                  Eleven flagship projects · complete editable source
                 </p>
                 <h3 id="example-library-title">Bundled Example Library</h3>
                 <p>
-                  Every project includes its full expectations and a clean source template.
-                  Inspect the brief or open an independent authoring copy.
+                  Every project includes authored scenes, reusable helpers, and
+                  its complete workflow brief. Inspect the source or open an
+                  independent editable copy.
                 </p>
               </div>
               <span className="example-library-count-modern">
@@ -769,7 +770,7 @@ export function ProjectsLanding({
                       <h4>{example.title}</h4>
                     </div>
                     <span className="example-stage-modern">
-                      {example.stage === "brief-ready" ? "Brief ready" : example.stage}
+                      {example.stage === "source-ready" ? "Source ready" : example.stage}
                     </span>
                   </div>
                   <p className="example-question-modern">{example.question}</p>
@@ -786,9 +787,7 @@ export function ProjectsLanding({
                       disabled={busy || !!readinessMessage}
                       onClick={() => onCreateExample(example.id)}
                     >
-                      {example.stage === "brief-ready"
-                        ? "Open authoring copy"
-                        : "Create editable copy"}
+                      Create editable copy
                     </button>
                     <button
                       type="button"
@@ -800,9 +799,7 @@ export function ProjectsLanding({
                     </button>
                   </div>
                   <div className="example-card-footnote-modern">
-                    {example.stage === "brief-ready"
-                      ? "Full brief + empty template"
-                      : "Source only"}
+                    Complete editable source
                     {" · "}{(example.sourceBytes / 1024).toFixed(0)} KB · No video bundled
                   </div>
                 </article>
@@ -956,7 +953,15 @@ export function ProjectsLanding({
                   key={file}
                   onClick={() => setExampleSourceFile(file)}
                 >
-                  {file === "description" ? "description.md" : `${file}.py`}
+                  {file === "description"
+                    ? "description.md"
+                    : file === "scenes" || file === "helpers"
+                      ? `${file}.py`
+                      : file === "passport" || file === "roadmap"
+                        ? `${file}.json`
+                        : file === "tape_content"
+                          ? "tapes/main.md"
+                          : `${file}.md`}
                 </button>
               ))}
             </div>
@@ -971,9 +976,7 @@ export function ProjectsLanding({
                 disabled={busy || !!readinessMessage}
                 onClick={() => onCreateExample(selectedExampleSource.summary.id)}
               >
-                {selectedExampleSource.summary.stage === "brief-ready"
-                  ? "Open authoring copy"
-                  : "Create editable copy"}
+                Create editable copy
               </button>
             </div>
           </div>

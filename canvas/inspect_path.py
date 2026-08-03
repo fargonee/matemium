@@ -292,7 +292,9 @@ def densify_path(
         return list(keyframes)
 
     poses = [keyframe_pose(kf, base_target) for kf in keyframes]
-    dense: List[InspectKeyframe] = []
+    # Preserve the first authored shot. It is a real composition target, and
+    # tape-to-world transitions use it as the cut pose before the world fades in.
+    dense: List[InspectKeyframe] = [keyframes[0]]
     n = max(2, int(samples_per_segment))
     for i in range(len(keyframes) - 1):
         a = poses[i]
@@ -315,7 +317,10 @@ def densify_path(
                     ),
                     run_time=src.run_time / n,
                     hold=src.hold if step == n else 0.0,
-                    rate_func=src.rate_func,
+                    # The spline already supplies the easing geometry. Reapplying
+                    # an ease-in/out to every generated subsegment creates visible
+                    # starts and stops along an otherwise smooth camera path.
+                    rate_func="linear",
                 )
             )
     return dense

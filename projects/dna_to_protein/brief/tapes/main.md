@@ -1,38 +1,17 @@
-# Visible content — DNA to Protein
+# Visible contexts — DNA to Protein
 
-## C00 — Function hook
+1. **Free world:** labelled cell → nucleus → chromosome → selected gene region.
+2. **Scale tape:** name all four levels and disclose cinematic, non-metric scale.
+3. **Free world:** open the DNA region, then assemble five RNA codons in sequence.
+4. **Sequence tape:** align large DNA, RNA, amino-acid, and stop rows.
+5. **Free world:** pre-mRNA → introns leave → exons join → mature mRNA.
+6. **Processing tape:** recap the four nuclear processing steps.
+7. **Free world:** move mature mRNA through the labelled nuclear pore.
+8. **Translation tape:** state the repeated codon/tRNA/amino-acid/ribosome cycle.
+9. **Free world:** repeat that cycle across the five source records and stop.
+10. **Model tape:** state the four-residue scientific boundary in two short lines.
+11. **Free world and finale:** show a readable schematic protein, then close on
+    `DNA → RNA → CODONS → PROTEIN`.
 
-- Proteins can bind, carry, signal, or catalyze.
-- Ask where amino-acid order comes from.
-
-## C01 — Spatial scale
-
-- Cell → nucleus → gene region → 15-base teaching window.
-- Keep one information sequence traceable across representations.
-
-## C02 — Transcription
-
-- DNA template: `3′-TAC GGA TTT CCG ACT-5′`.
-- Complementary RNA: `5′-AUG CCU AAA GGC UGA-3′`.
-- State that the template is read `3′→5′` while RNA is built `5′→3′`.
-
-## C03 — Processing and export
-
-- DNA → pre-mRNA → exon joining/intron removal → mature mRNA.
-- Export mature mRNA from the nucleus to the cytoplasm.
-- Disclose that the shown sequence is a compact mature coding message.
-
-## C04 — Translation
-
-- Advance through `AUG`, `CCU`, `AAA`, `GGC`, and `UGA`.
-- Map them to Met, Pro, Lys, Gly, and Stop.
-- tRNA anticodons pair with codons; tRNAs deliver amino acids.
-- Stop is a termination signal, not an amino acid.
-
-## C05 — Folding boundary
-
-- Morph the ordered four-residue teaching chain into a deliberately schematic
-  spatial arrangement.
-- Explicitly state that four residues are not a realistic protein.
-- End with DNA → processed RNA → codons → amino-acid sequence → folding and
-  maturation → function.
+All tape text is project-local DejaVu Sans. Scale is an authored level-of-detail
+journey, not a metrically literal zoom.

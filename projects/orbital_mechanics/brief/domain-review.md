@@ -1,6 +1,6 @@
 # Domain review — Orbital Mechanics
 
-**Review date:** 2026-07-27  
+**Review date:** 2026-07-30
 **Reviewer:** AI source-and-calculation review; independent physics review still
 recommended before public scientific sign-off.
 
@@ -31,10 +31,12 @@ recommended before public scientific sign-off.
 - `gravity_fraction(400 km)` returns `0.8865668`.
 - `circular_speed(400 km)` returns `7.672598648 km/s`.
 - The `0.78×` trial intersects the normalized Earth radius.
-- The `1.00×` trial maintains normalized radius `1.28` within integration
+- The `1.00×` trial maintains normalized radius `1.52` within integration
   tolerance.
+- The `1.08×` teaching trial remains below the local `√2` escape threshold and
+  therefore forms a bound ellipse rather than an open path.
 - The `1.46×` trial exceeds `√2` times local circular speed and has normalized
-  specific orbital energy `+0.05140625`.
+  specific orbital energy `+0.04328947`.
 
 ## Assumptions and simplifications
 
@@ -42,7 +44,8 @@ recommended before public scientific sign-off.
   central body.
 - Atmospheric drag, Earth rotation, oblateness, third bodies, and relativity
   are omitted.
-- Low-orbit altitude is visually exaggerated in the normalized plot.
+- Low-orbit altitude is visually exaggerated to `1.52` Earth radii so the
+  falling distance and trajectory curvature remain legible.
 - “Circular” describes the ideal initial condition in this two-body model.
 - “Centripetal force” names the inward net force requirement; it is not an
   additional force alongside gravity.
@@ -51,5 +54,5 @@ recommended before public scientific sign-off.
 
 - Obtain independent physics review before labeling the final-quality master
   “domain approved.”
-- The preview is an authoring-stage artifact, not the final 1080p website
-  master.
+- The cinematic reauthoring has a complete low-resolution runtime smoke, not
+  an accepted visual preview or final 1080p website master.

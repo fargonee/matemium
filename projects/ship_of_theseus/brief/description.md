@@ -4,7 +4,7 @@
 
 - **Subject:** Philosophy
 - **Project slug:** `ship_of_theseus`
-- **Status:** First authored prototype complete; engine feedback recorded; flagship render not yet accepted
+- **Status:** Full-tape authoring proof accepted; final mute-video master and independent philosophy review pending
 - **Central question:** What makes an object remain the same object while its parts change?
 - **Primary audience:** General learners with no philosophy background
 - **Target format:** 16:9 flagship master, approximately 2–3 minutes

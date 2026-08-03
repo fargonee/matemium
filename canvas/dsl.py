@@ -82,9 +82,9 @@ class DSLValidationError(ValueError):
 
 
 class ObservationMode(str, Enum):
-    """Explicit modes for camera observation (Phase 8 polish)."""
-    NORMAL_3D = "normal_3d"      # Default: cinematic 3D for any object (incl. tapes)
-    TAPE_SCROLL = "tape_scroll"  # Only this activates internal tape logic (local scroll, reveal, etc.)
+    """Explicit presentation contexts used by the runtime."""
+    NORMAL_3D = "normal_3d"      # Free 3D world is visible.
+    TAPE_SCROLL = "tape_scroll"  # One camera-facing tape is visible.
 
 
 @dataclass
@@ -249,10 +249,24 @@ class ObjectAnchor:
 
 
 @dataclass
+class TapeScroll:
+    """Select a tape curtain and frame a position in its local 2D layout."""
+
+    tape_id: str = "root_tape"
+    local_y: float = 0.0
+    framing_mode: str = "sheet"
+    # Retained in serialized projects for compatibility. Curtain presentation
+    # always hides the free world and all other tapes.
+    dim_others: bool = True
+    dim_opacity: float = 0.0
+
+
+ObservationTarget = Union[WorldPoint, ObjectAnchor, TapeScroll]
+
+
+@dataclass
 class CameraKeyframe:
-    """General camera keyframe / observation in 3D space.
-    target can be absolute world point or relative to object (with special tape handling).
-    """
+    """Observe the free world or select and scroll a foreground tape."""
     id: str
     time: float = 0.0
     target: ObservationTarget = field(default_factory=WorldPoint)
@@ -269,6 +283,15 @@ class CameraKeyframe:
             d["target"] = {"kind": "world_point", "position": self.target.position}
         elif isinstance(self.target, ObjectAnchor):
             d["target"] = {"kind": "object_anchor", "object_id": self.target.object_id, "anchor": self.target.anchor, "framing": getattr(self.target, "framing", "cinematic")}
+        elif isinstance(self.target, TapeScroll):
+            d["target"] = {
+                "kind": "tape_scroll",
+                "tape_id": self.target.tape_id,
+                "local_y": self.target.local_y,
+                "framing_mode": self.target.framing_mode,
+                "dim_others": self.target.dim_others,
+                "dim_opacity": self.target.dim_opacity,
+            }
         return d
 
 
@@ -536,7 +559,6 @@ class TapeObject:
     id: str
     local_elements: List[CanvasElement] = field(default_factory=list)
     local_canvas_settings: Optional[CanvasSettings] = None
-    # Future: local size, surface for 3D rendering, etc.
 
     def get_anchor(self, anchor: str = "center") -> Vector3:
         """Return local position for a named anchor on the tape.
@@ -570,7 +592,11 @@ class TapeObject:
         return {
             "id": self.id,
             "local_elements": [e.to_dict() if hasattr(e, 'to_dict') else e for e in self.local_elements],
-            # omit settings for brevity
+            "local_canvas_settings": (
+                asdict(self.local_canvas_settings)
+                if self.local_canvas_settings is not None
+                else None
+            ),
         }
 
     def get_local_frame(self) -> tuple[float, float]:
@@ -579,20 +605,13 @@ class TapeObject:
 
     def get_surface_info(self) -> dict:
         w, h = self.get_local_frame()
-        wt = self.world_transform
-        info = {
+        return {
             "width": w,
             "height": h,
             "is_planar": True,
             "local_space": "2d",
+            "presentation_mode": "camera_facing",
         }
-        if wt:
-            info.update({
-                "world_position": wt.position.as_tuple(),
-                "world_rotation": wt.rotation.as_tuple(),
-                "world_scale": wt.scale,
-            })
-        return info
 
 
 # Union of all timeline item types
@@ -794,7 +813,15 @@ class SheetDSL:
         # Also collect tape/world-object ids for parent_object_id checks
         tape_and_world_ids: set = set()
 
-        for tape in self.tapes:
+        tapes_for_validation = list(self.tapes)
+        root_tape = getattr(self, "root_tape", None)
+        if root_tape is not None and all(
+            getattr(tape, "id", None) != getattr(root_tape, "id", None)
+            for tape in tapes_for_validation
+        ):
+            tapes_for_validation.insert(0, root_tape)
+
+        for tape in tapes_for_validation:
             if tape and getattr(tape, "id", None):
                 tape_and_world_ids.add(tape.id)
             for elem in getattr(tape, "local_elements", []) or []:
@@ -891,6 +918,22 @@ class SheetDSL:
                 fg = item.flex_group
                 if fg is not None:
                     flex_groups.setdefault(fg, []).append(tl_idx)
+
+            elif isinstance(item, CameraKeyframe):
+                if (
+                    isinstance(item.target, TapeScroll)
+                    and item.target.tape_id not in tape_and_world_ids
+                ):
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="unknown_tape_id",
+                        message=(
+                            f"TapeScroll tape_id={item.target.tape_id!r} does "
+                            "not reference a known tape."
+                        ),
+                        element_id=item_id,
+                        field="target.tape_id",
+                    ))
 
             elif isinstance(item, TransformElement):
                 # --- Check 4: source_id references existing element ---
@@ -1203,7 +1246,14 @@ class SheetDSL:
                         anchor=target_data.get("anchor", "center"),
                         framing=target_data.get("framing", "cinematic")
                     )
-
+                elif kind == "tape_scroll":
+                    tgt = TapeScroll(
+                        tape_id=target_data.get("tape_id", "root_tape"),
+                        local_y=float(target_data.get("local_y", 0.0)),
+                        framing_mode=target_data.get("framing_mode", "sheet"),
+                        dim_others=bool(target_data.get("dim_others", True)),
+                        dim_opacity=float(target_data.get("dim_opacity", 0.0)),
+                    )
                 else:
                     tgt = WorldPoint()
                 ck = CameraKeyframe(
@@ -1348,10 +1398,11 @@ class SheetDSL:
             tapes_data.insert(0, data["root_tape"])
             
         for tdata in tapes_data:
+            settings_data = tdata.get("local_canvas_settings") or {}
             t = TapeObject(
                 id=tdata.get("id", "tape"),
                 local_elements=[], # Timeline reconstructs local_elements in Scene
-                local_canvas_settings=CanvasSettings(**tdata.get("local_canvas_settings", {})),
+                local_canvas_settings=CanvasSettings(**settings_data),
             )
             dsl.tapes.append(t)
 

@@ -1,64 +1,46 @@
 # Visible content — Orbital Mechanics
 
-## Beat P00 — The apparent contradiction
+The production has no long scrolling main tape. Three compact analytical tapes
+alternate with one persistent 3D orbital world.
 
-- `ORBIT IS A CONTINUOUS FALL`
-- “A satellite is always falling toward Earth. The puzzle is why it never
-  arrives.”
-- Three compact ideas: gravity pulls inward, velocity carries sideways, and
-  Earth curves away below.
+## Principle panel
 
-Viewer outcome: orbit is framed as motion under gravity, not the absence of it.
+- `WHY AN ORBIT IS A CONTINUOUS FALL`
+- “Gravity never switches off. Sideways motion keeps moving the miss.”
+- One small volumetric Earth embedded on the tape.
+- Final synthesis:
+  `FALLING INWARD + MOVING SIDEWAYS = CONTINUALLY MISSING EARTH`
 
-## Beat P01 — Gravity remains strong
+Viewer outcome: the compact curtain states the central claim without turning
+the full production into a vertical slide deck.
 
-- `WEIGHTLESS DOES NOT MEAN GRAVITY-FREE`
-- At 400 km, `g ≈ 8.69 m/s²`.
-- This is approximately 89% of standard surface gravity.
-- Spacecraft and occupants float because both accelerate together.
+## Telemetry panel
 
-Viewer outcome: “weightless” is separated from “gravity-free.”
+- `LOW-ORBIT TELEMETRY`
+- At 400 km, `g = 8.69 m/s²`.
+- Approximately 89% of standard surface gravity remains.
+- `v_circular = √(GM/r)`.
+- At 400 km, ideal circular speed is `7.67 km/s`.
 
-## Beat P02 — Controlled launch experiment
+Viewer outcome: numerical evidence remains readable, then gives the camera back
+to the world it describes.
 
-- One launch point; only sideways speed changes.
-- Explicit model disclosure: normalized teaching view, exaggerated altitude,
-  and ignored drag.
-- Trial 1: 5.98 km/s intersects Earth.
-- Trial 2: 7.67 km/s keeps missing.
-- Trial 3: 11.20 km/s has positive orbital energy and escapes.
+## Regime panel
 
-Viewer outcome: sideways speed controls which path the same gravity produces.
+- `ONE LAUNCH POINT · ONLY SPEED CHANGES`
+- Disclosure: normalized two-body model, exaggerated altitude, drag omitted.
+- `TOO SLOW` — the falling path intersects Earth.
+- `CIRCULAR SPEED` — the path bends as Earth curves away.
+- `ABOVE ESCAPE SPEED` — positive energy opens the trajectory.
 
-## Beat P03 — Compare the three regimes
+Viewer outcome: three outcomes are comparisons inside one physical model, not
+three unrelated plots.
 
-- Re-entry, circular orbit, and escape remain registered in one coordinate
-  system.
-- Semantic emphasis moves through each path while the other two recede.
+## Spatial world
 
-Viewer outcome: the regimes are qualitatively different outcomes of one model.
-
-## Beat P04 — Freeze one instant
-
-- Earth and satellite form a local geometry diagram.
-- Velocity points tangent to the path.
-- Acceleration points inward toward Earth.
-- Gravity is identified as the centripetal force in this idealized model.
-
-Viewer outcome: the two vector directions are distinguishable and causal.
-
-## Beat P05 — Governing relationship
-
-- `GMm/r² = mv²/r`
-- `v_circular = √(GM/r)`
-- At 400 km, `v ≈ 7.67 km/s`.
-
-Viewer outcome: the equation names the balance already seen in the geometry.
-
-## Beat P06 — Synthesis
-
-- `FALLING + MISSING`
-- “Orbit is not a place where gravity stops.”
-- Inward gravity plus sideways velocity produces continuous free fall.
-
-Viewer outcome: the central explanation can be recalled in two verbs.
+- Volumetric Earth with restrained globe guides.
+- Deterministically sampled re-entry, circular, and escape trajectories.
+- Stable launch point and satellite identity.
+- Tangent velocity and inward gravity vectors attached to the moving circular
+  satellite assembly.
+- Cinematic wide, close, and oblique observations.

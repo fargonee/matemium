@@ -191,12 +191,34 @@ pub struct SidecarRenderParams {
     pub output_dir: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SidecarTapeParams {
+    pub project_id: String,
+    pub scene: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SidecarTapeExportParams {
+    pub project_id: String,
+    pub scene: Option<String>,
+    pub tape_id: String,
+    #[serde(default = "default_tape_export_format")]
+    pub format: String,
+    pub high_res_height: Option<u32>,
+}
+
 fn default_quality() -> String {
     "preview".to_string()
 }
 
 fn default_orientation() -> String {
     "portrait".to_string()
+}
+
+fn default_tape_export_format() -> String {
+    "png".to_string()
 }
 
 #[derive(Debug, Deserialize)]
@@ -751,6 +773,50 @@ pub async fn sidecar_list_scenes(
             }),
         )
         .await
+}
+
+#[tauri::command]
+pub async fn sidecar_list_tapes(
+    state: State<'_, AppState>,
+    params: SidecarTapeParams,
+) -> Result<Value, String> {
+    let readiness = get_readiness(state.clone()).await?;
+    if !readiness.fully_ready {
+        return Err(format!("APP_NOT_READY: {}", readiness.message));
+    }
+    let workspace = workspace_path(&state.paths, &params.project_id)?;
+    let mut ipc_params = json!({ "workspace": workspace });
+    if let Some(scene) = params.scene {
+        ipc_params["scene"] = json!(scene);
+    }
+    state.sidecar.request("list_tapes", ipc_params).await
+}
+
+#[tauri::command]
+pub async fn sidecar_export_tape(
+    state: State<'_, AppState>,
+    params: SidecarTapeExportParams,
+) -> Result<Value, String> {
+    let readiness = get_readiness(state.clone()).await?;
+    if !readiness.fully_ready {
+        return Err(format!("APP_NOT_READY: {}", readiness.message));
+    }
+    let workspace = workspace_path(&state.paths, &params.project_id)?;
+    let output_dir = state.paths.renders_dir(&params.project_id);
+    let output_dir = validate_render_output_dir(&output_dir.display().to_string())?;
+    let mut ipc_params = json!({
+        "workspace": workspace,
+        "tape_id": params.tape_id,
+        "format": params.format,
+        "output_dir": output_dir.display().to_string(),
+    });
+    if let Some(scene) = params.scene {
+        ipc_params["scene"] = json!(scene);
+    }
+    if let Some(high_res_height) = params.high_res_height {
+        ipc_params["high_res_height"] = json!(high_res_height);
+    }
+    state.sidecar.request("export_project_tape", ipc_params).await
 }
 
 #[tauri::command]

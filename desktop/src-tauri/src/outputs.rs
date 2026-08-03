@@ -208,8 +208,22 @@ fn classify_kind(relative: &Path) -> (String, Option<String>) {
         }
     }
 
-    if parts.len() == 1 && relative.extension().and_then(|e| e.to_str()) == Some("mp4") {
-        return ("preview".to_string(), None);
+    if parts.len() == 1 {
+        match relative
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+        {
+            Some("mp4" | "webm" | "mov" | "m4v") => {
+                return ("preview".to_string(), None);
+            }
+            Some("png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "avif") => {
+                return ("image".to_string(), None);
+            }
+            Some("pdf") => return ("document".to_string(), None),
+            _ => {}
+        }
     }
 
     ("other".to_string(), extract_resolution(&parts))
@@ -515,6 +529,8 @@ mod tests {
         let (paths, renders) = fixture_paths("outputs-classify-test");
         let preview = renders.join("MyScene.mp4");
         fs::write(&preview, b"mp4").expect("preview");
+        fs::write(renders.join("MyScene-main-full-tape.png"), b"png").expect("tape png");
+        fs::write(renders.join("MyScene-main-full-tape.pdf"), b"pdf").expect("tape pdf");
 
         let partial = renders.join("media/videos/1920p30/partial_movie_files/MyScene/seg.mp4");
         fs::create_dir_all(partial.parent().expect("parent")).expect("partial dir");
@@ -534,6 +550,18 @@ mod tests {
         assert_eq!(
             kinds.get("MyScene.mp4").map(String::as_str),
             Some("preview")
+        );
+        assert_eq!(
+            kinds
+                .get("MyScene-main-full-tape.png")
+                .map(String::as_str),
+            Some("image")
+        );
+        assert_eq!(
+            kinds
+                .get("MyScene-main-full-tape.pdf")
+                .map(String::as_str),
+            Some("document")
         );
         assert_eq!(
             kinds

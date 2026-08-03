@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Any, Callable
 
 # NOTE: No heavy imports (canvas, manim, render that pulls them) at module top level.
@@ -538,6 +539,202 @@ def handle_list_scenes(params: dict[str, Any], events: EventEmitter) -> dict[str
     return {"scenes": scenes, "workspace": str(workspace)}
 
 
+def _tape_display_title(tape: Any) -> str:
+    """Return a short human label without building any Manim mobjects."""
+    for element in getattr(tape, "local_elements", None) or []:
+        content = getattr(element, "content", None)
+        text = ""
+        if isinstance(content, str):
+            text = content
+        elif isinstance(content, dict):
+            if isinstance(content.get("text"), str):
+                text = content["text"]
+            elif isinstance(content.get("runs"), list):
+                text = "".join(
+                    str(run.get("text", ""))
+                    for run in content["runs"]
+                    if isinstance(run, dict)
+                )
+        text = " ".join(text.split())
+        if text:
+            return text[:80]
+    return str(getattr(tape, "id", "Tape")).replace("_", " ").strip().title()
+
+
+def _project_tape_payload(dsl: Any) -> tuple[list[dict[str, Any]], str | None]:
+    from canvas.tape_export import available_tapes
+
+    root = getattr(dsl, "root_tape", None)
+    tapes = available_tapes(dsl)
+    payload: list[dict[str, Any]] = []
+    populated: list[Any] = []
+    for tape in tapes:
+        elements = list(getattr(tape, "local_elements", None) or [])
+        if elements:
+            populated.append(tape)
+        settings = getattr(tape, "local_canvas_settings", None) or dsl.canvas_settings
+        ys = [
+            float(getattr(element, "canvas_position", (0.0, 0.0, 0.0))[1])
+            for element in elements
+        ]
+        payload.append(
+            {
+                "id": str(tape.id),
+                "title": _tape_display_title(tape),
+                "element_count": len(elements),
+                "frame_width": float(settings.frame_width),
+                "frame_height": float(settings.frame_height),
+                "content_span": (max(ys) - min(ys)) if len(ys) > 1 else 0.0,
+                "is_root": tape is root,
+            }
+        )
+
+    default_tape_id = None
+    if root is not None and getattr(root, "local_elements", None):
+        default_tape_id = str(root.id)
+    elif populated:
+        default_tape_id = str(populated[0].id)
+    return payload, default_tape_id
+
+
+def handle_list_tapes(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
+    lazy.ensure_engine_loaded(events)
+    from ..workspace_project import instantiate_scene
+
+    workspace = _require_workspace(params)
+    scene_name = _resolve_scene_or_error(
+        workspace,
+        params.get("scene"),
+        path=params.get("path"),
+    )
+    native = instantiate_scene(workspace, scene_name, path=params.get("path"))
+    tapes, default_tape_id = _project_tape_payload(native.dsl)
+    return {
+        "workspace": str(workspace),
+        "scene": scene_name,
+        "tapes": tapes,
+        "default_tape_id": default_tape_id,
+    }
+
+
+def _safe_export_stem(value: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip(".-_")
+    return stem[:120] or "full-tape"
+
+
+def handle_export_project_tape(
+    params: dict[str, Any],
+    events: EventEmitter,
+) -> dict[str, Any]:
+    lazy.ensure_engine_loaded(events)
+    from PIL import Image
+    from canvas.tape_export import export_tape_document, resolve_tape
+    from ..workspace_project import instantiate_scene
+
+    workspace = _require_workspace(params)
+    scene_name = _resolve_scene_or_error(
+        workspace,
+        params.get("scene"),
+        path=params.get("path"),
+    )
+    check = check_project(workspace, scene=scene_name, path=params.get("path"))
+    if not check.get("ok"):
+        errors = check.get("errors") or []
+        first = errors[0] if errors else None
+        detail = (
+            first.get("message", "check failed")
+            if isinstance(first, dict)
+            else str(first or "check failed")
+        )
+        raise ProtocolError("CHECK_FAILED", detail)
+
+    native = instantiate_scene(workspace, scene_name, path=params.get("path"))
+    tape_id_raw = params.get("tape_id")
+    tape_id = str(tape_id_raw) if tape_id_raw else None
+    try:
+        tape = resolve_tape(native.dsl, tape_id)
+    except ValueError as exc:
+        raise ProtocolError("INVALID_TAPE", str(exc)) from exc
+
+    fmt = str(params.get("format", "png")).lower()
+    if fmt not in ("png", "pdf"):
+        raise ProtocolError("INVALID_FORMAT", "format must be png or pdf")
+
+    high_res_raw = params.get("high_res_height")
+    high_res_height = None
+    if high_res_raw is not None:
+        try:
+            high_res_height = int(high_res_raw)
+        except (TypeError, ValueError) as exc:
+            raise ProtocolError(
+                "INVALID_RESOLUTION",
+                "high_res_height must be a positive integer",
+            ) from exc
+        if high_res_height < 240 or high_res_height > 20_000:
+            raise ProtocolError(
+                "INVALID_RESOLUTION",
+                "high_res_height must be between 240 and 20000 pixels",
+            )
+
+    output_dir_raw = params.get("output_dir")
+    output_dir = (
+        Path(str(output_dir_raw)).expanduser().resolve()
+        if output_dir_raw
+        else workspace / "renders"
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    requested_name = params.get("filename")
+    stem = _safe_export_stem(
+        str(requested_name)
+        if requested_name
+        else f"{scene_name}-{tape.id}-full-tape"
+    )
+    title = params.get("title")
+
+    events.emit(
+        "tape_export_started",
+        scene=scene_name,
+        tape_id=tape.id,
+        format=fmt,
+    )
+    try:
+        path = export_tape_document(
+            native.dsl,
+            output_dir / stem,
+            format=fmt,  # type: ignore[arg-type]
+            tape_id=str(tape.id),
+            high_res_height=high_res_height,
+            title=str(title) if title else None,
+            natural_aspect=True,
+        )
+    except (RuntimeError, ValueError) as exc:
+        raise ProtocolError("TAPE_EXPORT_FAILED", str(exc)) from exc
+
+    pixel_width = None
+    pixel_height = None
+    if fmt == "png":
+        with Image.open(path) as image:
+            pixel_width, pixel_height = image.size
+    size_bytes = path.stat().st_size
+    events.emit(
+        "tape_export_complete",
+        path=str(path),
+        tape_id=tape.id,
+        format=fmt,
+        size_bytes=size_bytes,
+    )
+    return {
+        "path": str(path),
+        "format": fmt,
+        "workspace": str(workspace),
+        "scene": scene_name,
+        "tape_id": str(tape.id),
+        "pixel_width": pixel_width,
+        "pixel_height": pixel_height,
+        "size_bytes": size_bytes,
+    }
+
+
 def handle_lint_project(params: dict[str, Any], events: EventEmitter) -> dict[str, Any]:
     # Lint is intentionally lightweight (syntax + ruff) — does not require full engine load
     workspace = _require_workspace(params)
@@ -922,7 +1119,29 @@ def handle_get_preview_data(params: dict[str, Any], events: EventEmitter) -> dic
     else:
         dsl = _require_dsl(params)
     # Rich data for sophisticated manim-web 1-1 preview
+    tapes: list[Any] = []
+    seen_tape_ids: set[str] = set()
+    for tape in [
+        getattr(dsl, "root_tape", None),
+        *(getattr(dsl, "tapes", []) or []),
+    ]:
+        tape_id = str(getattr(tape, "id", "")) if tape is not None else ""
+        if tape_id and tape_id not in seen_tape_ids:
+            seen_tape_ids.add(tape_id)
+            tapes.append(tape)
+
+    element_tape_ids = {
+        str(element.id): str(tape.id)
+        for tape in tapes
+        for element in (getattr(tape, "local_elements", None) or [])
+        if getattr(element, "id", None)
+    }
+
     full_timeline = [_serialize_timeline_action(it) for it in getattr(dsl, "timeline", [])]
+    for action in full_timeline:
+        element_id = action.get("id")
+        if element_id in element_tape_ids:
+            action["tape_id"] = element_tape_ids[element_id]
     elements = [a for a in full_timeline if a.get("kind") == "element"]
 
     settings = dsl.canvas_settings
@@ -939,6 +1158,8 @@ def handle_get_preview_data(params: dict[str, Any], events: EventEmitter) -> dic
         # Phase 5/7: object graph + observations for full 3D preview
         "root_objects": [o.to_dict() for o in getattr(dsl, "root_objects", [])],
         "root_tape": dsl.root_tape.to_dict() if getattr(dsl, "root_tape", None) else None,
+        "tapes": [tape.to_dict() for tape in tapes],
+        "element_tape_ids": element_tape_ids,
         "observations": [a for a in full_timeline if a.get("kind") in ("CameraMove", "CameraKeyframe", "CameraFocus", "CameraInspect")],
     }
 
@@ -1313,9 +1534,11 @@ COMMANDS: dict[str, HandlerFn] = {
     "delete_reference": handle_delete_reference,
     "get_reference_content": handle_get_reference_content,
     "list_scenes": handle_list_scenes,
+    "list_tapes": handle_list_tapes,
     "lint_project": handle_lint_project,
     "check_project": handle_check_project,
     "render_project": handle_render_project,
+    "export_project_tape": handle_export_project_tape,
     "validate_dsl": handle_validate_dsl,
     "estimate_duration": handle_estimate_duration,
     "get_preview_data": handle_get_preview_data,

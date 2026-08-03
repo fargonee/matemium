@@ -1,54 +1,54 @@
 # Production report — Orbital Mechanics
 
-## Outcome
+## Current outcome
 
-- **Project behavior completed:** Seven-beat mute explanation covering gravity
-  at low orbit, controlled launch trials, regime comparison, local vectors,
-  force balance, circular speed, and synthesis.
-- **Engine behavior changed:** None during this flagship reauthoring.
-- **Project-local helpers added:** SI constants, normalized RK4 two-body
-  integration, sampled trajectories, semantic diagram data, and stable visual
-  identities.
-- **Authoring check:** `check_project` passed with 45 authored timeline items,
-  no errors, and no warnings.
-- **Accepted preview:** 960×540, 15 fps, landscape, 54.798047 seconds,
-  2,170,972 bytes, and 60 rendered animations.
-- **Mute verification:** `ffprobe` reported one H.264 video stream and no audio
-  stream.
+- **Visual narrative upgraded:** one high side establishing shot makes a single
+  deliberate move to a pole-locked experiment. Zero-speed drop, three widening
+  impact arcs, circular orbit, bound ellipse, and escape replay from one launch
+  point with no observational orbiting during the experiment.
+- **Project-local visual:** `OrbitalWorld` builds a volumetric Earth, procedural
+  paths, enlarged satellite and locator, launch marker, constant inward vector,
+  and speed-scaled tangential vector.
+- **Authoring check:** strict DSL validation passes with 33 timeline items and no
+  errors or warnings.
+- **Runtime proof:** a complete 960×540, 15 fps preview render finished at
+  63.730 seconds with 65 animations.
+- **Visual review:** finished frames at 2, 6, 12, 16, 20, 24, 29, 36, 42, 47,
+  53, 55, 57, 59, and 62 seconds were inspected. Satellite silhouette, force
+  vectors, impact arcs, circular path, bound ellipse, escape path, recap tape,
+  and closing synthesis are visible, framed, and free of overlap or clipping.
+- **Publication status:** the engine/project preview gate passes. Independent
+  human showcase acceptance and the 1920×1080 website master remain pending.
 
-## Visual repair record
+## General engine repairs
 
-1. The first contact sheet exposed trajectory content beyond the safe frame and
-   a vector-text collision.
-2. The first repair reduced plot/diagram footprints and separated vector copy.
-3. Full-resolution sampling then exposed rich-text boundary collapse, a
-   transition-state vector label that exceeded its node, and a force-balance
-   formula larger than its declared layout box.
-4. The next repair replaced fragile mixed-run cards, simplified the vector node
-   label, and matched equation size to layout.
-5. The final hold still revealed two touching synthesis cards. They were
-   replaced with one centered verbal equation.
-6. The accepted contact sheet and representative full-size frames show the
-   opening, gravity correction, three launch outcomes, comparison plot, vector
-   freeze frame, equations, and closing statement legibly. Camera travel may
-   crop previous stations while moving to the next focal item; active content
-   resolves fully inside the frame.
+The project exposed and justified reusable repairs to world-object IDs and
+bookkeeping, persistent world construction, complete tape ownership,
+world/tape opacity-only curtain switching with camera cuts, stale replacement
+cleanup, flex-first tape activation, hidden morph behavior, explicit
+`TapeScroll`, and world transform application.
+Regression coverage is in `tests/test_3d_space.py`.
 
-## Scientific checks
+No orbital rule or project-specific scene branch was added to engine core.
+
+## Scientific checks retained
 
 - Circular speed at 400 km: `7.672598648 km/s`.
 - Gravitational acceleration at 400 km: `8.694250483 m/s²`.
 - Fraction of standard surface gravity: `0.8865668`.
 - Slow trial intersects the normalized Earth.
-- Circular trial preserves its radius within integration tolerance.
+- Circular trial preserves radius within integration tolerance.
+- `1.08×` remains bound and is shown as an ellipse.
 - Escape trial has positive normalized specific orbital energy.
-- Source-and-calculation review is recorded in `brief/domain-review.md`;
-  independent expert sign-off remains pending.
 
-## Honest readiness
+See `domain-review.md` for assumptions and sources.
 
-The authoring-stage preview is accepted and the project is a bundled flagship
-candidate. Final public delivery still requires a visually inspected
-1920×1080 master and independent physics sign-off. Continuous moving-body,
-path-history, and vector synchronization remains a future general engine
-capability; this project uses honest staged paths and a freeze-frame diagram.
+## Invalidated evidence
+
+The former 48.864-second preview predates the speed-ladder narrative. It remains
+historical evidence only and must not be cited as acceptance of this version.
+
+## Next publication gate
+
+Obtain independent human composition and physics sign-off, then render the
+final 1920×1080 mute master.

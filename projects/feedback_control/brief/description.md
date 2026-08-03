@@ -12,8 +12,9 @@
 ## Purpose
 
 Use cruise control as a concrete system to explain closed-loop feedback. The
-accepted scene connects a physical disturbance, semantic block diagram, error
-signal, PI action, and aligned deterministic time-series plots.
+cinematic scene connects one persistent 3D vehicle/road world to a semantic
+block diagram, numerical dashboard, PI action, and aligned deterministic
+time-series plots.
 
 The story should show that useful automation is continuous measurement and correction, not a one-time command.
 
@@ -43,7 +44,9 @@ The viewer should understand:
 
 - Maintain fixed colors for setpoint, measured output, error, and control command.
 - Animate signal flow directionally through the block diagram.
-- Keep the car scene simplified and subordinate to the system explanation.
+- Keep the procedural 3D car, wheels, road surface, and signal callouts readable;
+  use only above-road roadside cameras and alternate physical detail with
+  terrain context.
 - Align comparison plots to the same axes and disturbance time.
 - Show overshoot and settling with annotations rather than relying on visual inference.
 - Use the camera to move between physical, diagrammatic, and quantitative views while preserving continuity.
@@ -63,7 +66,8 @@ The viewer should understand:
 - Use a documented simplified longitudinal car model.
 - Generate response curves deterministically from explicit parameters.
 - Keep controller gains and disturbance profiles configurable.
-- Use procedural diagrams and vehicle silhouettes; no external media is required.
+- Use procedural diagrams and a project-local procedural 3D vehicle world; no
+  external media is required.
 
 ## Scope boundaries
 

@@ -1,117 +1,133 @@
-> **Status — design target, not current authoring specification (2026-07-27).**
-> This document describes the intended unified world model. The current
-> high-level API supports 2D tape layout/scroll contexts and free 3D objects,
-> but `add_tape()` rejects physical position/rotation/scale and transformed-tape
-> observation is not a proven public capability. Use
-> [`AUTHORING_API.md`](AUTHORING_API.md) for implemented authoring behavior.
-> `TapeScroll` references below are proposals. The current DSL does not define
-> that type, and `scroll_tape()` is therefore not usable.
+# Free 3D World and Tape Presentation Model
 
-The core image is powerful: the world is one infinite 3D space. The "infinite tape" is no longer the root of the universe. It is one special kind of object living inside that space — a flat, content-bearing plane that can be positioned, rotated, scaled, and observed like anything else, but which carries its own rich internal rules.
+**Current contract: 2026-07-30**
 
-This single shift can (and should) ripple outward to solve the deeper architectural problems we've been circling:
+Matemium uses two cooperating presentation contexts. They share a timeline and
+object registry, but they are intentionally not composited at the same time.
 
-• Lesson/object-specific bloat and constant patching
-• The tension between "granular/abstract engine" and the nice CSS-like sheet ergonomics
-• Renderer-agnostic measurement + faithful manim-web preview
-• Camera and animation semantics feeling bolted-on
-• Risk of two parallel systems (sheet vs real 3D)
-• WYSIWYG/layout fidelity problems
+## 1. Free 3D world
 
-The Extended Mental Model
+The free world is a persistent three-dimensional scene:
 
-The Universe
-• One shared 3D coordinate system (origin + axes). XZ is conventionally "ground", Y is height, but nothing forces this.
-• Everything that appears is an Object.
-• Objects have:
-  • A transform in world space (position, orientation, scale)
-  • A local space (most objects have a simple local 3D space; some have richer internal structure)
-  • Optional behaviors (animation, state, interaction)
-  • A way to be observed by the camera
+- registered objects have stable IDs and `WorldTransform`s;
+- project-local object kinds can build reusable compound geometry;
+- camera inspection can orbit, dolly, change angle, and follow authored paths;
+- state transitions address an object or one of its semantic parts;
+- `ElementMorph` can replace a world object while preserving its stable ID.
 
-The Tape as Special Object The current infinite sheet becomes TapeObject (or SheetPlane, whatever name feels right).
+The world may continue to evolve while hidden behind a tape. When the tape
+opens, the current world state is shown.
 
-• It exists at some world transform (it can sit flat on the ground, float at an angle, be part of a larger 3D construction, etc.).
-• Internally it has its own 2D local coordinate system (its local XY becomes the old "sheet").
-• All the beautiful sheet machinery (LayoutEngine + CSS-like styling + flex + margins + wrapping + lazy reveal) lives inside the TapeObject's local space.
-• The TapeObject knows how to report its own "surface" for measurement and rendering.
-• Content inside the tape (Text, Math, plots, even small embedded 3D objects) is authored and laid out using the familiar 2D sheet tools, but the whole thing is just one node in the bigger 3D scene graph.
+## 2. Tape presentation
 
-Objects in General
-• Regular 3D objects (solids, graphs, diagrams) are also first-class Objects with their own local spaces.
-• Composition is natural: a Tape can contain regular objects projected onto its surface; a larger 3D assembly can contain Tapes as "pages" or "screens".
-• Every object can be a target for relative positioning: "place this at the center of Tape #7's local (3.2, 1.1)" or "attach this label 0.4 units above the top edge of this Solid".
+A `TapeObject` is an isolated, camera-facing 2D reasoning canvas. It owns:
 
-The Camera as Intelligent Observer
+- local XY layout and vertical flow;
+- CSS-like width, margin, wrapping, and alignment;
+- flex rows and columns;
+- lazy reveal and local scrolling;
+- text, math, plots, diagrams, and small embedded solids;
+- a per-tape static document export.
 
-The camera is a first-class participant in the 3D space. Keyframes target objects, anchors, or world points. By default, **every object is observed the same way** — as a 3D object in world space.
+A tape is not a plane positioned or rotated in the 3D world. `add_tape()` does
+not accept `position`, `rotation`, or `scale`.
 
-A keyframe target can be:
-• A world point (absolute)
-• The center or a named anchor of any Object (relative) — this includes TapeObjects
-• A special "tape scroll" observation that activates tape mode
+## 3. Curtain transitions
 
-**Default observation (applies to regular 3D objects AND to TapeObjects):**
-• Pure cinematic 3D: look-at, orbit, dolly, follow a moving/rotating object, phi/theta, distance control, smooth interpolation.
-• The tape (when targeted via ObjectAnchor or similar) is treated exactly like any other 3D object — a flat plane you can fly the camera around in world space.
-• Free 3D objects never receive tape-like internal behaviors (layout, lazy reveal driven by local scroll, sheet panning, etc.) unless they are explicitly a TapeObject.
+Only one presentation context is visible:
 
-**Tape-scroll-mode (activated explicitly via TapeScroll target or equivalent):**
-This is the **only** time the tape's special internal mechanisms engage.
-• Camera is positioned using the tape's internal local measurements (local Y position on the tape plane).
-• The old sheet behaviors activate in the tape's local 2D space: panning/scrolling along local coordinates, auto-focus on elements, viewport fitting, flex groups, and lazy content reveal driven by observation progress along the tape's local Y.
-• All internal sheet machinery (LayoutEngine, styling, reveal timing) runs locally inside the TapeObject.
-• The outer 3D camera still respects the tape's full world_transform, so a rotated, positioned, or moving tape works correctly when in scroll mode.
-• Transitions into and out of tape-scroll-mode are first-class.
+```text
+free 3D world ── close tape ──> selected camera-facing tape
+selected tape ── replace ─────> another camera-facing tape
+selected tape ── open tape ───> free 3D world
+```
 
-In short:
-- Observe a TapeObject with a normal 3D target → it behaves like any free 3D object.
-- Activate tape-scroll-mode (TapeScroll) → camera "enters" the tape and the classic infinite-tape experience takes over, but the whole thing remains one object inside the 3D world.
+The selected tape behaves like a curtain placed directly in front of the
+camera. Closing it hides all free-world objects and every other tape. Switching
+tapes replaces the foreground canvas. Opening it removes all tape content and
+restores only free-world objects.
 
-Transitions are explicit and smoothable. Example: "cinematic 3D orbit around a floating cube → look at the angled tape as a 3D plane (ObjectAnchor) → enter tape-scroll-mode at local_y=4.5 → later exit back to free 3D camera following the moving tape object."
+This isolation is a correctness rule, not merely an artistic default. It keeps
+text face-on and readable, prevents mirrored/clipped overlays, and prevents
+previous tapes from accumulating over a 3D shot.
 
-The old "infinite tape" experience is recovered exactly when using TapeScroll targets against a default (identity transform) root TapeObject. All classic authoring continues to work through the new model.
+## 4. Authoring transitions
 
-Measurement, Layout, and Renderer-Agnosticism
-• Measurement is always performed in an object's local space.
-• The existing renderer-agnostic measurement protocol becomes per-object-kind. A TapeObject can use the current 2D KaTeX/Manipulation backend for its internal content. A pure 3D Solid can use a different strategy.
-• LayoutEngine lives inside TapeObjects (and potentially other "planar" objects). It is no longer a global thing.
-• This keeps the CSS-like styling powerful exactly where it is useful (inside tapes) without forcing it onto free 3D space.
+Tape context can be selected in two ways:
 
-Preview (manim-web) The preview becomes a true 3D manim-web scene by default.
+- revealing an element owned by a different tape switches automatically;
+- `scroll_tape(tape_id=..., local_y=...)` selects it explicitly.
 
-• It renders the world space + all objects.
-• When the camera keyframe targets a TapeObject (or enters its observation mode), the preview can:
-  • Continue rendering the outer 3D context
-  • Locally apply the existing high-fidelity sheet preview logic on the surface of that tape plane
-  • Or switch to a "focused tape view" while still allowing 3D camera freedom
-• Because the tape's internal layout already used the (now more agnostic) measurement, positions inside the tape match the final render extremely closely.
-• New object kinds only need to declare "how I look in 3D" and "how the camera should observe me". No more global patching.
+World context is selected by a world camera action, including
+`observe_object()`, `add_camera_keyframe()` with a world target, or
+`add_camera_inspect()`.
 
-How This Solves the "Rest Problems"
+Example:
 
-• No more constant patching of lesson-specific stuff: New visualizations become either (a) compositions of existing objects or (b) new object kinds that register their local renderer, local measurer, and observation behavior. The core only cares about transforms, observation targets, and timeline ordering.
-• Granular + abstract engine: The CSS-like styling is no longer a global hack — it is the layout language of TapeObjects. Free 3D uses explicit or constraint-based positioning. You get both without compromise.
-• Deep but clean coupling between rendering and preview: Everything funnels through objects + observation modes. The manim-web preview can be "3D world + special observation handlers". Adding a new kind of object is local work.
-• Camera and 3D feel first-class from the beginning: The current "tilt/lift/inspect" hacks become special cases of the general observation system.
-• Mixed sheet + real 3D becomes natural: A scene can have free-floating 3D geometry, multiple angled tapes, objects moving between them, camera paths that treat them uniformly but observe them differently.
-• WYSIWYG and fidelity: Layout happens in local object space using the right measurement backend. The preview replays the same world + the same observation logic.
+```python
+b = CanvasBuilder(canvas_settings=CanvasSettings.for_youtube())
 
-Creative Implications & New Opportunities
+analysis = b.add_tape("analysis", frame_width=6.4, frame_height=4.8)
+results = b.add_tape("results", frame_width=6.4, frame_height=4.8)
 
-• Tape as a 3D citizen + special mode: You can treat a tape as a normal 3D prop (rotate it, orbit the camera around it, attach other objects to it) and only enter full tape-scroll-mode when you want the classic scrolling narrative experience.
-• Normal 3D observation of tapes vs. tape-scroll-mode: Camera can fly around tapes like any object, then "dive in" via a TapeScroll keyframe.
-• Nested tapes and "books": A TapeObject can itself contain other TapeObjects as "pages" or "side panels". Each can be observed in 3D or entered via scroll-mode independently.
-• Relative everything in world + local: Place objects relative to a tape's world anchor, or position things inside a tape using its local coordinates.
-• Multi-tape + mixed scenes: Multiple tapes + free 3D objects. Camera can do pure 3D moves between them, or enter scroll-mode on one tape at a time.
-• Explicit mode switching: Authors consciously choose `ObjectAnchor("my_tape")` (3D view of the plane) vs `TapeScroll("my_tape", local_y=...)` (enter classic tape experience).
-• Hybrid authoring remains powerful: Builder still feels natural for pure tape videos; 3D features are additive.
+world_id = b.add_object(
+    "OrbitalWorld",
+    id="orbital_world",
+    content=initial_state,
+)
+b.add_camera_inspect(world_id, path=opening_path, return_to_sheet=False)
 
-Open Tensions (Things to Keep Thinking About)
+analysis.add_heading("Gravity is still strong")
+# world -> analysis happens on reveal
 
-• How does the authoring surface feel when you're working mostly on a tape vs working in full space? (The builder probably needs lightweight "enter tape context" / "exit to world" modes.)
-• Lazy reveal and timing: currently deeply tied to sheet panning. In the new model it should be driven by observation progress on a TapeObject.
-• Static exports / full-sheet screenshots: still make sense per TapeObject.
-• Performance: a scene with many tapes or very large tapes will need the same lazy instantiation ideas we already have.
+b.add_element_morph(world_id, changed_world)
+b.add_camera_inspect(world_id, path=close_path, return_to_sheet=False)
+# analysis -> world; the hidden morph is now visible
 
-This direction feels like it gives us the "well-thought, deeply tied but clean" design you mentioned, while still protecting the excellent sheet ergonomics as a first-class (but no longer unique) citizen.
+results.add_heading("Only launch speed changed")
+# world -> results
+```
+
+## 5. Engine invariants
+
+1. Every tape element belongs to exactly one tape.
+2. Tape-owned elements are excluded when restoring the free world.
+3. Switching tapes hides the prior tape before revealing the next.
+4. World objects have stable registry IDs across hidden morphs.
+5. Tapes remain local 2D layouts; world transforms apply only to free objects.
+6. Topic-specific simulations and geometry stay in project helpers or
+   registered object kinds, not in engine-core branches.
+
+## 6. Static export and preview
+
+Static export renders one tape as an isolated document in its natural local
+coordinates. It does not reuse the live 3D camera.
+
+Desktop preview and final Manim output should replay the same context sequence:
+world, selected tape, selected tape, or world. Simultaneously showing a tape
+over undimmed/unhidden world geometry is a preview or runtime defect.
+
+## 7. Deliberate non-goals
+
+The current contract does not include:
+
+- physically posed tapes floating in world space;
+- cinematic fly-arounds of tape planes;
+- multiple tapes visible simultaneously;
+- attaching tapes as faces or panels of 3D assemblies.
+
+Those are different interaction models. They must not be inferred from the
+existence of `WorldTransform` or implemented as project-specific exceptions.
+
+## 8. Open spatial-authoring discussion
+
+The current contract does not yet define persistent parent-relative movement,
+generic object traversal, surface-relative placement, or geodesic movement.
+The flagship Orbit, Feedback Control, SN2 Reaction, and DNA to Protein projects
+are being used as evidence for evaluating possible cross-subject abstractions;
+the engine is not being adapted to their subject matter.
+
+No candidate design has been accepted or rejected. See
+[`SPATIAL_AUTHORING_OPEN_QUESTIONS.md`](SPATIAL_AUTHORING_OPEN_QUESTIONS.md) for
+the open question, alternatives, evaluation criteria, and public-launch
+communication boundary.

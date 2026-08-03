@@ -4,7 +4,7 @@
 
 - **Subject:** Language Learning
 - **Project slug:** `sentence_across_languages`
-- **Status:** First authored prototype complete; engine feedback recorded; flagship render not yet accepted
+- **Status:** Full-tape authoring proof accepted; native-speaker pronunciation review and final mute-video master pending
 - **Central question:** How can different languages organize the same intended meaning in different ways?
 - **Primary audience:** Curious language learners; the exact language pair or trio must be chosen with qualified review
 - **Target format:** 16:9 flagship master, approximately 2–3 minutes, with a later portrait-friendly sequence
@@ -13,7 +13,9 @@
 
 This project must show language as a structured transformation of meaning, not word-for-word substitution. A single concrete thought should pass through semantic roles, sentence structure, morphology, word order, and timed pronunciation.
 
-The final language selection should favor genuinely instructive contrasts and available expert review. English plus Uzbek and one additional language is a promising direction, but it is not fixed by this brief.
+The authored flagship uses English and standard Uzbek because their neutral
+orders and morphology provide an instructive contrast. Additional languages
+remain a future extension rather than a requirement for this focused example.
 
 ## Learning outcomes
 

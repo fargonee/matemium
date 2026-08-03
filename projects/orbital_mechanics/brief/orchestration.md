@@ -2,65 +2,53 @@
 
 ## Format and visual system
 
-- Landscape 16:9 master on a dark navy editorial canvas.
-- Earth blue is reserved for the body and curvature reference.
-- Coral identifies re-entry and inward acceleration.
-- Cyan identifies circular orbit.
-- Gold identifies tangent velocity and escape.
-- The scene uses the automatic root tape; camera travel connects seven
-  conceptual stations.
+- Landscape 16:9 master in one continuous spatial world.
+- A volumetric Earth and procedural trajectory are the persistent center.
+- Four compact camera-facing tapes act as principle, telemetry, experiment,
+  and synthesis instruments. Each temporarily hides the world like a curtain.
+- Earth blue identifies the body, coral identifies re-entry/inward
+  acceleration, cyan identifies circular orbit, and gold identifies tangent
+  velocity/escape.
 
-## Beat choreography
+## Camera-led beat choreography
 
-### P00 — Hook
+### W00 — Establish the world
 
-Build the apparent contradiction typographically, then reveal three small
-concept cards. The hook is deliberately quiet: no decorative star field or
-irrelevant spacecraft footage.
+Hold a high side view long enough to establish Earth, orbital plane, and
+satellite silhouette. Make one measured move to a near-pole view so the orbit
+reads as a circle rather than a foreshortened ring.
 
-### P01 — Gravity
+### T01 — State the puzzle
 
-Lead with the 400 km reference altitude and compute both local acceleration and
-its fraction of standard surface gravity. Keep numbers subordinate to the
-misconception correction.
+Close the principle tape over the world. Reveal the title, one-sentence
+premise, and a small embedded 3D Earth.
 
-### P02 — Launch trials
+### W02 — Observe the mechanism
 
-Register one generic data plot under a stable ID and morph its sampled trajectory
-through re-entry, circular, and escape trials. Preserve launch point, Earth, axes,
-and scale. Pair each state with a short consequence card.
+Return to the pole-locked central model. Release the satellite first with no
+tangential speed, then replay from the same point with progressively more
+sideways speed. The attached tangent and inward vectors, impact arcs, and final
+closed path make continuous free fall visible without camera movement.
 
-### P03 — Regime comparison
+### T03 — Read telemetry
 
-Show all three trajectories together. Use semantic series IDs and state
-transitions to isolate one result at a time without rebuilding the coordinate
-system.
+Close the telemetry tape. Quantify gravity at 400 km and introduce circular
+speed only after the physical directions have visual referents.
 
-### P04 — Local vectors
+### W04/T04 — Run the controlled experiment
 
-Switch from global paths to a semantic diagram. Emphasize the tangent velocity
-edge, then the inward acceleration edge. Text appears after each visual focus.
-This is a freeze-frame explanation; it does not claim unsupported reactive
-binding to a continuously moving satellite.
+Continue from circular speed to a wider bound ellipse, then exceed escape
+speed to open the path. Keep the pole axis fixed and zoom out only as needed to
+contain each trajectory. Follow with one compact regime recap tape.
 
-### P05 — Equation
+### W05 — Resolve
 
-Introduce force balance only after the inward direction and curved motion have
-visual referents. Isolate the circular-speed law, then provide the computed
-400 km value.
+Return to circular orbit for one final stable pole observation. Finish by
+closing the synthesis tape over the world.
 
-### P06 — Finale
+## Implementation boundary
 
-Resolve the opening puzzle with `FALLING + MISSING`, followed by three compact
-cards that preserve the established visual identities.
-
-## Motion and implementation notes
-
-- Trajectories come from a deterministic normalized RK4 two-body integration.
-- Staged generic-element morphs preserve visual identity across trials.
-- Semantic state transitions provide series- and edge-level emphasis.
-- The normalized plot exaggerates low-orbit altitude so different paths remain
-  readable at website scale; this is disclosed on screen.
-- The engine currently has no general reactive vector/path clock, so the scene
-  honestly uses an inspectable freeze frame rather than faking continuous
-  synchronization.
+- The two-body model and `OrbitalWorld` builder remain project-local.
+- World construction, tape curtain switching, camera paths, semantic state
+  changes, and object morphing use general engine contracts.
+- No downloaded textures, footage, or network resources are required.

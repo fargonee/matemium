@@ -133,6 +133,8 @@ pub fn run() {
             commands::sidecar_lint,
             commands::sidecar_check,
             commands::sidecar_list_scenes,
+            commands::sidecar_list_tapes,
+            commands::sidecar_export_tape,
             commands::sidecar_render,
             commands::sidecar_get_preview_data,
             commands::sidecar_cancel,

@@ -7,10 +7,9 @@ class FocusTest(CanvasScene):
         tape = b.add_tape("main")
         tape.add_heading("Tape A")
         
-        tb = b.add_tape("tape_b", position=(15, 10, -5), rotation=(45, 60, 30))
-        with b.in_object_space(tb):
-            tape.add_heading("Tape B")
-            tape.add_body("Is camera here?")
+        tape_b = b.add_tape("tape_b")
+        tape_b.add_heading("Tape B")
+        tape_b.add_body("Is the curtain switch clean?")
             
         super().__init__(dsl=b.build(), **kwargs)
 

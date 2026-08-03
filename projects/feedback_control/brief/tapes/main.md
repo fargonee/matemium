@@ -1,29 +1,15 @@
-# Visible content — Feedback Control
+# Visible contexts — Feedback Control
 
-## C00 — Disturbance
-
-- Target remains 25 m/s while an uphill load changes.
-- A fixed command cannot react in open loop.
-
-## C01 — Close the loop
-
-- Target → compare → PI control → actuator → car → sensor → feedback.
-- Trace one signal cycle and define `e(t)=r(t)−y(t)`.
-
-## C02 — One correction
-
-- Show target, measured speed, error, and controller command at 4.5 s.
-- Clarify that feedback changes input rather than removing the disturbance.
-
-## C03 — Recovery
-
-- Show target, hill start, and balanced response on one time axis.
-
-## C04 — Tuning
-
-- Compare slow, balanced, aggressive, and open-loop responses on identical axes.
-- State the PI control law.
-
-## C05 — Synthesis
-
-- Measure → compare → correct → repeat.
+1. **Free world:** establish the 3D road, vehicle, speed, and hill load.
+2. **Principle tape:** target remains fixed while disturbance changes response.
+3. **Free world:** observe open loop at 6 seconds on the hill.
+4. **Open dashboard:** target, measured speed, error, and unchanged command.
+5. **Loop tape:** trace sensor → feedback → error → control → plant.
+6. **Free world:** close the loop at the identical road position and time.
+7. **Closed dashboard:** inspect the changed error and command.
+8. **Response tape:** marker at the same deterministic time.
+9. **Free world:** advance to recovery and pull back for terrain context.
+10. **Response/comparison tapes:** update the marker and compare four tunings on
+    identical axes.
+11. **Free world and finale:** return to the physical system, then synthesize
+    measure → compare → correct → repeat.

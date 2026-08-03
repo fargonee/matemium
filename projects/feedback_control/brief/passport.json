@@ -15,9 +15,9 @@
   "duration_target_seconds": {"minimum": 45, "maximum": 60},
   "language": "English",
   "scientific_depth": "introductory closed-loop feedback, PI action, actuator lag, disturbance rejection, and tuning tradeoffs",
-  "visual_direction": "dark systems dashboard with stable signal colors and aligned response plots",
+  "visual_direction": "dark cinematic 3D road world alternating with stable-color dashboards, loop inspection, and aligned response plots",
   "tone": "causal, precise, practical",
-  "pacing": "physical hook, one signal cycle, one numerical correction, response, tuning, synthesis",
+  "pacing": "physical road hook, open-loop observation, causal loop, closed-loop correction, recovery, tuning, synthesis",
   "audio": {"final_track": "none", "must_remain_understandable_without_sound": true},
   "constraints": [
     "offline and deterministic",
@@ -33,5 +33,5 @@
     "model parameters remain editable"
   ],
   "readiness": {"status": "ready", "missing_fields": []},
-  "last_updated": "2026-07-27"
+  "last_updated": "2026-08-03"
 }

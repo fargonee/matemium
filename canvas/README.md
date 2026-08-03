@@ -2,12 +2,11 @@
 
 Layout-to-animation compiler for structured visual explanations on Manim.
 
-**Current contract (2026-07-27):** the automatic root tape provides the mature
-2D layout, scroll, lazy-reveal, and focus path. Additional tapes and free 3D
-objects exist but remain experimental. `scroll_tape()` is not usable because
-the current DSL has no `TapeScroll` target. Arbitrary physical tape transforms
-remain an unfinished architecture seam; `add_tape()` rejects position,
-rotation, and scale. See the following as design records:
+**Current contract (2026-07-30):** the automatic root tape and secondary tapes
+are isolated, camera-facing presentation contexts. Activating one closes it
+over the camera and hides the free 3D world and every other tape. A world
+observation opens the tape and restores only free-world objects.
+`scroll_tape()` is an explicit, serializable tape selector.
 
 - `3D-model.md` (audit + terminology + diagrams)
 - `../architecture.md` (updated paradigm section)

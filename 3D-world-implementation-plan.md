@@ -1,319 +1,102 @@
-# 3D World Unification Implementation Plan
-
-> **Status — historical/forward implementation plan (reviewed 2026-07-27).**
-> Phase labels in this file are not proof of current public behavior. The
-> implemented high-level contract is documented in
-> [`AUTHORING_API.md`](AUTHORING_API.md). In particular, transformed physical
-> tapes and unified world-camera observation remain unfinished.
-> `TapeScroll` below is a planned type, not a current class in `canvas.dsl`.
-
-**Goal:** Evolve the Matemium engine from a sheet-first system (with bolted-on 3D) into a true infinite 3D space where the current "infinite tape/sheet" is simply one special kind of object (`TapeObject`). 
-
-**Clarified observation model (2026-07):**
-- The tape is one object among others.
-- By default, **all objects** (including TapeObjects) are observed with normal cinematic 3D behavior.
-- Free 3D objects never get tape-like internal features.
-- **Tape-scroll-mode** (triggered by `TapeScroll` target) is the only time the tape activates its full internal 2D sheet mechanisms (local scroll, lazy reveal driven by local progress, layout, focus, etc.).
-- The old tape experience must be perfectly reproduced when using tape-scroll-mode on a default root tape.
-- See `3D-WORLD-DESCRIPTION.md` for the full mental model.
-
-This enables a more generic, abstract, granular engine while preserving (and enhancing) the powerful CSS-like styling, layout, lazy reveal, and WYSIWYG preview characteristics of the sheet.
-
-**Source Vision:** See `3D-WORLD-DESCRIPTION.md` (the extended mental model).
-
-**Key Problems This Plan Addresses:**
-- Constant patching of lesson/object-specific code into the core engine.
-- Need for a more granular/abstract engine (leveraging the original intent behind CSS-like styling for sheet positions).
-- Deep but clean integration between rendering, layout, camera, and preview (manim-web).
-- Supporting full 3D space (XZ ground + Y height) without duplicating systems or breaking the existing sheet UX.
-- Renderer-agnostic measurement and 1-1 manim-web powered preview.
-- Unified handling of absolute/relative positioning, camera keyframes, and "observation modes" that differ for tapes vs. regular 3D objects.
-- Avoiding "two parallel universes" while keeping the sheet productive for narrative math videos.
-
-**Guiding Principles:**
-- **Evolutionary, not big-bang rewrite.** Current sheet behavior must continue to work (and improve) at every milestone.
-- **Tape as one special object.** It lives in world 3D space (with transform) but owns rich internal 2D machinery that is **only activated** when tape-scroll-mode is explicitly engaged.
-- **Default = uniform 3D observation.** Every object (tape or not) is observed cinematically in 3D space unless a `TapeScroll` (tape-scroll-mode) target is used.
-- **Tape-scroll-mode is opt-in and special.** Only `TapeScroll` targets (or legacy CameraMove on root tape for compat) activate internal local sheet logic, reveal driven by local progress, etc.
-- **Old tape must work exactly as before.** Using the classic builder + TapeScroll on a default identity root_tape must produce identical behavior and feel.
-- **Free 3D objects stay simple.** They do not get layout engines or tape-scroll behaviors by default.
-- **Local spaces everywhere.** Measurement and content authoring for tapes happen in the tape's local 2D coordinates.
-- **Registry + protocols.** Support per-kind observe behavior (normal 3D vs tape-scroll).
-- **Preview is the 3D world.** manim-web renders the full scene; tape-scroll-mode reuses high-fidelity local sheet logic on the transformed plane.
-- **Document as we go.** Keep docs in sync with the clarified model.
-
-**Risks & Mitigations (high-level):**
-- Sheet UX regression → Prioritize "tape mode" preservation in every phase; use existing tests + new 3D examples.
-- Preview complexity → Start with sheet-only 3D world (tapes only), add free 3D objects later.
-- Performance (many objects/tapes) → Reuse lazy instantiation and registry patterns from current code.
-- Migration effort → Provide compatibility shims and migration helpers in builder/scene.
-
-**Overall Phases (Sequential)**
-
-## Phase 0: Setup, Audit, and Modeling (No breaking changes)
-
-**Purpose:** Establish the plan, map current code to new model, update docs. Make the vision concrete without touching logic yet.
-
-1. Read and internalize `3D-WORLD-DESCRIPTION.md` (already done).
-2. Audit current architecture:
-   - Map `canvas/` modules (dsl.py, builder.py, scene.py, camera.py, layout.py, measure.py, coords.py, etc.) to new concepts (Object, TapeObject, local space, Observation).
-   - Identify all places that hard-assume "sheet at z=0" (e.g., `SHEET_PLANE_Z`, camera defaults, flow state in LayoutEngine).
-   - Document current 3D-on-sheet usage (Solid3D, pitch, CameraInspect, etc.).
-3. Create/update supporting docs:
-   - Add section to `architecture.md` and `canvas/README.md` describing the new model.
-   - Create or update `canvas/3D-model.md` (or similar) with diagrams (ASCII or mermaid) of:
-     - World space + Objects (Tape vs. Solid vs. Group).
-     - Local vs. world coordinates.
-     - Camera keyframe targeting + observation delegation.
-   - Update `desktop-architecture.md` to mention future 3D canvas mode for preview.
-4. Define core terminology and data shapes (in docs only for now):
-   - `WorldTransform` (position, rotation, scale).
-   - `ObjectId`, `Anchor` (named points like center, edge, local (x,y)).
-   - `ObservationTarget` (WorldPoint | ObjectRef | TapeScroll {tape_id, local_y, framing}).
-   - `CameraKeyframe` (time, target, params, easing).
-5. Inventory existing special types and plan migration path (QuadraticPlot etc. → either composed or registered custom objects).
-6. Set up basic test scaffolding if needed (e.g., a new `tests/test_3d_space.py` skeleton that currently just asserts current behavior).
-7. **Milestone:** Plan approved, docs updated, current sheet still 100% functional. No code changes to core logic.
-
-**Dependencies:** None (pure docs/audit).
-**Success:** Anyone reading the docs understands "the tape is now a TapeObject in 3D space".
-
-## Phase 1: Core 3D Object Model & World Space (Foundation)
-
-**Purpose:** Introduce the generic "everything is an object in 3D space" without changing behavior for the current tape.
-
-1. Introduce world coordinate primitives (new or in `canvas/coords.py` or new `canvas/space.py`):
-   - `WorldTransform`, `Vector3`, helpers for absolute vs. relative resolution (resolve position relative to another object's anchor or origin).
-2. Refactor `CanvasElement` (in `dsl.py`):
-   - Keep backward compat (default to tape-local behavior).
-   - Add `world_transform: WorldTransform` (or position/orientation/scale fields).
-   - Add `parent_object_id` or `space` hint (for now mostly implicit).
-   - Make `type: str` (already trending this way) fully open.
-3. Introduce minimal `Object` / scene graph concept:
-   - A registry (extend or replace current `MobjectRegistry`) that tracks objects by id + their world transforms.
-   - Base "object" handling that can wrap current elements.
-4. Update `CanvasSettings` / `SheetDSL`:
-   - Add `mode` or `coordinate_system` (initially only "sheet" for compat).
-   - Support declaring root objects.
-5. **Internal only for now:** Make the current sheet implicitly a root `TapeObject` at identity transform.
-6. Update serialization (to_dict, from_dict, IPC) to carry transforms (backward compatible).
-7. **Milestone:** Code can represent elements with explicit world transforms. Existing code paths still treat everything as on the default sheet. Tests pass.
-
-**Dependencies:** Phase 0.
-**Success Criteria:** Can place two elements with relative positioning in docs/tests (without full runtime).
-
-## Phase 2: TapeObject as First-Class Special Object
-
-**Purpose:** Explicitly model the current sheet behavior as the internal logic of a TapeObject.
-
-1. Define `TapeObject` (new dataclass or subclass of CanvasElement / new abstraction in dsl.py):
-   - `world_transform`
-   - `local_elements: list[CanvasElement]` (the old timeline items now live inside a tape).
-   - `local_layout: LayoutEngine` (reuse existing, scoped to the tape's local space).
-   - Internal 2D size / surface reporting for measurement & 3D rendering.
-2. Move / adapt current sheet layout, flex, styling, lazy reveal, and flow logic to operate on a TapeObject's local space.
-3. Update `CanvasBuilder`:
-   - By default, operations build inside an implicit root TapeObject (for backward compat).
-   - Add explicit methods like `add_tape(...)`, `enter_tape_context(id)`, `place_object_in_world(...)` (later phases).
-   - `element_spec`, `math_spec`, etc. become ways to populate a tape's local content.
-4. Adapt `LayoutEngine` and `measure.py` to be instantiable per-object (especially for tapes) + support the new measurement protocol.
-5. Update coords.py, viewport_fit.py, etc. to handle local vs world.
-6. **Milestone:** The existing sheet authoring (`add_flex_row`, styling, etc.) now conceptually lives inside a TapeObject. Runtime behavior identical.
-
-**Dependencies:** Phase 1 (transforms).
-**Success:** All current projects/ demos still render exactly the same.
-
-## Phase 3: Generalized Camera & Keyframe Observation System (Updated for Clarified Model)
-
-**Purpose:** Build a uniform 3D observer. Normal observation works for every object (including tapes). Tape-scroll-mode is a distinct, opt-in activation of the tape's internal mechanisms.
-
-**Clarified behavior:**
-- `ObjectAnchor` (or WorldPoint) on a TapeObject → normal cinematic 3D observation of the tape plane as a 3D object.
-- `TapeScroll` target → explicitly enters tape-scroll-mode: camera uses tape local measurements + internal sheet logic (local pan, reveal timing, focus) while the outer camera pose accounts for the tape's world_transform.
-- Legacy `CameraMove` on root tape acts as tape-scroll for full backward compatibility.
-
-1. Redesign camera primitives:
-   - Keep `ObservationTarget`: `WorldPoint`, `ObjectAnchor`, `TapeScroll`.
-   - `TapeScroll` is the explicit "enter tape-scroll-mode" signal.
-2. Implement two observation paths:
-   - **Normal 3D observation** (default for WorldPoint + ObjectAnchor on any object, including tapes): resolve to world pose using object's transform + anchor; use 3D look-at / orbit / follow logic.
-   - **Tape-scroll observation** (only for TapeScroll): compute desired camera position from tape local_y (using internal measurement), transform through tape.world_transform, then activate scoped legacy sheet behaviors (local pan, focus, lazy reveal) inside that tape.
-3. Support smooth 3D camera for moving/rotating targets (tapes and free objects).
-4. Update timeline:
-   - `CameraKeyframe` with different target kinds drives the two paths.
-   - Keep `CameraMove` as sugar that maps to tape-scroll on root tape.
-5. Adapt scene execution:
-   - Resolve targets against the object registry.
-   - Only run tape-internal reveal/focus machinery when the current observation is a TapeScroll.
-6. **Milestone:** 
-   - `ObjectAnchor` on a tape does pure 3D cinematic observation.
-   - `TapeScroll` activates full classic tape scroll + reveal behavior (local to the tape).
-   - Old pure-tape videos are bit-identical.
-   - Mixed scenes (3D objects + tape) work with explicit mode switching.
-
-**Dependencies:** Phase 2 (tapes as objects).
-**Success:** Existing tilt/inspect/sheet panning still work; new tape-targeted keyframes produce equivalent or better behavior.
-
-## Phase 4: Positioning, Relative Anchors & Transforms (Core Power)
-
-**Purpose:** Make relative/absolute positioning and object-relative camera natural.
-
-1. Implement resolution helpers:
-   - `resolve_position(target, relative_to=None)` → world coords. Supports centers, named anchors, local offsets on any object.
-2. Update `CanvasBuilder` and DSL with relative placement APIs (e.g., `place_relative_to(other_id, local_offset, style=...)`).
-3. Extend `TapeObject` (and other objects) to expose anchors (e.g., "top_edge", "content_center", custom).
-4. Update camera keyframes to support `target: {object_id: "...", anchor: "center"}`.
-5. Add support for object transforms affecting children (a rotated tape affects its internal local coords when observed).
-6. **Milestone:** Can author a scene with a tape at an angle + a 3D solid positioned relative to a point on the tape, with camera keyframing between them.
-
-**Dependencies:** Phase 3.
-**Success:** Relative positioning works for both regular objects and tape-local content.
-
-## Phase 5: Timeline, DSL & Builder Generalization
-
-**Purpose:** Make the authoring model support the new 3D world while keeping sheet ergonomics.
-
-1. Evolve `SheetDSL` → more general `WorldDSL` or `SceneGraph` (keep SheetDSL as sugar for tape-heavy cases).
-2. Timeline becomes a mix of:
-   - Object creation/placement (with world_transform or relative).
-   - Animations on objects (entry + state behaviors).
-   - Camera observations.
-   - Special actions (still supported inside tapes or generalized).
-3. Update builder methods to be context-aware (current tape context vs world).
-4. Support `add_raw` for low-level 3D objects.
-5. Backward compat layer: old builder calls implicitly target the default tape.
-6. Update IPC protocol (`get_preview_data`, etc.) to include object graph + observations.
-7. **Milestone:** New scenes can mix tape content and free 3D objects using the builder. Old scenes unaffected.
-
-**Dependencies:** Phases 1-4.
-**Success:** `CanvasBuilder` remains the primary authoring surface; complexity of 3D is opt-in.
-
-## Phase 6: Renderer-Agnostic Measurement & Layout (Deepen Existing Work)
-
-**Purpose:** Make the measurement protocol and layout fully object-local and ready for mixed 2D/3D.
-
-1. Expand the `MeasurementBackend` protocol (already started in `canvas/measurement/`) to support:
-   - Per-object-kind backends.
-   - 2D content inside tapes (current KaTeX path).
-   - 3D bounding / surface measurement for general objects.
-2. Make `LayoutEngine` always scoped to a specific object's local space (tapes get the full CSS+flex; other objects may use identity or simple rules).
-3. For content on a tape: measurement must be accurate for manim-web preview even when the tape is transformed in world space.
-4. Add "surface reporting" API on TapeObject (and other planar objects) so 3D renderers know where the 2D content lives.
-5. **Milestone:** Layout/measurement works correctly for content inside a transformed TapeObject.
-
-**Dependencies:** Phase 2 (tapes), Phase 1 (objects).
-**Success:** WYSIWYG fidelity preserved/improved; new measurement backends easy to plug (including future web-side ones).
-
-## Phase 7: manim-web Preview as Full 3D World + Special Tape Mode
-
-**Purpose:** Make the desktop live preview a true manim-web 3D renderer that handles the new model.
-
-1. Update preview data (from `sidecar_get_preview_data` / `get_preview_data`):
-   - Include full object graph with world transforms.
-   - List of observations / camera keyframes.
-   - Per-object "observation hints" or type info.
-2. In desktop/app:
-   - Enhance or replace current `LiveMeasurementPreview` with a 3D manim-web scene.
-   - Render all objects in world space.
-   - When playing observations:
-     - For regular 3D targets: use manim-web camera controls (moveTo, lookAt, orbit).
-     - For Tape targets: apply tape's world transform + invoke the existing high-fidelity sheet rendering logic projected onto the tape's plane (reuse rich text, math, etc. from current code).
-   - Support smooth camera interpolation between mixed targets.
-3. Add UI for 3D preview (orbit controls when in free space, "follow tape" button, etc.).
-4. Keep a "sheet-only" fallback or mode for pure legacy previews.
-5. **Milestone:** Loading a (future) mixed scene in desktop shows correct 3D layout + accurate tape content + camera keyframes that respect tape observation rules. Current pure-sheet projects still preview beautifully.
-
-**Dependencies:** Phases 3 (camera), 6 (measurement), 5 (data).
-**Success:** "manim-web powered preview from the very beginning" is now in a real 3D context, solving the 1-1 + gap issues at a deeper level.
-
-## Phase 8: Scene/Render Execution & Existing 3D Features Migration
-
-**Purpose:** Make the Manim runtime use the new model. Migrate current 3D-on-sheet features.
-
-1. Update `CanvasScene` (and `build_mobject`, etc.):
-   - Build a world object registry.
-   - For each TapeObject: build its local content using existing logic, then place the resulting group at the tape's world transform.
-   - General objects built directly in world space.
-2. Migrate special 3D behaviors:
-   - SolidLift/Rotate/Inspect → general object animations + "inspect" observation mode on the target object.
-   - Current tilt → part of tape or 3D object observation.
-   - Plot traces, etc. → behaviors attached to objects (still scoped to their local space when appropriate).
-3. Camera execution in scene now drives the generalized keyframe system.
-4. Keep full backward compat for existing scenes (they implicitly create a default tape at identity).
-5. Update reel cutter, export_sheet, etc. to handle world space (or per-tape).
-6. **Milestone:** `matemium render` and desktop render produce correct output for migrated scenes. 3D features work in the new unified model.
-
-**Dependencies:** All prior phases.
-**Success:** No regression on existing outputs; new 3D capabilities unlocked.
-
-## Phase 9: Builder Ergonomics, Extensibility & Polish
-
-**Purpose:** Make the new model pleasant to use and truly extensible (solving bloat).
-
-1. High-level builder APIs for the 3D world:
-   - `add_object(type=..., position=..., relative_to=...)`
-   - Context managers or `with builder.in_object_space(id): ...`
-   - Helpers for common patterns (e.g., "floating label relative to tape element").
-2. Full registration system (build on `register_element_builder`):
-   - Register new object kinds with: local build fn, measure fn, observation handler (for camera), preview recipe.
-3. Update project templates and `USAGE.md` to show mixed 3D + tape examples.
-4. Improve AI chat prompts / shared templates to generate code using the new abstractions.
-5. Performance, error messages, docs for relative positioning and observation modes.
-6. **Milestone:** Adding a new viz type (e.g. a custom diagram) requires only registering a handler + using it in a project helper — no core patches, works in both sheet and 3D contexts, previews correctly.
-
-**Dependencies:** Phase 8.
-**Success:** The engine feels "more granular and abstract" as intended.
-
-## Phase 10: Full Migration, Examples, Tests & Cutover
-
-**Purpose:** Productionize and clean up.
-
-1. Migrate all existing projects/demos to the new model (or keep compat shims + deprecate old paths).
-2. Create compelling demo scenes that showcase:
-   - Tape floating/rotated in 3D space.
-   - Camera moving between 3D solids and tapes.
-   - Relative positioning.
-   - Mixed content.
-3. Comprehensive test suite (unit for transforms/resolution, integration for camera + preview data, render parity tests).
-4. Update desktop UI (if needed) for new 3D preview features.
-5. Performance tuning, documentation, changelog.
-6. Optional: Deprecate old "sheet at z=0 only" assumptions in docs.
-7. **Final Milestone:** The 3D world model is the canonical architecture. Current sheet videos continue to be the easiest to author. New 3D capabilities are available without pain.
-
-**Dependencies:** Phase 9.
-**Success:** The ideas from the description are reality; future features are easier because of the abstraction.
-
-## Cross-Cutting Concerns & Tooling
-
-- **Testing strategy per phase:** Run existing test suite + render parity + new 3D preview smoke tests. Use `scripts/verify-*.sh` patterns.
-- **Desktop / IPC:** All phases must keep `get_preview_data`, `render_project`, etc. working. Extend payload gradually.
-- **manim-web specifics:** Coordinate closely with desktop/app changes. The preview player becomes the place where "observation mode" is most visible.
-- **AI / Authoring:** Update prompts in `shared/prompts/` and `USAGE.md` as soon as Phase 5 lands.
-- **Versioning:** Use feature flags or `canvas_mode` during transition.
-- **Documentation updates:** Touch `architecture.md`, `canvas/USAGE.md`, `desktop-architecture.md`, `project-spec.md`, `canvas/README.md` in relevant phases.
-
-## Suggested Ordering & Prioritization
-
-Follow the phases strictly (0 → 10). Within a phase, the numbered steps are intended to be done sequentially where dependencies exist.
-
-Start with Phase 0 + Phase 1 in parallel where possible (audit + modeling).
-
-After Phase 3, the "tape as object + general camera" vision is already demonstrable in preview + a simple scene.
-
-After Phase 7, the manim-web preview is delivering on the "from the very beginning" goal in the new model.
-
-## Open Questions to Resolve During Implementation
-
-- Exact name: `TapeObject`, `SheetObject`, `PlanarTape`?
-- How much of the old `CameraMove` / special timeline items to keep as sugar vs. migrate to `CameraObservation`.
-- Should free 3D objects also support a limited form of "local styling/layout" or stay explicit?
-- Performance model for very large scenes with many tapes/objects.
-- How "infinite" the 3D space needs to be vs. bounded for practical math videos.
-
-This plan applies the creative 3D-world ideas to reality in small, verifiable increments while directly addressing abstraction, preview fidelity, renderer independence, and avoiding future patching.
-
-**Next Step Recommendation:** Review this plan, prioritize/adjust phases if needed, then begin Phase 0 (audit + docs). We can create more detailed sub-plans or tickets per phase as we go.
-
----
-
-*This file is the living implementation roadmap. Update it as phases are completed.*
+# Free-World and Tape-Curtain Implementation Plan
+
+**Reconciled with the current engine: 2026-07-30**
+
+The earlier plan treated tapes as transformed planes inside the 3D world. That
+model is superseded. The supported design has a persistent free 3D world and
+isolated camera-facing tapes.
+
+## Implemented foundation
+
+- [x] `WorldTransform`, `WorldObject`, stable IDs, and registered object kinds
+- [x] persistent free-world construction before timeline execution
+- [x] cinematic inspection paths
+- [x] semantic-part state transitions
+- [x] stable-ID `ElementMorph`
+- [x] root and additional `TapeObject` local layouts
+- [x] automatic world → tape and tape → tape switching
+- [x] tape → world restoration that excludes all tape-owned content
+- [x] serialized `TapeScroll` and `scroll_tape()` authoring sugar
+- [x] isolated per-tape static export
+- [x] orbital flagship runtime proof
+
+## Architecture boundary
+
+```text
+Free world                    Selected tape
+-----------                   -------------
+3D transforms                 local 2D layout
+perspective camera            orthographic face-on camera
+registered objects            text/math/flex/embedded solids
+semantic actions              lazy reveal/local scroll
+
+          one visible context at a time
+```
+
+Physical tape poses, tape fly-arounds, and simultaneous visible tapes are not
+part of the current contract.
+
+## Near-term work
+
+### 1. Runtime visibility
+
+- [ ] Centralize visible-context state rather than inferring it from membership
+  in `scene.mobjects`.
+- [ ] Ensure every action type can update a hidden world object without adding
+  it to an active tape shot.
+- [ ] Add a minimal world → tape A → tape B → world render fixture.
+
+### 2. Preview parity
+
+- [ ] Emit active presentation context and tape ownership in preview data.
+- [ ] Make the desktop preview hide the same ID sets as `CanvasScene`.
+- [ ] Compare representative transition frames, not every frame.
+
+### 3. Transition styling
+
+- [ ] Add reusable fade/curtain timing parameters.
+- [ ] Preserve hard isolation regardless of visual transition style.
+- [ ] Keep camera reset and content transition in one deterministic action.
+
+### 4. World authoring
+
+- [ ] Evaluate how relative placement and named anchors should mature for free
+  objects.
+- [ ] Evaluate reusable traversal actions for sampled paths and poses.
+- [ ] Validate low-level world/tape target IDs before runtime.
+
+The first two items are open design questions, not an accepted implementation
+plan. Real projects are evidence and test cases; they must not produce
+subject-specific engine contracts. Candidate directions, alternatives, and
+decision criteria are recorded in
+[`SPATIAL_AUTHORING_OPEN_QUESTIONS.md`](SPATIAL_AUTHORING_OPEN_QUESTIONS.md).
+
+### 5. Packaging
+
+- [ ] Exercise registered project-local kinds in frozen sidecars.
+- [ ] Verify fonts, LaTeX, FFmpeg, and renderer behavior on each desktop target.
+- [ ] Keep bundled projects source-only; do not ship rendered videos.
+
+## Verification policy
+
+For every general engine repair:
+
+1. prove the defect with a focused test or reproducible project action;
+2. implement the smallest reusable contract;
+3. run structural checks and relevant unit tests;
+4. execute the complete project timeline at economical settings;
+5. inspect only representative frames/transitions needed for visual evidence;
+6. keep domain-specific calculations in project helpers.
+
+## Acceptance
+
+The implementation is mature when:
+
+- tape content is always upright and readable;
+- the world never leaks behind a tape;
+- prior tapes never return during a world shot;
+- tape-to-tape switching never stacks content;
+- hidden world state changes appear on reopening;
+- desktop preview and final render agree on the active context;
+- additional flagship projects use the same contracts without engine branches
+  keyed to their topics.

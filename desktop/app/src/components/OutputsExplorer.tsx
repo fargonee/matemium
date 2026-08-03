@@ -17,10 +17,11 @@ const KIND_LABELS: Record<string, string> = {
   tex: "LaTeX cache",
   text: "Text cache",
   image: "Images",
+  document: "Documents",
   other: "Other",
 };
 
-const KIND_ORDER = ["preview", "video", "partial", "tex", "text", "image", "other"];
+const KIND_ORDER = ["preview", "video", "image", "document", "partial", "tex", "text", "other"];
 
 const CLEAR_OPTIONS: { kind: CacheKind; label: string }[] = [
   { kind: "partials", label: "Partial movies" },
@@ -208,7 +209,7 @@ export function OutputsExplorer({
         {loading && !data ? (
           <p className="outputs-empty">Loading outputs…</p>
         ) : filteredEntries.length === 0 ? (
-          <p className="outputs-empty">No outputs yet — render a scene to populate this list</p>
+          <p className="outputs-empty">No outputs yet — render a scene or export a tape</p>
         ) : (
           KIND_ORDER.filter((kind) => grouped.has(kind)).map((kind) => {
             const entries = grouped.get(kind) ?? [];

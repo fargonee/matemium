@@ -130,9 +130,9 @@ Required contracts:
 - `element_spec(CanvasElement(...))` — any custom element in a flex row (topic code uses this from project `helpers.py`)
 - `text_spec`, `math_spec`, `observation_spec` — flex item dicts
 
-The root tape exists automatically and is the production-safe default.
-Additional tapes have automatic context-switch machinery, but that path is
-experimental and every switch must be inspected in an actual preview.
+The root tape exists automatically and remains the simplest production path.
+Additional tapes retain independent local layout. At runtime exactly one tape
+is presented face-on; it is not placed or rotated in the free 3D world.
 
 **Camera & focus**
 
@@ -144,25 +144,36 @@ experimental and every switch must be inspected in an actual preview.
 
 **Tape and 3D world model**
 
-The current public tape API creates isolated 2D layout contexts. Root-tape
-reveal activates local scroll, lazy reveal, focus, and flex behavior
-automatically.
-`add_tape()` rejects `position`, `rotation`, and `scale`; old
-`set_tape_pose()` examples are not current API.
+The public tape API creates isolated 2D layout contexts. Root-tape reveal
+activates classic local scroll, lazy reveal, focus, and flex behavior.
+When content from a tape becomes active, that tape closes over the current
+camera like a curtain:
 
-`scroll_tape()` remains in the builder source but is not usable in the current
-runtime because the `TapeScroll` DSL target is absent. Do not generate it.
+- world → tape: free-world objects disappear and the tape becomes readable;
+- tape → tape: the new tape replaces the previous foreground tape;
+- tape → world: the tape opens and only free-world objects are restored.
+
+Context changes use a short opacity fade around an instantaneous camera cut.
+Camera position, angle, and zoom never interpolate between tape and world
+coordinate systems. Once the world is visible, later keyframes in the same
+`add_camera_inspect()` path may animate normally.
+
+Tapes do not accept `position`, `rotation`, or `scale`. Use `scroll_tape()` for
+an explicit tape selection/local-Y move; ordinary tape-element reveal also
+switches contexts automatically.
 
 Free 3D objects use `add_object()` / `add_world_object()` and explicit
-observation. The architecture records a broader future model for transformed
-tapes, but arbitrary physical tape observation remains experimental and must
-not be advertised from structural types alone.
+observation. `add_object(..., id=...)` preserves a stable author-selected ID.
 
 Authoring examples:
+
 - `add_object("Solid3D", position=(x,y,z), ...)`
-- `left = add_tape("left")`; `right = add_tape("right")`; then author with `left.add_body(...)` / `right.add_body(...)`
-- reveal content from `left`, then `right`, then `left` again only when the
-  resulting context switches will be preview-tested
+- `analysis = add_tape("analysis", frame_width=6.4, frame_height=4.8)`
+- use `scroll_tape(tape_id="analysis", local_y=...)` for an explicit switch
+- author with `analysis.add_body(...)`; small solids can also be embedded with
+  `analysis.add_solid(...)`
+- return to free 3D with `observe_object(...)`, `add_camera_keyframe(...)`, or
+  `add_camera_inspect(...)`
 
 `add_solid_lift(...)` is specifically for raising 3D solids above a tape for orbit/inspection. Do not use it as a tape switching or tape stacking mechanism.
 
@@ -223,7 +234,25 @@ scene = builder.to_scene()
 scene.export_full_sheet("my_reasoning", full_tape=True, format="png")
 ```
 
-`full_tape=True` exports the entire written tape in its natural shape (no forced 9:16 or 16:9 crop).
+`full_tape=True` exports the entire written tape in its natural shape (no forced
+9:16 or 16:9 crop). The exporter rebuilds the tape in local document
+coordinates, so the video camera and any world/camera rotation cannot flip,
+offset, or stretch the result. For projects containing more than one populated
+tape, select one explicitly:
+
+```python
+scene.export_full_sheet(
+    "worked_solution",
+    full_tape=True,
+    tape_id="main",
+    format="png",
+)
+```
+
+Without `high_res_height`, export density follows the canvas's native pixels per
+logical unit. Long tapes are rendered in tiles and stitched at that consistent
+resolution. Pass `high_res_height=2160` when an exact final image height is
+preferred.
 
 ### Mixing with raw control
 

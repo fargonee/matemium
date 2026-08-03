@@ -8,6 +8,7 @@ from manim.utils.rate_functions import smooth
 
 from .coords import inspect_target_from_mob
 from .dsl import CameraInspect
+from .dsl import ObservationMode
 from .inspect_path import compile_inspect_segments, resolve_inspect_keyframes
 
 if TYPE_CHECKING:
@@ -65,6 +66,18 @@ class InspectEngine:
         segments = compile_inspect_segments(keyframes, base_target, curve=curve)  # type: ignore[arg-type]
 
         self.scene.registry.pause_far_updaters(self.camera_ctl.current_y, buffer=5.0)
+
+        entered_from_tape = (
+            getattr(self.scene, "_observation_mode", None)
+            == ObservationMode.TAPE_SCROLL
+        )
+        if entered_from_tape and segments:
+            first = segments.pop(0)
+            self.scene._enter_world_context(initial_pose=first.to_pose)
+            if first.hold > 0:
+                self.scene.wait(first.hold)
+        else:
+            self.scene._enter_world_context()
 
         for segment in segments:
             rate = _rate_func(segment.rate_func)

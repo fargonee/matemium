@@ -1,48 +1,48 @@
-# Authoring feedback — DNA to Protein
+# Authoring feedback — DNA to Protein clarity revision
 
-## Current evidence
+## Revision outcome
 
-- Structured sequence records generate the DNA template, complementary mRNA,
-  codons, amino-acid labels, and stop signal from one source.
-- `Diagram` expresses spatial scale, nuclear processing/export, translation,
-  and the amino-acid chain.
-- Semantic `StateTransition` advances through scale contexts and codons.
-- `ElementMorph` transforms the ordered residue window into a schematic
-  spatial arrangement.
-- `check_project` passes with 44 authored timeline items and no diagnostics.
+- Preserved the dark scientific palette and one persistent `BiologyScaleWorld`.
+- Enlarged primary world objects and introduced high-contrast DejaVu Sans labels.
+- Made cell, nucleus, chromosome, gene region, and DNA region explicit.
+- Limited boundary spheres to the cell and nucleus stages.
+- Added a visibly opened DNA region and five RNA-assembly progress states.
+- Added separate pre-mRNA, splicing, mature-mRNA, and nuclear-pore export states.
+- Repeated codon highlight, tRNA/amino-acid arrival, peptide growth, and ribosome
+  advance across all five codons; stop has no amino-acid delivery.
+- Replaced dense explanatory paragraphs with six short isolated tapes.
+- Removed the unsupported `FUNCTION` conclusion. The finale now ends at
+  `DNA → RNA → CODONS → PROTEIN`.
 
 ## Engine changes required
 
-None. General diagrams, semantic addressing, transforms, flex layout, math,
-root-tape travel, and focus cover the project without biology-specific engine
-behavior.
+None. The revision is project composition: a registered project-local world and
+project-local `BioText` kind composed through existing morph, camera, tape,
+flex, and validation contracts.
 
-## Authoring and visual findings
+## Render and visual evidence
 
-- Applying `stroke_width` to a semantic diagram node also thickened its text
-  glyphs. Modest scale-only emphasis remained readable.
-- Repeating direction labels inside every codon card created clutter. Separate
-  strand-direction labels around one aligned sequence row were clearer.
-- Diagram connectors crossed compact residue labels even with buffer values;
-  ordered nodes plus a separate text chain were safer.
-- Structural validity did not catch the scientific implication that a
-  four-residue chain might look like a realistic folded protein. Domain review
-  prompted an explicit on-screen boundary.
+- Updated draft: `outputs/dna_to_protein/media/videos/810p30/DNAToProtein.mp4`.
+- H.264, 1440×810 landscape, 30 fps, 71.292839 seconds, 115 animations.
+- Inspected a five-second contact sheet and full frames at 15, 27, 37, 48, 56,
+  64, 67.5, and 71 seconds.
+- Verified the actual rendered DNA opening, complete RNA row, intron departure,
+  labelled pore, translation clearance, top-down protein label, and corrected
+  final sentence.
+- All six corrected tapes were also exported at 810-pixel height and inspected;
+  the first translation layout collision was repaired into two rows before the
+  final render.
 
-## Honest remaining limitations
+## Honest limitations
 
-- There is no shared sequence cursor binding DNA bases, codons, tRNAs, and
-  residues to one reactive index; the project stages semantic snapshots.
-- Spatial scale is a traceable ladder, not a nested-coordinate camera journey.
-- The fold morph is conceptual and cannot predict or represent molecular
-  structure.
-- Preview acceptance does not replace a final 1920×1080 render or independent
-  molecular-biology review.
+- Scale transitions are cinematic levels of detail, not metric zoom.
+- The exon/intron blocks explain processing but are not coordinates in the
+  displayed 15-base coding window.
+- Molecular machinery and protein geometry are procedural schematics.
+- The four-residue trace is not a realistic protein or structure prediction.
+- Independent molecular-biology sign-off and the 1920×1080 master remain pending.
 
-## Generalizable maturity conclusion
+## Readiness
 
-The engine can explain a multistage biological information transformation with
-structured source, semantic tokens, spatial contexts, and geometry morphing.
-Keyed sequences, shared cursors, and nested coordinate spaces would be broadly
-useful future abstractions, but they should be designed across language,
-history, algorithms, and biology rather than as gene-expression special cases.
+Visually inspected 30 fps flagship draft and strong website-showcase candidate.
+Not final-master or independently domain-approved.

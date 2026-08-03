@@ -496,17 +496,14 @@ unless this note explicitly resolves them.
    deprecation warnings. Record and address them deliberately rather than treating green tests as
    proof of warning-free compatibility.
 10. **The root tape is the mature default.** `CanvasBuilder` creates it
-    automatically. Do not create a redundant `main` tape. Additional tapes and
-    automatic context switching are experimental until real multi-tape renders
-    establish the needed parity.
-11. **`TapeScroll` is missing.** `scroll_tape()` imports a DSL type that does not
-    exist in the current source, so neither it nor old `TapeScroll(...)`
-    examples are usable. Use automatic root-tape reveal or `add_camera_move()`
-    until a dedicated engine task restores or removes the contract.
-12. **World-object ergonomics are incomplete.** `add_object()` can emit a root
-    object and return its generated ID, but caller-supplied ID/relative
-    composition behavior is not yet a mature public guarantee. Prefer
-    tape-local `add_solid(id=...)` plus inspection for production work.
+    automatically. Do not create a redundant `main` tape. Additional tapes are
+    isolated camera-facing contexts, not physical planes in the 3D world.
+11. **Context isolation is mandatory.** World → tape hides the world and other
+    tapes; tape → tape replaces the foreground; tape → world restores only
+    free-world objects. `scroll_tape()`/`TapeScroll` explicitly selects a tape.
+12. **World-object composition needs evidence.** `add_object(..., id=...)`
+    supports stable IDs and transforms, but low-level relative placement and
+    camera keyframes still require project preview evidence.
 
 These risks are a starting backlog, not permission to refactor everything during the next project.
 Address them deliberately when a project or dedicated engine task supplies a clear contract and

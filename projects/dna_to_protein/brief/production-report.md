@@ -2,32 +2,41 @@
 
 ## Outcome
 
-- **Project behavior completed:** Function hook, multiscale ladder,
-  complementary transcription, nuclear processing/export, addressable
-  codon-to-amino-acid translation, stop signal, chain morph, and explicit
-  folding boundary.
+- **Project behavior:** One registered world now explicitly stages cell,
+  nucleus, chromosome, selected DNA, DNA opening, RNA assembly, processing,
+  export, codon-by-codon translation, and a bounded schematic protein.
 - **Engine behavior changed:** None.
-- **Authoring check:** 44 authored timeline items with no diagnostics.
-- **Accepted preview:** 960×540, 15 fps, 52.064063 seconds, 2,071,178 bytes,
-  and 67 rendered animations.
-- **Mute verification:** One H.264 video stream and no audio stream.
+- **Project-local work:** Expanded `BiologyScaleWorld` semantic states and added
+  registered `BioText` for explicit DejaVu Sans tape typography.
+- **Structural gate:** Strict DSL validation passed with 86 timeline items, six
+  tapes, and one world object.
+- **Focused test:** DNA sequence/world synchronization passed.
+- **Source gate:** Python compilation and targeted Ruff checks passed.
+- **Draft:** H.264, 1440×810 landscape, 30 fps, 71.292839 seconds, 115 animations.
 
-## Visual and scientific repair record
+## Visual repair and inspection
 
-1. The first preview exposed unreadable node labels because state transitions
-   applied large stroke widths to entire semantic node groups.
-2. Node emphasis was reduced to modest scale changes; transcription became a
-   simpler aligned row; the chain geometry was tightened; diagram connectors
-   that crossed residue labels were removed.
-3. Full-frame review then showed clean scale, processing, translation, and fold
-   sections.
-4. Domain review caught a conceptual risk: four residues could be mistaken for
-   a realistic folded protein. A third preview added an explicit limitation and
-   changed the synthesis to folding plus maturation before function.
+The first 30 fps revision exposed two remaining defects: serif tape typography
+and diagonally clipped labels during the final protein orbit. Tape content was
+recomposed with project-local sans-serif text, translation instructions were
+split into two readable rows, translation zoom was reduced for tRNA clearance,
+and the protein observation became near top-down.
+
+The repaired video was inspected through a five-second contact sheet and full
+frames at 15, 27, 37, 48, 56, 64, 67.5, and 71 seconds. These frames verify the
+scale title, complete transcription state, splicing, pore export, translation,
+model boundary, readable protein label, and corrected finale. Six static tape
+exports at 810-pixel height supplied additional layout evidence.
+
+## Domain evidence
+
+The deterministic mapping remains
+`TAC GGA TTT CCG ACT → AUG CCU AAA GGC UGA → Met Pro Lys Gly Stop`.
+Processing is explicitly presented as a separate schematic rather than exon
+coordinates in the tiny teaching sequence. The ending no longer asserts an
+unshown protein function.
 
 ## Honest readiness
 
-The preview is accepted as a bundled flagship candidate. Public delivery still
-requires an inspected 1920×1080 master and independent molecular-biology
-sign-off. The final source explicitly identifies its sequence, processing, and
-folding simplifications.
+Visually inspected 30 fps flagship draft; website-showcase candidate. A final
+1920×1080 master and independent molecular-biology review remain pending.

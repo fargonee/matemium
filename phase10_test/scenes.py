@@ -3,7 +3,7 @@
 Copy this into a project as scenes.py (with a matching assets.py).
 
 Exercises:
-- Default root_tape + posed/rotated TapeObject in 3D space
+- Default root tape + explicit camera-facing tape curtain
 - World objects placed with absolute + relative transforms
 - builder.add_object (registered kinds)
 - builder.add_world_object
@@ -72,7 +72,7 @@ class Phase10Comprehensive(CanvasScene):
     """Comprehensive test of the unified infinite 3D space model (Phase 10).
 
     Features demonstrated:
-    - Tape posed in 3D (rotated)
+    - Camera-facing tape context
     - Traditional tape content (headings, math, flex, 3D graphs inside the tape)
     - Free world objects (Solids, Axes, custom Marker)
     - Absolute + relative placement (add_object + add_relative)
@@ -87,28 +87,20 @@ class Phase10Comprehensive(CanvasScene):
             canvas_settings=CanvasSettings.for_reels(title="Phase 10 3D Test"),
         )
 
-        # === 1. Content inside the (soon to be rotated) root tape ===
+        # === 1. Content inside the camera-facing root tape ===
         builder.add_heading("Phase 10: Unified 3D Space", style={"align": "center", "margin-bottom": 0.6})
         builder.add_body(
-            "The old infinite tape is now a TapeObject that can live anywhere in 3D space.",
+            "The tape is an isolated reasoning context beside a free 3D world.",
             style={"margin-bottom": 0.8},
         )
         builder.add_math(r"\vec{r} = (x, y, z)", style={"margin-bottom": 0.6})
 
-        # Pose the tape in 3D (XZ ground, Y up)
-        positions = test_assets.get_test_positions()
-        builder.set_tape_pose(
-            position=(0.0, 0.0, 0.0),
-            rotation=(22, -18, 5),   # pitch, yaw, roll (degrees)
-            scale=1.0,
-        )
-
         builder.add_body(
-            "Everything below lives in the tape's local 2D plane, even though the plane itself is tilted in world space.",
+            "Everything below lives in the tape's local 2D layout.",
             style={"margin-top": 0.3, "margin-bottom": 0.8},
         )
 
-        # Flex + math inside the rotated tape
+        # Flex + math inside the tape
         builder.add_flex_row(
             [
                 builder.text_spec("Flex still works →", style={"align": "right"}),
@@ -250,7 +242,7 @@ class LegacyCompatScene(CanvasScene):
 
 
 # ------------------------------------------------------------------
-# Scene that mixes posed tape + many world objects
+# Scene that alternates a tape with many world objects
 # ------------------------------------------------------------------
 class MixedWorldTour(CanvasScene):
     """Another mixed scene for deeper testing."""
@@ -258,10 +250,8 @@ class MixedWorldTour(CanvasScene):
     def __init__(self, **kwargs):
         b = CanvasBuilder(title="Mixed World Tour")
 
-        b.set_tape_pose(rotation=(30, 12, 0))
-
         b.add_heading("Mixed 3D Tour")
-        b.add_body("One rotated tape + several independently placed 3D objects.")
+        b.add_body("One tape curtain + several independently placed 3D objects.")
 
         # Several world objects at different locations
         b.add_object("Solid3D", id="c1", position=(5, 0, 1), content={"shape": "cube", "size": 0.9})

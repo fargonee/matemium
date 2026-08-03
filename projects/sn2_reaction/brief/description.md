@@ -4,89 +4,72 @@
 
 - **Subject:** Chemistry
 - **Project slug:** `sn2_reaction`
-- **Status:** Portrait flagship preview accepted; final master and independent chemistry sign-off pending
-- **Central question:** How can bond formation and bond breaking occur in one coordinated molecular event?
+- **Status:** 1080×1920/30 fps master rendered and visually inspected; independent chemistry sign-off pending
+- **Central question:** How can bond formation, bond breaking, and inversion be one molecular event?
 - **Primary audience:** Introductory organic chemistry learners
-- **Target format:** 9:16 portrait flagship master, approximately 50–65 seconds; a landscape adaptation may follow
+- **Target format:** silent 9:16 portrait flagship, approximately 30 seconds
 
 ## Purpose
 
-This project explains the mechanism, geometry, and energy profile of a standard
-elementary SN2 substitution. It makes backside approach and coordinated bond
-change spatially understandable without pretending that molecular bonds are
-rigid sticks.
-
-The accepted portrait scene coordinates two reviewable views: a molecular
-node-and-bond projection and a qualitative reaction-energy profile. Curved
-electron-pair arrows remain a future extension rather than a capability implied
-by this version.
+This project makes an SN2 mechanism spatially readable on a phone. It treats
+backside approach, concerted bond change, the energy maximum, and Walden
+inversion as observations of one persistent 3D molecular event instead of
+separate slides.
 
 ## Learning outcomes
 
 The viewer should understand:
 
-- the roles of nucleophile, electrophilic carbon, and leaving group;
-- why approach occurs opposite the leaving group;
-- that bond formation and bond breaking are concerted;
-- what the transition state represents;
-- why stereochemical inversion results;
-- why steric crowding changes reaction accessibility.
+- which atoms are the nucleophile, stereocentre, and leaving group;
+- that attack occurs opposite the leaving group, approximately along the C—Br
+  axis;
+- that C—O formation and C—Br breaking happen together;
+- that the transition state is an energy maximum, not an intermediate;
+- that inversion is a geometry change, not an effect of camera rotation.
 
 ## Narrative arc
 
-1. **The puzzle:** Show reactants and products with an inverted center; ask what happened in between.
-2. **Identify roles:** Highlight electron-rich nucleophile, electrophilic carbon, and leaving group.
-3. **Backside approach:** Rotate to a spatially useful view and expose the accessible orbital direction.
-4. **Concerted event:** Animate forming and breaking bonds together while the central geometry flattens.
-5. **Transition state:** Pause at the energy maximum and show partial bonds with restrained notation.
-6. **Inversion:** Complete the passage and compare starting and final stereochemistry.
-7. **Energy view:** Synchronize molecular progress with a marker moving along the energy profile.
-8. **Steric comparison:** Briefly contrast an accessible substrate with a crowded one.
-9. **Synthesis:** Reassemble mechanism, energy, and geometry in one final coordinated view.
+1. Identify the reaction and its atoms.
+2. Establish backside alignment in a stable side view.
+3. Animate the concerted bond change and freeze the transition state.
+4. Replay the event beside a synchronized energy marker.
+5. Compare reactant and product configurations under one fixed reference.
+6. Close with one concise synthesis.
 
 ## Visual and motion direction
 
-- Use chemically conventional atom colors while maintaining accessible contrast.
-- Distinguish full, partial, forming, and breaking bonds visually.
-- Any future curved arrows must represent electron-pair movement and terminate
-  at chemically meaningful locations.
-- The current project uses a stable 2D teaching projection rather than implying
-  trustworthy molecular rotation or dynamics.
-- The energy diagram should present the same three registered states as the
-  molecular view. Until a general shared-clock binding exists, staged state
-  changes must be described honestly rather than called exactly synchronized.
-- Labels must use correct charge, lone-pair, and transition-state notation.
+- Use conventional, persistent atom colors and explicit labels.
+- Keep the chemically decisive camera locked after one establishing move.
+- Distinguish forming and breaking bonds with dashed partial bonds, labels,
+  progressive geometry, and a clear transition-state freeze.
+- Keep all text large, short, high-contrast, and inside portrait safe margins.
+- Use a reference plane and identical camera for stereochemical comparison.
+- Derive energy marker and molecule from the same authored reaction-progress
+  state.
 
-## Matemium capabilities this project must demonstrate
+## Matemium capabilities demonstrated
 
-- structured molecular diagrams in 2D and spatial 3D-like arrangement;
-- synchronized reaction coordinate and energy plot;
-- morphing between molecular states;
-- semantic node, edge, and state annotations;
-- stable identity-preserving 2D molecular projections;
-- comparison of two mechanistic scenarios;
-- reusable atom, bond, orbital, and reaction-profile helpers.
-
-## Required source and assets
-
-- Build the molecular model procedurally from a compact atom-and-bond definition.
-- Use a deliberately simple representative reaction with documented stereochemistry.
-- External molecular files are optional, but the bundled project must not depend on them.
-- Include a source comment identifying the chemical simplifications made for visualization.
+- a persistent registered 3D world with semantic molecular parts;
+- camera observation without scene reset;
+- identity-preserving world morphs;
+- one state coordinating 3D geometry and a 2D scientific representation;
+- multiple observations inside one world, plus a deliberately isolated tape;
+- project-local domain composition without engine special cases.
 
 ## Scope boundaries
 
-- Do not generalize the mechanism to every substitution reaction.
-- Do not animate atoms colliding mechanically as if bonds were springs.
-- Do not show an isolable intermediate; SN2 has a transition state, not a stable intermediate.
-- Do not introduce solvent effects, kinetics derivations, and competing E2 behavior unless needed in a short closing note.
+- The procedural geometry is a teaching model, not an optimized structure.
+- The energy curve is qualitative, not a computed universal profile.
+- No stable intermediate is depicted.
+- No molecular dynamics, electron density, solvent model, or kinetic derivation
+  is implied.
 
 ## Acceptance criteria
 
-- A chemistry reviewer can verify every arrow, charge, bond state, and stereochemical claim.
-- Backside attack and inversion remain visually unambiguous throughout.
-- Molecular and energy-coordinate states correspond through the same three
-  registered stages; the project does not claim continuous synchronization.
-- The transition state is clearly distinguished from reactants, products, and intermediates.
-- The scene renders without external media and remains editable through structured molecular data.
-- The result demonstrates that Matemium can explain spatial microscopic processes, not merely display formulas.
+- Atom identities and reaction sides are readable at normal phone size.
+- The 180° backside relationship is understood before bond change begins.
+- Both partial bonds coexist visibly at the transition state.
+- The molecular transition state and energy maximum coincide.
+- Inversion cannot be confused with camera rotation.
+- The result renders offline at 1080×1920 and 30 fps with no external media.
+- Independent chemistry review is obtained before claiming domain approval.

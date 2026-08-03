@@ -21,9 +21,9 @@
   },
   "language": "English",
   "scientific_depth": "conceptual two-body introduction with low-Earth-orbit reference values",
-  "visual_direction": "dark editorial canvas, normalized trajectory plots, stable regime colors, semantic vector freeze-frame",
+  "visual_direction": "persistent volumetric Earth and orbital world alternating with four camera-facing tape curtains, embedded tape solid, stable regime colors, attached semantic vectors, restrained cinematic camera paths",
   "tone": "precise, surprising, modern",
-  "pacing": "short readable claims followed by inspectable trajectory and vector state changes",
+  "pacing": "camera-led alternation between one persistent physical model and compact readable tape curtains",
   "audio": {
     "final_track": "none",
     "must_remain_understandable_without_sound": true
@@ -40,11 +40,12 @@
     "three speeds produce re-entry, circular orbit, and positive-energy escape",
     "velocity and acceleration directions are visually distinct",
     "the circular-speed equation follows its geometric referents",
-    "preview render is inspected at representative timestamps"
+    "low-resolution runtime smoke completes",
+    "cinematic preview receives human composition acceptance"
   ],
   "readiness": {
     "status": "ready",
     "missing_fields": []
   },
-  "last_updated": "2026-07-27"
+  "last_updated": "2026-08-03"
 }

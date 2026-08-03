@@ -161,6 +161,7 @@ export function RenderModal({
           value={quality}
           onChange={(e) => onQualityChange(e.target.value)}
         >
+          <option value="fast_preview">Fast preview — quarter resolution, 10 fps</option>
           <option value="preview">Preview — fast, half resolution</option>
           <option value="low">Low — default</option>
           <option value="medium">Medium</option>

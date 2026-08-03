@@ -51,7 +51,9 @@ Events may arrive **between** the request write and the matching response line. 
 | `lint_project` | `workspace` | `{ ok, diagnostics[], workspace }` |
 | `check_project` | `workspace`, (`scene`?) | `{ ok, errors[], warnings[], scene, timeline_length?, title? }` |
 | `list_scenes` | `workspace` | `{ scenes[], workspace }` |
+| `list_tapes` | `workspace`, (`scene`?) | `{ tapes[], default_tape_id, scene, workspace }` |
 | `render_project` | `workspace`, (`scene`?, `quality`, `output_dir`) | `{ video, workspace, scene, duration_estimate }` |
+| `export_project_tape` | `workspace`, `tape_id`, (`scene`?, `format`?, `high_res_height`?, `output_dir`?) | `{ path, format, tape_id, pixel_width, pixel_height, size_bytes }` |
 | `get_preview_data` | `{ projectId }` (maps to workspace + optional scene) | `{ elements: PreviewElement[], frame_width, frame_height, title?, orientation? }` — drives the manim-web live preview with authoritative layout |
 
 Optional: `path` — alternate scenes file relative to workspace (default `scenes.py`).
@@ -84,7 +86,7 @@ schemas, semantic-part targets, state patches, and morph targets.
 |-------|------------|-------------|
 | `output_dir` | render, export, preview, cut | Tauri-managed job directory |
 | `job_id` | render, export, preview | Fallback id under `outputs/desktop/<id>/` |
-| `quality` | render, preview, export | `preview` \| `draft` \| `low` \| `medium` \| `high` \| `final` |
+| `quality` | render, preview, export | `fast_preview` \| `preview` \| `draft` \| `low` \| `medium` \| `high` \| `final` |
 | `strict` | `validate_dsl` | Reject legacy dev-only timeline types (default `true`) |
 
 Current inline DSL recognizes `DataPath`, `DataPlot`, and `Diagram` elements,

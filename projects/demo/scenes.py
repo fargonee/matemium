@@ -280,8 +280,7 @@ FlexTicTacToeDemo = TicTacToeTutorial
 
 
 class Space3DDemo(CanvasScene):
-    """Demo of mixed 3D world with rotated TapeObject, floating 3D solids,
-    relative positioning, using newest authoring patterns.
+    """Demo of a free 3D world alternating with camera-facing tapes.
 
     - `observe_object("id")` for normal 3D view
     - `scroll_tape(local_y=...)` for tape-scroll mode
@@ -293,23 +292,19 @@ class Space3DDemo(CanvasScene):
     def __init__(self, **kwargs):
         builder = CanvasBuilder(title="3D Space Demo")
 
-        # Pose the main tape in 3D space (tilts the plane itself). Camera in tape-scroll
-        # mode will automatically look straight down the local normal (from above).
         tape = builder.add_tape("main_tape")
         
 
         # Tape content in its local space (old sheet ergonomics preserved)
         tape.add_heading("3D World Demo", style={"align": "center"})
         tape.add_body(
-            "The infinite tape is now a TapeObject inside 3D space. "
-            "It can be rotated and positioned arbitrarily.",
+            "The tape is a readable camera-facing context beside a free 3D world.",
             style={"margin-bottom": 0.8},
         )
         tape.add_math(r"\vec{r} = (x, y, z)", style={"margin-bottom": 0.5})
 
         tape.add_body(
-            "Content inside the tape still uses familiar flex, styling, and lazy reveal — "
-            "but the whole plane lives in 3D.",
+            "Content inside the tape uses familiar flex, styling, and lazy reveal.",
             style={"margin-top": 0.4, "margin-bottom": 0.8},
         )
 
@@ -341,19 +336,16 @@ class Space3DDemo(CanvasScene):
             scale=0.7,
         )
 
-        # Demonstrate a second top-level tape as a first-class 3D object
+        # Demonstrate a second isolated top-level tape.
         info_tape = builder.add_tape("info_card")
-        with builder.in_object_space(info_tape):
-            tape.add_body("Tilted secondary tape", style={"align": "center"})
+        info_tape.add_body("Secondary tape curtain", style={"align": "center"})
 
         # === Camera tour using newest patterns ===
         # Normal 3D: observe_object (cinematic, no tape logic)
         builder.observe_object("cube1", run_time=3.0)
         
-        # Face-on: perfectly align camera to an object's face
-        builder.observe_object("info_card", framing="face_on", run_time=2.0)
-
-        # Tape-scroll mode: scroll_tape (internal tape logic)
+        # Close the secondary tape over the free world.
+        builder.scroll_tape(tape_id="info_card", local_y=0.0, run_time=2.0)
 
         # Back to world point (normal 3D)
         builder.add_camera_keyframe(
@@ -361,7 +353,7 @@ class Space3DDemo(CanvasScene):
             duration=2.5,
         )
 
-        # Visit the secondary info tape in pure 3D
-        builder.observe_object("info_card", run_time=2.0)
+        # Visit the secondary tape again.
+        builder.scroll_tape(tape_id="info_card", local_y=0.0, run_time=2.0)
 
         super().__init__(dsl=builder.build(), **kwargs)

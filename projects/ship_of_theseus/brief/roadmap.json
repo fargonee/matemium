@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "project_slug": "ship_of_theseus",
+  "production_path": "mute_video",
+  "current_phase": "mute_delivery",
+  "phases": [
+    {"id": "description", "label": "Creative description", "status": "complete", "evidence": ["brief/description.md"]},
+    {"id": "passport", "label": "Passport and mute path", "status": "complete", "evidence": ["brief/passport.json"]},
+    {"id": "tape_content", "label": "Visible content", "status": "complete", "evidence": ["brief/tapes/main.md"]},
+    {"id": "orchestration", "label": "Visual orchestration", "status": "complete", "evidence": ["brief/orchestration.md"]},
+    {"id": "authoring", "label": "Scene and helper authoring", "status": "complete", "evidence": ["scenes.py", "helpers.py", "check_project: 36 timeline items, no diagnostics"]},
+    {"id": "tape_review", "label": "Full-tape export and visual review", "status": "complete", "evidence": ["2096x7971 PNG inspected", "first tape accepted without repair"]},
+    {"id": "mute_delivery", "label": "Validated mute-video delivery", "status": "pending", "evidence": ["full-tape proof accepted", "final 1920x1080 master pending"]}
+  ],
+  "invalidated_phases": [],
+  "blockers": [],
+  "next_action": "Render and inspect the final 1920x1080 mute master during the showcase export cycle.",
+  "last_updated": "2026-07-30"
+}

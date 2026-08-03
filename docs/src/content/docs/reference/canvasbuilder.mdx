@@ -6,6 +6,12 @@ description: A concise map of the stable high-level Matemium authoring API.
 `CanvasBuilder` collects content and timeline intent, then produces the internal
 representation consumed by `CanvasScene`.
 
+This page documents implemented methods. Persistent parent-relative movement,
+generic traversal, surface-relative positioning, and arbitrary-surface
+geodesics are not current API promises. Matemium is evaluating those questions
+through real projects, and no candidate design has been accepted or rejected.
+See the [open spatial-authoring discussion](https://github.com/fargonee/math/blob/main/SPATIAL_AUTHORING_OPEN_QUESTIONS.md).
+
 ```python
 builder = CanvasBuilder(title="My Explanation")
 builder.add_heading("A clear question")  # root tape is automatic
@@ -111,14 +117,15 @@ The target of a morph is a `CanvasElement`, not another builder call.
 | --- | --- |
 | `add_camera_focus(id, ...)` | Isolate or overlay-focus an existing element |
 | `add_camera_move(dy, ...)` | Legacy explicit tape movement |
+| `scroll_tape(tape_id=..., local_y=...)` | Select and locally scroll one foreground tape |
 | `add_camera_keyframe(target=..., ...)` | General 3D observation keyframe |
 | `observe_object(target, ...)` | Experimental world-object observation |
 | `add_camera_inspect(id, path=..., ...)` | Inspect a 3D object along a path |
 
-Normal root-tape content scrolls and reveals automatically. Although a
-`scroll_tape()` method remains in the builder source, it is not part of the
-current usable contract because its `TapeScroll` target type is absent from the
-runtime DSL.
+Normal root-tape content scrolls and reveals automatically. `scroll_tape()`
+uses the serialized `TapeScroll` target to select an explicit camera-facing
+tape. The tape hides the free world and every other tape until a world camera
+action opens it.
 
 ## 3D objects
 

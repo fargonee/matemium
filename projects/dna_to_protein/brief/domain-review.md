@@ -1,6 +1,6 @@
 # Domain review — DNA to Protein
 
-**Review date:** 2026-07-27  
+**Review date:** 2026-08-03
 **Reviewer:** AI source-and-sequence review; independent molecular-biology
 review remains recommended before public sign-off.
 
@@ -43,11 +43,13 @@ review remains recommended before public sign-off.
 
 - The sequence is fictional and intentionally tiny.
 - Its four-residue product is not presented as a realistic protein.
-- The processing diagram is generic; the short displayed coding sequence does
+- The processing tape and pore world are generic; the short displayed coding sequence does
   not explicitly model exon coordinates, caps, tails, splice variants, or
   regulatory regions.
-- Transcription and translation machinery are semantic diagrams rather than
-  molecular structures.
+- Exon and intron blocks are a separate schematic processing model; they are
+  not asserted to be coordinates within the displayed 15-base teaching window.
+- Transcription and translation machinery are procedural spatial schematics
+  rather than molecular structures.
 - The fold morph is a conceptual spatial change, not structure prediction.
 - Regulation, editing, degradation, localization, post-translational
   modification detail, and genetic-code exceptions are outside scope.
@@ -55,4 +57,4 @@ review remains recommended before public sign-off.
 ## Unresolved review items
 
 - Obtain independent molecular-biology review before final domain approval.
-- The preview is not the final 1920×1080 website master.
+- The inspected 1440×810, 30 fps draft is not the final 1920×1080 website master.

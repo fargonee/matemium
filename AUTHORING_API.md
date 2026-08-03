@@ -1,12 +1,18 @@
 # Matemium authoring API
 
-**Current engine specification:** 2026-07-27  
+**Current engine specification:** 2026-07-30
 **Authority:** current `canvas/` and `matemium/` source plus executable tests
 
 This is the concise, source-aligned reference for authoring projects with the
 current Matemium engine. The public documentation site provides task-oriented
 guides; [`canvas/USAGE.md`](canvas/USAGE.md) provides longer examples; exact
 signatures remain authoritative in [`canvas/builder.py`](canvas/builder.py).
+
+This document describes implemented authoring behavior. Persistent
+parent-relative movement, generic traversal, surface-relative positioning, and
+arbitrary-surface geodesics are not current API promises. Their possible
+design is explicitly open; see
+[`SPATIAL_AUTHORING_OPEN_QUESTIONS.md`](SPATIAL_AUTHORING_OPEN_QUESTIONS.md).
 
 ## 1. Authoring boundary
 
@@ -60,9 +66,14 @@ additional tapes only when the narrative genuinely benefits from separate
 canvases:
 
 ```python
-method = builder.add_tape("method")
+method = builder.add_tape(
+    "method",
+    frame_width=6.4,
+    frame_height=4.8,
+)
 method.add_heading("Method")
 method.add_body("Content authored through this object belongs to that tape.")
+builder.scroll_tape(tape_id="method", local_y=0.0)
 ```
 
 ## 3. Stable high-level methods
@@ -77,7 +88,7 @@ method.add_body("Content authored through this object belongs to that tape.")
 | `add_concept` | builder | Small title/explanation/formula composition |
 | `add_flex_row`, `add_flex_column` | builder | Independently addressable flex items |
 | `text_spec`, `math_spec`, `element_spec`, `observation_spec` | spec dict | Flex item specifications |
-| `add_tape` | `TapeBuilder` | A separate 2D content canvas |
+| `add_tape` | `TapeBuilder` | An isolated, camera-facing 2D presentation canvas |
 | `add_data_path` | element ID | Generic sampled path |
 | `add_data_plot` | element ID | Generic sampled plot |
 | `add_diagram` | element ID | Generic node-edge diagram |
@@ -90,8 +101,9 @@ method.add_body("Content authored through this object belongs to that tape.")
 | `add_element_morph` | builder | Replace one compiled visual with another |
 | `add_camera_focus` | builder | Isolate or overlay focus |
 | `add_camera_move` / `auto_camera` | builder | Explicit or suggested root-tape movement |
+| `scroll_tape` | builder | Select one foreground tape and move within its local layout |
 | `add_camera_keyframe` | builder | Low-level world observation keyframe |
-| `observe_object` | builder | Experimental world-object observation sugar |
+| `observe_object` | builder | World-object observation sugar |
 | `add_camera_inspect` | builder | Keyframed 3D inspection |
 
 ### 3D and low-level composition
@@ -101,7 +113,7 @@ method.add_body("Content authored through this object belongs to that tape.")
 | `add_3d` | builder | Equation-backed mathematical surface |
 | `add_solid` | builder | Built-in volumetric solid |
 | `add_solid_lift`, `add_solid_rotate` | builder | Solid actions |
-| `add_object` | object ID | Experimental registered/free world object |
+| `add_object` | object ID | Registered/free world object with optional stable ID and transform |
 | `add_relative` | element ID | Low-level relative placement |
 | `add_raw` | builder | Low-level `CanvasElement` or `WorldObject` |
 
@@ -357,14 +369,18 @@ Use this matrix when choosing an authoring method:
 | --- | --- | --- |
 | Production authoring | root-tape text/math, rich runs, block style, flex, `DataPath`, `DataPlot`, `Diagram`, `StateTransition`, `ElementMorph`, focus, portrait/landscape settings | Implemented, exercised by tests and real project renders |
 | Specialized but usable | equation-backed surfaces, `Solid3D`, solid lift/rotation/inspection, static full-sheet export, legacy grid/quadratic helpers | Implemented; requires target-orientation preview evidence |
-| Experimental | additional tapes and automatic context switching, `add_object`, `add_world_object`, `add_camera_keyframe`, `observe_object`, relative world placement | Structural support exists, but world-camera parity and composition ergonomics are not a flagship-safe default |
-| Not a current contract | arbitrary physical tape transforms; generic timed traversal of `DataPath`/`DataPlot`; reactive bindings/shared clocks; timed audio/media; automatic domain-specific layouts | Do not advertise or fake these with lesson-specific engine patches |
+| Production spatial composition | additional camera-facing tapes, automatic curtain switching, explicit `scroll_tape`, `add_object`, stable-ID world morphs, `add_camera_inspect` | Exercised by the orbital flagship and engine tests |
+| Experimental | `add_world_object`, low-level `add_camera_keyframe`, `observe_object`, relative world placement | Structural support exists, but composition ergonomics still require preview evidence |
+| Not a current contract | arbitrary physical tape transforms or simultaneous visible tapes; generic timed traversal of `DataPath`/`DataPlot`; reactive bindings/shared clocks; timed audio/media; automatic domain-specific layouts | Do not advertise or fake these with lesson-specific engine patches |
 
-`scroll_tape()` exists as builder sugar but is **not currently usable** because
-the runtime `TapeScroll` target type is absent from the current DSL. Use normal
-automatic root-tape reveal or `add_camera_move()` in production work. Treat
-older examples that import or construct `TapeScroll` as design-history
-examples, not current authoring instructions.
+The tape/world boundary is deliberate. A selected tape fills the presentation
+context and hides the free world and every other tape. Selecting another tape
+replaces it; inspecting a world object opens it. This prevents unreadable
+compositing and keeps analytical text camera-facing.
+
+The boundary is an opacity fade around a camera cut, not a camera move. On a
+tape-to-world inspect path, the first authored shot is the cut destination;
+subsequent shots remain available for purposeful movement within the world.
 
 The generic visuals are sampled and static between timeline actions. Use
 `StateTransition` and `ElementMorph` for staged changes. They do not yet share a

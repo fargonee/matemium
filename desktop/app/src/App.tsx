@@ -13,6 +13,8 @@ import type {
   ProjectSummary,
   Settings,
   SidecarEventPayload,
+  TapeExportFormat,
+  TapeExportResult,
   VideoOrientation,
   ChatCompletionResponse,
   AgentTraceEntry,
@@ -29,6 +31,7 @@ import { OutputsExplorer } from "./components/OutputsExplorer";
 import { ProjectMediaLibrary } from "./components/ProjectMediaLibrary";
 import { MediaPreviewModal } from "./components/MediaPreviewModal";
 import { RenderModal } from "./components/RenderModal";
+import { TapeExportModal } from "./components/TapeExportModal";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { BottomDock } from "./components/BottomDock";
 import { ResizeHandle } from "./components/ResizeHandle";
@@ -349,6 +352,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<"general" | "models">("general");
   const [renderOpen, setRenderOpen] = useState(false);
+  const [tapeExportOpen, setTapeExportOpen] = useState(false);
   const [outputsRefreshToken, setOutputsRefreshToken] = useState(0);
   const [mediaPreview, setMediaPreview] = useState<MediaPreviewItem | null>(null);
   const [readiness, setReadiness] = useState<api.Readiness | null>(null);
@@ -1124,6 +1128,50 @@ export default function App() {
       if (!renderCancelledRef.current) {
         setBusy(false);
       }
+    }
+  };
+
+  const handleTapeExport = async (options: {
+    scene: string;
+    tapeId: string;
+    format: TapeExportFormat;
+    highResHeight: number | null;
+  }): Promise<TapeExportResult> => {
+    if (!project) throw new Error("Open a project before exporting a tape.");
+    try {
+      setBusy(true);
+      await flushDirtyFiles();
+      appendLog(
+        `[tape-export] starting scene=${options.scene} tape=${options.tapeId} format=${options.format}`,
+      );
+      const result = await api.sidecarExportTape(
+        project.id,
+        options.tapeId,
+        options.scene,
+        options.format,
+        options.highResHeight,
+      );
+      setOutputsRefreshToken((value) => value + 1);
+      setActiveWorkspaceItem("renders");
+      const dimensions =
+        result.pixel_width && result.pixel_height
+          ? ` · ${result.pixel_width}×${result.pixel_height}`
+          : "";
+      setStatusMessage(
+        `Tape exported · ${result.format.toUpperCase()}${dimensions}`,
+        "ok",
+      );
+      appendLog(
+        `[tape-export] path=${result.path}${dimensions}`,
+      );
+      return result;
+    } catch (error) {
+      const message = formatError(error);
+      setStatusMessage(message, "error");
+      appendLog(`[tape-export-error] ${message}`);
+      throw error;
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -2081,6 +2129,24 @@ export default function App() {
                 </div>
                 <button
                   type="button"
+                  className="btn btn-ghost toolbar-tape-export"
+                  disabled={busy || linting || saving || !isReady}
+                  title="Export a complete tape as an upright PNG or PDF document"
+                  onClick={() => {
+                    if (!isReady) {
+                      setStatusMessage("App not ready — " + readinessMessage, "idle");
+                      return;
+                    }
+                    setTapeExportOpen(true);
+                  }}
+                >
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M5.5 2.5h9v3h-9zM4 5.5h12v12H4zM7 9h6M7 12h6M7 15h4" />
+                  </svg>
+                  Export tape
+                </button>
+                <button
+                  type="button"
                   className="btn btn-primary"
                   disabled={busy || linting || saving || !renderAllowed}
                   onClick={() => {
@@ -2370,7 +2436,7 @@ export default function App() {
                 messages={chatMessages}
                 pendingEdit={pendingEdit}
                 input={chatInput}
-                busy={busy}
+                busy={chatBusy}
                 contextMatches={chatContextMatches}
                 validationErrors={appliedEditErrors}
                 onFixErrors={handleFixAppliedEditErrors}
@@ -2461,6 +2527,28 @@ export default function App() {
         onClose={() => setMediaPreview(null)}
         onStatus={(message, kind = "ok") => setStatusMessage(message, kind)}
       />
+
+      {project ? (
+        <TapeExportModal
+          open={tapeExportOpen}
+          projectId={project.id}
+          scenes={scenes}
+          scene={selectedScene}
+          busy={busy}
+          onSceneChange={updateSelectedScene}
+          onClose={() => setTapeExportOpen(false)}
+          onPrepare={prepareForValidation}
+          onExport={handleTapeExport}
+          onPreview={(path) => {
+            const item = mediaPreviewItemFromPath(path);
+            if (item) {
+              setTapeExportOpen(false);
+              setMediaPreview(item);
+            }
+          }}
+          onStatus={(message, kind) => setStatusMessage(message, kind)}
+        />
+      ) : null}
 
       {project ? (
         <RenderModal

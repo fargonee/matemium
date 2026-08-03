@@ -187,15 +187,12 @@ class EmWaves(CanvasScene):
             content={"shape": "cylinder", "size": 0.8},
         )
 
-        # Create a secondary "key formulas" tape floating at an angle
+        # Create a secondary camera-facing "key formulas" tape.
         key_tape = builder.add_tape(
             "key_formulas",
-            position=(4, 2, -2),
-            rotation=(10, 40, 5),
         )
-        with builder.in_object_space(key_tape):
-            tape.add_math(r"\nabla \times \vec{E} = -\frac{\partial \vec{B}}{\partial t}")
-            tape.add_math(r"c = \frac{1}{\sqrt{\mu_0 \varepsilon_0}}")
+        key_tape.add_math(r"\nabla \times \vec{E} = -\frac{\partial \vec{B}}{\partial t}")
+        key_tape.add_math(r"c = \frac{1}{\sqrt{\mu_0 \varepsilon_0}}")
 
         # Camera sequence using new observation modes to "animate" the content
         # Normal 3D view of the wave concept object
@@ -203,8 +200,8 @@ class EmWaves(CanvasScene):
 
         # Enter tape-scroll mode on the main tilted tape
 
-        # Look at the secondary formulas panel in 3D
-        builder.observe_object(key_tape, run_time=2.5)
+        # Explicitly close the formulas tape over the world.
+        builder.scroll_tape(tape_id="key_formulas", local_y=0.0, run_time=2.5)
 
         # Pure 3D fly-around
         builder.add_camera_keyframe(target=WorldPoint(position=(2, 3, 10)), duration=2.5)

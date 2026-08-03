@@ -4,7 +4,7 @@
 
 - **Subject:** General Education
 - **Project slug:** `clean_water_system`
-- **Status:** First authored prototype complete; engine feedback recorded; flagship render not yet accepted
+- **Status:** Full-tape authoring proof accepted; final mute-video master and independent water-systems review pending
 - **Central question:** What happens between a natural water source and safe water arriving at a tap?
 - **Primary audience:** General learners, families, and classroom audiences
 - **Target format:** 16:9 flagship master, approximately 2–3 minutes

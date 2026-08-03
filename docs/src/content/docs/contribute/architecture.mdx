@@ -116,6 +116,12 @@ Subject recipes belong in `projects/<name>/helpers.py`:
 This boundary allows Matemium to expand across subjects without forcing every
 topic into its core API.
 
+The same rule applies to ongoing 3D authoring research. Real projects are used
+as evidence and acceptance tests, but they do not determine subject-specific
+engine APIs. The possible abstractions for relative movement, traversal, and
+surface-aware authoring remain undecided; see the
+[open spatial-authoring discussion](https://github.com/fargonee/math/blob/main/SPATIAL_AUTHORING_OPEN_QUESTIONS.md).
+
 ## Current generic contracts
 
 `DataPath`, `DataPlot`, and `Diagram` provide shared build/measurement
@@ -127,11 +133,10 @@ synchronized action. `ElementMorph` recompiles a target `CanvasElement` and
 replaces the source registry object. `CanvasScene` validates these contracts
 strictly before render by default.
 
-The automatic root tape is the mature default. Additional-tape switching and
-free-world camera composition are experimental; `scroll_tape()` is currently
-unusable because its `TapeScroll` target is absent from the DSL. Architecture
-plans that describe that target are design records rather than current API
-evidence.
+The automatic root tape is the mature default. Additional tapes are isolated,
+camera-facing presentation contexts. Revealing tape content or calling
+`scroll_tape()` closes that tape over the world; a world observation opens it
+and restores only free-world objects.
 
 See the [CanvasBuilder reference](/reference/canvasbuilder/) and
 [Data visuals and transitions](/authoring/data-visuals-and-transitions/).

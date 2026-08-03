@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Union
 
-from manim import DOWN, LEFT, RIGHT, BackgroundRectangle, Mobject, Text, VGroup, WHITE
+from manim import DOWN, LEFT, RIGHT, BackgroundRectangle, Mobject, Rectangle, Text, VGroup, WHITE
 
 DEFAULT_TEXT_FONT_SIZE = 36
 
@@ -122,14 +122,58 @@ def _run_mobject(run: TextRun) -> Mobject:
     return mob
 
 
-def _line_width(line: Sequence[Mobject]) -> float:
+def _space_advance(run: TextRun, count: int) -> float:
+    """Measure whitespace that Manim omits from standalone Text bounds."""
+    if count <= 0:
+        return 0.0
+    kwargs: Dict[str, Any] = {"font_size": run.font_size, "color": run.color}
+    if run.bold:
+        kwargs["weight"] = "BOLD"
+    if run.italic:
+        kwargs["slant"] = "ITALIC"
+    probe = "n"
+    with_spaces = Text(probe + (" " * count) + probe, **kwargs)
+    without_spaces = Text(probe + probe, **kwargs)
+    return max(0.0, with_spaces.width - without_spaces.width)
+
+
+def _run_parts(run: TextRun) -> List[Mobject]:
+    """Return a run plus explicit layout objects for omitted edge whitespace."""
+    mob = _run_mobject(run)
+    leading = len(run.text) - len(run.text.lstrip(" "))
+    trailing = len(run.text) - len(run.text.rstrip(" "))
+    parts: List[Mobject] = []
+    if leading:
+        parts.append(
+            Rectangle(
+                width=_space_advance(run, leading),
+                height=1e-6,
+                stroke_width=0,
+                fill_opacity=0,
+            )
+        )
+    parts.append(mob)
+    if trailing:
+        parts.append(
+            Rectangle(
+                width=_space_advance(run, trailing),
+                height=1e-6,
+                stroke_width=0,
+                fill_opacity=0,
+            )
+        )
+    return parts
+
+
+def _line_width(line: Sequence[TextRun]) -> float:
     if not line:
         return 0.0
-    return VGroup(*line).arrange(RIGHT, buff=0.0, aligned_edge=DOWN).width
+    parts = [part for run in line for part in _run_parts(run)]
+    return VGroup(*parts).arrange(RIGHT, buff=0.0, aligned_edge=DOWN).width
 
 
 def _runs_to_line_mobjects(runs: Sequence[TextRun]) -> Mobject:
-    parts = [_run_mobject(r) for r in runs]
+    parts = [part for run in runs for part in _run_parts(run)]
     if not parts:
         return Text(" ", font_size=DEFAULT_TEXT_FONT_SIZE, color=WHITE)
     if len(parts) == 1:
@@ -153,7 +197,7 @@ def _break_runs_to_lines(runs: Sequence[TextRun], max_width: float) -> List[List
 
     for run in runs:
         trial = current + [run]
-        if _line_width([_run_mobject(r) for r in trial]) <= max_width:
+        if _line_width(trial) <= max_width:
             current = trial
             continue
 

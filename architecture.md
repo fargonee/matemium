@@ -10,34 +10,33 @@ Output can target 9:16 short-form video or 16:9 long-form explanation.
 
 ## 2. Core Architectural Paradigm
 
-The root is one **infinite 3D space** (XZ ground, Y up by convention). The legacy "infinite sheet" is a special `TapeObject` inside that space.
+The renderer supports two presentation contexts:
 
-- **The sheet:** The infinite tape is the **XY plane at `z = 0`**. Text, math, plots, and anchored 3D graphs live here by default.
-- **Z axis:** Depth — grid marks lifted slightly above the sheet, optional explicit `z` on elements, future camera dolly. Not a separate “2D mode.”
-- **The viewport:** A 9:16 frame whose center pans along `(x, y, 0)` down the sheet.
-- **The elements:** Stateless components anchored at `(x, y, z)` canvas coordinates.
-- **The engine:** Scrolls the camera on the sheet; zoom crops the frame on the plane; optional **tilt** only for 3D surface moments.
+- **Free world:** one shared 3D coordinate system (XZ ground, Y up by
+  convention) containing transformed objects and cinematic camera paths.
+- **Tape:** one isolated camera-facing 2D layout with local XY coordinates,
+  vertical flow, flex, focus, lazy reveal, and optional embedded solids.
+- **Context switch:** a tape closes over the current camera; opening it returns
+  to the free world. Tapes are not physical planes inside the world.
 
-**Canonical model (clarified model — see `3D-WORLD-DESCRIPTION.md`):**
+**Canonical model (see `3D-WORLD-DESCRIPTION.md`):**
 
-The following is the target architecture. As of 2026-07-27, the public
-high-level contract is narrower: tapes are isolated 2D layout contexts,
-`add_tape()` rejects physical transforms, and arbitrary transformed-tape
-observation is not production-supported. Free world objects are experimental,
-and the source-level `scroll_tape()` method is unusable because `TapeScroll` is
-not defined in the current DSL. See `AUTHORING_API.md`.
+As of 2026-07-30, Matemium has two deliberately separate presentation
+contexts: a free 3D world and camera-facing 2D tapes. Free registered objects
+have world transforms and cinematic observation. Tapes own local layout but
+do not have physical world poses.
 
-The root is one **infinite 3D space** (XZ ground / Y up). The legacy "tape/sheet" is a special `TapeObject` inside the world.
+**Observation model:**
+- World targets use normal cinematic 3D behavior.
+- Tape reveal or `TapeScroll` closes one tape over the camera, hiding the world
+  and all other tapes.
+- Selecting a different tape replaces the foreground context.
+- Selecting or inspecting a world target opens the tape and restores only
+  free-world objects.
+- Tape-local layout, flex, focus, lazy reveal, and scrolling stay 2D.
 
-**Target observation model (not current API):**
-- Every object (tapes included) is observed by default with normal cinematic 3D behavior (look-at, orbit, follow transforms).
-- Free 3D objects do not get tape-like features.
-- A future `TapeScroll` target would explicitly activate a tape's internal 2D mechanisms.
-- The outer camera always respects a tape's `world_transform`, even in scroll mode.
-- Current classic/root-tape videos use automatic reveal and legacy
-  `CameraMove`; they do not require `TapeScroll`.
-
-See `3D-WORLD-DESCRIPTION.md` and `canvas/3D-model.md` for the full model, terminology, and current status. Architecture and camera implementation still need work to fully realize the separation between normal 3D observation and tape-scroll-mode.
+See `3D-WORLD-DESCRIPTION.md` and `canvas/3D-model.md` for the full model,
+terminology, remaining serialization limits, and runtime evidence.
 
 ## 3. Data Schema (The Sheet DSL)
 Claude, we will not write pure Manim scripts directly. We will build a JSON/YAML-based layout specification (or a lightweight Python DSL) that compiles into a Manim scene. 

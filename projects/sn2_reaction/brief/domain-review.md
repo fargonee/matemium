@@ -1,6 +1,6 @@
 # Domain review — SN2 Reaction
 
-**Review date:** 2026-07-27  
+**Review date:** 2026-08-03
 **Reviewer:** AI source-and-structure review; independent chemistry review still
 recommended before public scientific sign-off.
 
@@ -12,11 +12,8 @@ recommended before public scientific sign-off.
 3. The transition state contains partial nucleophile–carbon and
    carbon–leaving-group bonds.
 4. Backside passage produces stereochemical inversion at the reacting center.
-5. Steric crowding obstructs backside approach and generally slows the SN2
-   pathway.
-6. For the standard elementary case shown, the rate law is
-   `rate = k[Nu⁻][R–Br]`. The scene does not claim that every reaction
-   classified as SN2 must exhibit that observed kinetic law.
+5. A one-maximum reaction-coordinate profile is consistent with the scene's
+   concerted, no-intermediate explanation.
 
 ## Evidence
 
@@ -29,30 +26,29 @@ recommended before public scientific sign-off.
 
 ## Deterministic checks
 
-- The qualitative reaction coordinate contains 81 ordered samples.
-- Its only maximum lies between the reactant and product endpoints.
-- The selected product endpoint lies below the reactant endpoint; this is a
-  deliberate illustrative exergonic profile, not a universal SN2 claim.
-- Reactant, transition-state, and product diagrams each have unique stable node
-  identities.
-- The transition-state diagram contains both partial bonds and no intermediate
-  state.
+- Molecule geometry and energy marker are derived from the same normalized
+  `progress` value.
+- At progress 0.5, both dashed partial bonds and the energy maximum are shown.
+- Reactant, transition-state, and product observations preserve stable atom and
+  substituent identities.
+- No intermediate state or intermediate energy well is presented.
 
 ## Assumptions and simplifications
 
 - `HO⁻ + R–Br` is a generic teaching example, not a specified solvent/temperature
   experiment.
-- `R¹`, `R²`, and `R³` are identity markers in a 2D stereochemical projection.
-- Atom circles and straight bond edges are explanatory notation, not scale
+- H, CH3, and CH2CH3 are labelled persistent identities in a procedural 3D
+  teaching geometry; this is not a named, optimized molecular structure.
+- Atom spheres and straight bond segments are explanatory notation, not scale
   models of electron density or molecular motion.
 - The energy curve is qualitative and intentionally omits solvent, entropy,
   isotope, and competing-pathway effects.
-- The molecular and energy panels correspond by registered stages rather than
-  a continuous physical simulation.
+- The molecular and energy views share a continuous authored progress value,
+  but that value is not a physical simulation or general engine clock.
 
 ## Unresolved review items
 
 - Obtain independent organic-chemistry review before labeling the final master
   “domain approved.”
-- The preview is an authoring-stage artifact, not the final 1080×1920 website
-  master.
+- Verify the exact stereochemical labelling and teaching geometry against the
+  final master during independent review.

@@ -245,10 +245,14 @@ def build_data_plot(
     all_points = [point for item in series for point in _points(item.get("points"))]
     x_range = list(data.get("x_range") or _range(point[0] for point in all_points))
     y_range = list(data.get("y_range") or _range(point[1] for point in all_points))
+    # Axes lengths are construction dimensions. Building at one width and then
+    # scaling to the resolved layout width also scales the authored height,
+    # causing the rendered plot to escape its layout box and overlap neighbors.
+    plot_width = float(target_width or data.get("width", 8.0))
     axes = Axes(
         x_range=x_range,
         y_range=y_range,
-        x_length=float(data.get("width", 8.0)),
+        x_length=plot_width,
         y_length=float(data.get("height", 4.5)),
         tips=bool(data.get("tips", False)),
     )
@@ -278,6 +282,13 @@ def build_data_plot(
     group = _attach_parts(VGroup(*visuals), parts)
     if target_width and group.width > 0:
         group.set_width(float(target_width))
+    target_height = (
+        float(elem.layout.height)
+        if elem.layout is not None
+        else float(data.get("height", 4.5))
+    )
+    if group.height > target_height:
+        group.set_height(target_height)
     return group
 
 

@@ -56,6 +56,7 @@ def render_quality_config(
     """Map CLI quality presets to Manim tempconfig fields.
 
     Profiles:
+    - ``fast_preview`` — quickest iteration (quarter resolution, 10 fps)
     - ``preview`` — fast iteration (half resolution, 15 fps)
     - ``draft`` / ``low`` — default dev renders
     - ``medium`` — sharper draft
@@ -65,6 +66,7 @@ def render_quality_config(
     # Do not set Manim's ``quality`` preset here — presets like ``low_quality`` force
     # 854×480 landscape and ignore portrait pixel_width/height from CanvasSettings.
     profiles = {
+        "fast_preview": {"frame_rate": 10, "scale": 0.25},
         "preview": {"frame_rate": 15, "scale": 0.5},
         "draft": {"frame_rate": 30, "scale": 0.75},
         "low": {"frame_rate": 30, "scale": 1.0},

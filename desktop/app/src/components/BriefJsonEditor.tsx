@@ -54,6 +54,12 @@ const LOCKED_ROADMAP_PREVIEW: RoadmapPreviewPhase[] = [
   { id: "preview-custom-audio-final-assembly", route: "custom_audio", title: "Final assembly", notes: "Attach approved audio without avoidable video quality loss.", locked: true },
 ];
 
+const SHARED_PHASES = [
+  { id: "project_creation", title: "Project creation", notes: "The workspace and initial idea are preserved." },
+  { id: "description", title: "Project description", notes: "Settle the rare-changing description through collaboration." },
+  { id: "passport", title: "Passport and production path", notes: "Resolve the production identity and explicitly select a production path." },
+];
+
 export function BriefJsonEditor({ file, value, onChange, readOnly = false }: BriefJsonEditorProps) {
   let data: JsonObject;
   try {
@@ -102,7 +108,26 @@ export function BriefJsonEditor({ file, value, onChange, readOnly = false }: Bri
     </div></div>;
   }
 
-  const phases = Array.isArray(data.phases) ? data.phases as JsonObject[] : [];
+  const savedPhases = Array.isArray(data.phases) ? data.phases as JsonObject[] : [];
+  const savedById = new Map(savedPhases.map((phase) => [String(phase.id), phase]));
+  const canonicalPhase = (phase: { id: string; title: string; notes: string }): JsonObject => {
+    const saved = savedById.get(phase.id) ?? {};
+    const savedStatus = String(saved.status ?? (phase.id === "project_creation" ? "done" : "todo"));
+    const status = savedStatus === "complete" ? "done" : savedStatus === "pending" ? "todo" : savedStatus;
+    return {
+      ...saved,
+      id: phase.id,
+      title: phase.title,
+      notes: phase.notes,
+      status,
+      progress: saved.progress ?? (status === "done" ? 100 : 0),
+    };
+  };
+  const trunkPhases = SHARED_PHASES.map(canonicalPhase);
+  const canonicalBranch = data.production_path === "mute_video" || data.production_path === "tts" || data.production_path === "custom_audio"
+    ? LOCKED_ROADMAP_PREVIEW.filter((phase) => phase.route === data.production_path).map(canonicalPhase)
+    : [];
+  const phases = [...trunkPhases, ...canonicalBranch];
   const currentPhase = String(data.current_phase ?? "");
   const phaseProgress = (phase: JsonObject) => {
     const value = Number(phase.progress ?? 0);
@@ -120,8 +145,7 @@ export function BriefJsonEditor({ file, value, onChange, readOnly = false }: Bri
   const invalidated = Array.isArray(data.invalidated_phases) ? data.invalidated_phases.map(String) : [];
   const hasConcretePath = data.production_path === "mute_video" || data.production_path === "tts" || data.production_path === "custom_audio";
   const concretePath = hasConcretePath ? data.production_path as RoadmapRoute : null;
-  const trunkPhases = phases.slice(0, 3);
-  const actualBranch = phases.slice(3);
+  const actualBranch = canonicalBranch;
   const routePhases = (route: RoadmapRoute): Array<JsonObject | RoadmapPreviewPhase> => {
     if (route === concretePath) return actualBranch;
     return LOCKED_ROADMAP_PREVIEW.filter((phase) => phase.route === route);

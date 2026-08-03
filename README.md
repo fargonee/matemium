@@ -161,10 +161,10 @@ Save as `projects/my_lesson/scenes.py`, then `./matemium.sh render my_lesson`.
 - **3D solids** — `add_solid(shape="cube", ...)`, `add_solid_lift(id, lift=1.8)`, `add_camera_inspect(id, path=[...])`
 - **Escape hatch** — `add_raw(CanvasElement(...))` for full DSL control
 
-The production-safe default is the automatic root tape. Additional tapes and
-free-world object/camera composition are experimental and require render
-evidence. `scroll_tape()` is not currently usable because the DSL does not yet
-define its `TapeScroll` target. See the capability-maturity table in
+The production-safe default is the automatic root tape. Additional tapes are
+camera-facing curtains: one selected tape hides the free world and all other
+tapes, and a world observation opens it again. `scroll_tape()` explicitly
+selects a tape and local position. See the capability-maturity table in
 [`AUTHORING_API.md`](AUTHORING_API.md).
 
 Topic-specific calculations and recipes belong in `projects/<name>/helpers.py`,
@@ -203,8 +203,14 @@ Export the full reasoning tape as PNG or PDF (natural aspect, no forced crop):
 
 ```python
 scene = builder.to_scene()
-scene.export_full_sheet("my_sheet", format="png", full_tape=True)
+scene.export_full_sheet(
+    "my_sheet",
+    format="png",
+    full_tape=True,
+)
 ```
+
+Use `tape_id="main"` when selecting among multiple populated tapes.
 
 ## Reel cutting
 
@@ -261,10 +267,8 @@ cutter.cut(input_video=..., output_dir=..., manifest=manifest)
 - Move legacy grid/quadratic builder methods into project helpers
 - Reauthor and visually validate the flagship projects with the current generic primitives
 - Generic timed traversal/trace over `DataPath` or `DataPlot` (the old `PlotTrace` remains quadratic-specific)
-- Restore or redesign a real `TapeScroll` DSL target before documenting
-  `scroll_tape()` as usable
-- Harden additional-tape and free-world camera composition before treating it
-  as a flagship-safe default
+- Keep additional-tape and free-world curtain composition covered by preview
+  and runtime regressions as more flagship projects adopt it
 - Dedicated future work for unfinished world-camera seams and timed media/audio
 - SolutionTape integration as canvas elements
 - Reel cutting polish (audio, titles, padding)

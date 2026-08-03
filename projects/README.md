@@ -69,12 +69,20 @@ learning, and general education. Each project includes:
 
 - `brief/description.md` with its intended outcome and acceptance criteria;
 - deterministic `helpers.py` subject data/calculations;
-- a first-pass `scenes.py`;
-- `AUTHORING_FEEDBACK.md` from the pre-mutation engine authoring pass.
+- a source-visible `scenes.py`;
+- `AUTHORING_FEEDBACK.md` recording the strongest current evidence.
 
-These sources are engine evidence and reauthoring inputs. Fourier epicycles has
-an accepted preview; the other ten are not yet accepted showcase renders. See
-[`flagship_library.md`](flagship_library.md).
+These sources are engine evidence and reauthoring inputs. SN2 Reaction,
+Feedback Control, and DNA to Protein now have visually inspected world-first
+cinematic previews; final masters and independent domain sign-off remain
+separate gates. See [`flagship_library.md`](flagship_library.md).
+
+Orbit, Feedback Control, SN2 Reaction, and DNA to Protein also expose repeated
+manual 3D positioning and movement work. They are evidence for an open
+cross-subject spatial-authoring discussion, not templates for subject-specific
+engine APIs. No proposed relative-movement, surface, or geodesic API has been
+accepted or rejected. See
+[`../SPATIAL_AUTHORING_OPEN_QUESTIONS.md`](../SPATIAL_AUTHORING_OPEN_QUESTIONS.md).
 
 ## Generic cross-subject authoring
 
@@ -93,9 +101,14 @@ in `helpers.py`.
 ## Tape and world authoring
 
 ```python
-tape = builder.add_tape("notes")
+tape = builder.add_tape(
+    "notes",
+    frame_width=6.4,
+    frame_height=4.8,
+)
 tape.add_heading("Supporting notes")
 tape.add_body("This content has its own local tape layout.")
+builder.scroll_tape(tape_id="notes", local_y=0.0)
 
 cube_id = builder.add_object(
     "Solid3D",
@@ -105,9 +118,9 @@ cube_id = builder.add_object(
 builder.observe_object(cube_id)
 ```
 
-The root tape exists automatically. Additional tapes are separate 2D layout
-contexts and their switching behavior is experimental. Free objects belong to
-the experimental 3D world path and use explicit observation. Advanced
-arbitrary-world camera behavior still requires render evidence; do not treat
-architectural types alone as proof of production readiness. Do not use
-`scroll_tape()` in current projects: its `TapeScroll` DSL type is absent.
+The root tape exists automatically. Additional tapes are separate local 2D
+layout contexts presented face-on, one at a time. A selected tape hides the
+free world and every other tape; observing a free object opens it.
+`scroll_tape()` is an explicit serialized selector. The orbital flagship is a
+complete multi-tape curtain runtime proof; new spatial productions still
+require an economical preview.

@@ -41,6 +41,13 @@ def test_render_quality_preview_scales_down():
     assert "quality" not in cfg
 
 
+def test_render_quality_fast_preview_is_quickest():
+    cfg = render_quality_config("fast_preview", base_width=1080, base_height=1920)
+    assert cfg["pixel_width"] == 270
+    assert cfg["pixel_height"] == 480
+    assert cfg["frame_rate"] == 10
+
+
 def test_render_quality_final_is_production():
     cfg = render_quality_config("final", base_width=1080, base_height=1920)
     assert cfg["pixel_width"] == 1080

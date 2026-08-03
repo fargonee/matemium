@@ -105,6 +105,12 @@ export async function resolveVideoAssetFallback(path: string): Promise<string> {
   return videoAssetUrl(info.playbackPath);
 }
 
+/** Fallback when streamed asset playback or range seeking fails in the webview. */
+export async function resolveVideoBlobFallback(path: string): Promise<string> {
+  const info = await mediaFileInfo(path);
+  return videoBlobUrl(info);
+}
+
 export function clearMediaPreviewSrc(): void {
   revokeActiveBlobUrl();
 }

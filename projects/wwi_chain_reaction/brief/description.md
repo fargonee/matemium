@@ -4,7 +4,7 @@
 
 - **Subject:** History
 - **Project slug:** `wwi_chain_reaction`
-- **Status:** First authored prototype complete; engine feedback recorded; flagship render not yet accepted
+- **Status:** Full-tape authoring proof accepted; final mute-video master and independent historian review pending
 - **Central question:** How did a regional assassination become a European war within weeks?
 - **Primary audience:** General history learners and secondary-school students
 - **Target format:** 16:9 flagship master, approximately 3 minutes
@@ -28,7 +28,7 @@ The viewer should understand:
 
 ## Narrative arc
 
-1. **Before the trigger:** Establish Europe’s major powers, alliances, and selected pre-existing tensions.
+1. **Before the trigger:** Establish the central question and distinguish trigger, structures, constraints, and decisions.
 2. **Sarajevo:** Locate and date the assassination without dramatized reconstruction.
 3. **The July Crisis:** Build a dated sequence of ultimatum, responses, assurances, and mobilizations.
 4. **Decision network:** Connect actors to the information and pressures visible at each step.
@@ -39,7 +39,8 @@ The viewer should understand:
 
 ## Visual and motion direction
 
-- Use a historically appropriate map with restrained borders and labels.
+- Use a clearly labelled schematic of relative geography; do not imply that it
+  is a historically precise border map.
 - Maintain one visual identity per state across map, timeline, and relationship network.
 - Every dated event should occupy a clear chronological position.
 - Show messages and decisions as directed connections, not omniscient information.
@@ -48,7 +49,7 @@ The viewer should understand:
 
 ## Matemium capabilities this project must demonstrate
 
-- animated maps;
+- spatial geographic schematics;
 - precise timelines;
 - relationship and decision networks;
 - causal layers and branching possibilities;

@@ -4,10 +4,8 @@ import { sidecarGetPreviewData } from "../api/tauri";
 import type { PreviewData, PreviewElement, TimelineAction } from "../api/types";
 
 // =====================================================
-// Phase 10 (canonical): manim-web Full 3D World + Special Tape Mode preview
-// Renders object graph (root_objects + root_tape) in world space. Special handling for
-// TapeObjects (local sheet logic projected onto the tape's world-transformed plane).
-// Camera keyframes (ObjectAnchor / TapeScroll / WorldPoint) drive observations.
+// Canonical preview model: a persistent free 3D world plus one isolated,
+// camera-facing tape curtain. World and tape content are never shown together.
 // =====================================================
 import { ManimScene } from "manim-web/react";
 import {
@@ -94,8 +92,7 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
   }
 
   // Build a manim-web mobject from the rich Python element spec.
-  // 3D world + tape: normal 3D observation vs tape-scroll-mode (TapeScroll target activates internal tape logic).
-  // Handles world_transform for 3D placement, and special logic for tapes.
+  // World transforms apply only to free objects; tape elements use local XY.
   function createMobjectFromSpec(el: PreviewElement | TimelineAction, _fw: number, _fh: number): any {
     const type = el.type;
     const spec = (el as any).spec || (el as any).raw_content || el.content || {};
@@ -274,7 +271,7 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
   }
 
   async function simulate3DCamera(scene: Scene, targetPos: number[], runTime: number) {
-    // Normal cinematic 3D observation for ObjectAnchor / WorldPoint (incl. on tapes as rigid 3D objects)
+    // Normal cinematic 3D observation for free-world targets.
     const rt = Math.max(0.2, runTime / playbackSpeed);
     const cam: any = (scene as any).camera;
     const [tx = 0, ty = 0, tz = 0] = targetPos || [0, 0, 0];
@@ -298,50 +295,28 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
     }
   }
 
-  async function simulateTapeScroll(scene: Scene, localY: number, runTime: number, tapeData: any, tapeMob: any) {
-    // Tape-scroll-mode: camera follows the tape plane (respecting its world_transform),
-    // while content scrolls internally using local measurements.
+  async function simulateTapeScroll(scene: Scene, localY: number, runTime: number) {
+    // Tape-scroll mode is a flat local-2D camera move. The context switch that
+    // called this function has already removed the free world and other tapes.
     const rt = Math.max(0.2, runTime / playbackSpeed);
     const cam: any = (scene as any).camera;
 
-    const contentGroup = tapeMob && (tapeMob as any)._contentGroup;
-    const tw = (tapeData && tapeData.world_transform) || {};
-
-    // 1. Scroll the local content inside the tape plane (simulates classic infinite tape pan)
-    if (contentGroup) {
-      try {
-        const scrollOffset = -localY * 0.55; // factor tuned to match python local Y units
-        // Use moveTo relative to the content group's base (0 at build) or shift delta.
-        // For reliable replay, shift from current.
-        const curr = contentGroup.getY?.() || 0;
-        contentGroup.shift?.([0, scrollOffset - curr, 0]);
-      } catch {}
-    }
-
-    // 2. Position camera to view the scrolled point on the (possibly rotated) tape plane
     if (cam && typeof cam.moveTo === "function") {
       try {
-        const baseX = (tw.position && tw.position[0]) || 0;
-        const baseY = (tw.position && tw.position[1]) || 0;
-        const baseZ = (tw.position && tw.position[2]) || 0;
-        // Approximate the scrolled point on plane; camera "above" it
-        const viewX = baseX;
-        const viewY = baseY + localY * 0.4;
-        const viewZ = baseZ + 6;
-        await Promise.resolve(cam.moveTo([viewX, viewY + 1, viewZ]));
-        // Look toward the scrolled point on plane
+        cam.use_orthographic_projection = true;
+        await Promise.resolve(cam.moveTo([0, localY, 10]));
         if (typeof cam.lookAt === "function") {
-          try { await Promise.resolve(cam.lookAt([viewX, viewY, baseZ])); } catch {}
+          try { await Promise.resolve(cam.lookAt([0, localY, 0])); } catch {}
         }
+        await new Promise((r) => setTimeout(r, rt * 250));
+        return;
       } catch {}
-    } else {
-      // Fallback shift
-      if (rootGroupRef.current && typeof rootGroupRef.current.shift === "function") {
-        const delta = -localY * 0.4;
-        rootGroupRef.current.shift([0, delta, 0]);
-        await new Promise((r) => setTimeout(r, rt * 800));
-      }
     }
+    if (rootGroupRef.current && typeof rootGroupRef.current.shift === "function") {
+      const currentY = rootGroupRef.current.getY?.() || 0;
+      rootGroupRef.current.shift([0, -localY - currentY, 0]);
+    }
+    await new Promise((r) => setTimeout(r, rt * 700));
   }
 
   async function simulateCamera(scene: Scene, targetY: number, runTime: number) {
@@ -387,10 +362,15 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
       ? preview.timeline
       : (preview.elements || []).map(e => ({ ...e, kind: "element" } as any));
 
-    // Phase 7: Full 3D world + special tape mode
+    // One container is reused, but its membership is exclusive: either world
+    // mobjects or one tape's already-revealed mobjects.
     const root = new VGroup();
     rootGroupRef.current = root;
     scene.add(root);
+    const worldMobjects = new Map<string, any>();
+    const tapeMobjects = new Map<string, Map<string, any>>();
+    const elementTapeIds = preview.element_tape_ids || {};
+    let activeContext = "world";
 
     // Render root objects in world space (3D support)
     const rootObjs = preview.root_objects || [];
@@ -407,40 +387,37 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
           if (rz) (mob as any).rotate?.(rz * Math.PI / 180, [0,0,1]);
         }
         root.add(mob);
+        worldMobjects.set(obj.id, mob);
         revealedRef.current.set(obj.id, mob);
       }
     }
 
-    // Special tape handling: render tape content projected on its plane using local sheet logic
-    const tape = preview.root_tape;
-    if (tape) {
-      const tapeGroup = new VGroup();
-      const tapeContentGroup = new VGroup(); // inner group for local scrolling in tape-scroll-mode
-      const tapeContent = tape.local_elements || [];
-      for (const localEl of tapeContent) {
-        const mob = createMobjectFromSpec(localEl, fw, fh);
-        // local positions on tape plane
-        const lpos = localEl.canvas_position || [localEl.x || 0, localEl.y || 0, localEl.z || 0];
-        mob.moveTo(lpos);
-        tapeContentGroup.add(mob);
-      }
-      tapeGroup.add(tapeContentGroup);
-      // Apply tape's world transform to the outer group (plane)
-      const tw = tape.world_transform;
-      if (tw && tw.position) {
-        tapeGroup.moveTo(tw.position);
-      }
-      if (tw && tw.rotation) {
-        const [rx, ry, rz] = tw.rotation;
-        if (rx) (tapeGroup as any).rotate?.(rx * Math.PI / 180, [1,0,0]);
-        if (ry) (tapeGroup as any).rotate?.(ry * Math.PI / 180, [0,1,0]);
-        if (rz) (tapeGroup as any).rotate?.(rz * Math.PI / 180, [0,0,1]);
-      }
-      root.add(tapeGroup);
-      revealedRef.current.set(tape.id || "root_tape", tapeGroup);
-      // store content group for local scroll simulation
-      (tapeGroup as any)._contentGroup = tapeContentGroup;
-    }
+    const switchToTape = async (tapeId: string) => {
+      if (activeContext === `tape:${tapeId}`) return;
+      worldMobjects.forEach((mob) => root.remove(mob));
+      tapeMobjects.forEach((mobjects, candidateId) => {
+        mobjects.forEach((mob) => {
+          if (candidateId === tapeId) root.add(mob);
+          else root.remove(mob);
+        });
+      });
+      activeContext = `tape:${tapeId}`;
+      const cam: any = (scene as any).camera;
+      if (cam) cam.use_orthographic_projection = true;
+      await new Promise((resolve) => setTimeout(resolve, 120 / playbackSpeed));
+    };
+
+    const switchToWorld = async () => {
+      if (activeContext === "world") return;
+      tapeMobjects.forEach((mobjects) => {
+        mobjects.forEach((mob) => root.remove(mob));
+      });
+      worldMobjects.forEach((mob) => root.add(mob));
+      activeContext = "world";
+      const cam: any = (scene as any).camera;
+      if (cam) cam.use_orthographic_projection = false;
+      await new Promise((resolve) => setTimeout(resolve, 120 / playbackSpeed));
+    };
 
     setIsPlaying(true);
 
@@ -450,12 +427,9 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
       } catch {}
     }
 
-    // Replay using observations if present (Phase 7), else fall back to sequential
-    const observations = preview.observations || actions;
-
     let i = 0;
-    while (i < observations.length) {
-      const action = observations[i];
+    while (i < actions.length) {
+      const action = actions[i];
       const kind = action.kind || (action.type === "CanvasElement" ? "element" : action.type || "element");
 
       setCurrentAction(`${kind}: ${action.id || action.content?.slice(0, 28) || ""}`);
@@ -463,9 +437,13 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
       if (kind === "element" || kind === "CanvasElement") {
         const el = action as PreviewElement;
         if (revealedRef.current.has(el.id)) { i++; continue; }
+        const tapeId = action.tape_id || elementTapeIds[el.id] || "root_tape";
+        await switchToTape(tapeId);
         const mob = createMobjectFromSpec(el, fw, fh);
         root.add(mob);
         revealedRef.current.set(el.id, mob);
+        if (!tapeMobjects.has(tapeId)) tapeMobjects.set(tapeId, new Map());
+        tapeMobjects.get(tapeId)!.set(el.id, mob);
         const animSpec = el.entry_animation;
         const anim = makeEntryAnim(mob, animSpec);
         try { await scene.play(anim); } catch { scene.add(mob); }
@@ -482,26 +460,39 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
           } else break;
         }
         const avgY = groupEls.reduce((s, e) => s + ((e.y ?? e.canvas_position?.[1] ?? 0)), 0) / Math.max(1, groupEls.length);
+        const tapeId = action.tape_id || elementTapeIds[action.id] || "root_tape";
+        await switchToTape(tapeId);
         await simulateCamera(scene, avgY, action.run_time || 0.9);
         for (const gel of groupEls) {
           if (revealedRef.current.has(gel.id)) continue;
           const m = createMobjectFromSpec(gel, fw, fh);
           root.add(m);
           revealedRef.current.set(gel.id, m);
+          const ownerId = gel.tape_id || elementTapeIds[gel.id] || tapeId;
+          if (!tapeMobjects.has(ownerId)) tapeMobjects.set(ownerId, new Map());
+          tapeMobjects.get(ownerId)!.set(gel.id, m);
           try { await scene.play(makeEntryAnim(m, gel.entry_animation)); } catch { scene.add(m); }
         }
         i = j - 1;
-      } else if (kind === "CameraMove" || kind === "CameraKeyframe") {
+      } else if (kind === "CameraMove") {
+        await switchToTape("root_tape");
+        await simulateTapeScroll(
+          scene,
+          Number(action.target_position?.[1] ?? action.y ?? 0),
+          action.run_time || 1.2,
+        );
+      } else if (kind === "CameraKeyframe") {
         const rt = action.run_time || action.duration || 1.2;
         const target = action.target || {};
         const isTapeScroll = target && (target.kind === "tape_scroll" || target.local_y != null || !!action.target?.local_y);
 
         if (isTapeScroll) {
+          const tapeId = target.tape_id || "root_tape";
+          await switchToTape(tapeId);
           const localY = Number(target.local_y ?? action.target_position?.[1] ?? action.y ?? 0);
-          const tapeMob = tape ? revealedRef.current.get(tape.id || "root_tape") : null;
-          await simulateTapeScroll(scene, localY, rt, tape, tapeMob);
+          await simulateTapeScroll(scene, localY, rt);
         } else {
-          // Normal 3D observation (ObjectAnchor, WorldPoint, etc.)
+          await switchToWorld();
           let targetPos = target.position || action.target_position || [0, 0, 0];
           if (target.kind === "object_anchor" && target.object_id) {
             const targetMob = revealedRef.current.get(target.object_id);
@@ -514,7 +505,14 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
           }
           await simulate3DCamera(scene, targetPos as number[], rt);
         }
-      } else if (kind === "CameraFocus" || kind === "CameraInspect") {
+      } else if (kind === "CameraInspect") {
+        await switchToWorld();
+        const targetY = action.target_position?.[1] ?? 0;
+        await simulateCamera(scene, targetY, action.run_time || 1.0);
+      } else if (kind === "CameraFocus") {
+        const ownerId = elementTapeIds[action.element_id || ""];
+        if (ownerId) await switchToTape(ownerId);
+        else await switchToWorld();
         const targetY = action.target_position?.[1] ?? 0;
         await simulateCamera(scene, targetY, action.run_time || 1.0);
       } else if (kind === "TransformElement" || kind === "SolidRotate" || kind === "SolidLift") {
@@ -554,7 +552,7 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
       await new Promise(r => setTimeout(r, 60 / playbackSpeed));
     }
 
-    setCurrentAction(is3D ? "3D World Preview complete (manim-web)" : "Preview complete (manim-web)");
+    setCurrentAction(is3D ? "World + curtain preview complete" : "Preview complete");
     setIsPlaying(false);
   }
 
@@ -613,7 +611,7 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
         </label>
 
         <span style={{ marginLeft: "auto", color: "#9aa0a6" }}>
-          {is3DMode ? "manim-web Full 3D + Tape" : "manim-web Sheet"}
+          {is3DMode ? "manim-web World ↔ Tape Curtain" : "manim-web Sheet"}
         </span>
         <button onClick={() => { setData(null); if (sceneRef.current) void playWebPreview(sceneRef.current, null); }}>
           {is3DMode ? "3D Demo" : "Demo"}
@@ -639,8 +637,8 @@ export function LiveMeasurementPreview({ projectId }: LivePreviewProps) {
       </div>
 
       <div style={{ fontSize: 10, color: "#666", marginTop: 5, lineHeight: 1.3 }}>
-        Phase 4: Proper distinction between normal 3D camera (ObjectAnchor/WorldPoint: moveTo + look) and tape-scroll-mode (local content shift on transformed tape plane + camera following scroll point).
-        WYSIWYG for both styles vs final render.
+        Free-world shots and camera-facing tapes are exclusive contexts. A tape
+        hides the world and other tapes until a world camera action opens it.
       </div>
     </div>
   );

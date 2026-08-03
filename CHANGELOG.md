@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-07-27
 
 ### Added
+- Isolated camera-facing secondary tapes with automatic world → tape,
+  tape → tape, and tape → world curtain transitions.
+- A serializable `TapeScroll` target and working `scroll_tape()` authoring
+  sugar for explicit tape selection/local scrolling.
+- Desktop preview payloads now include every tape and element ownership; the
+  manim-web replay uses exclusive world/tape curtain contexts.
+- Stable explicit IDs and complete transform bookkeeping for registered free
+  objects created by `add_object()`.
+- A cinematic orbital flagship proving a persistent project-local 3D kind,
+  multiple analytical tapes, an embedded tape solid, semantic vectors,
+  deterministic regime morphs, and camera paths in one production.
 - Generic `DataPath`, `DataPlot`, and `Diagram` visual kinds backed by sampled,
   JSON-compatible data.
 - Stable semantic-part addressing for compound visuals:
@@ -19,18 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pre-render validation, and structured project-check diagnostics.
 - Eleven deterministic first-pass flagship projects across subjects.
 - Source-aligned `AUTHORING_API.md` and public docs for generic visuals/actions.
-- Corrected authoring docs to use the automatic root tape, distinguish mature
-  APIs from experimental world/multi-tape paths, and stop advertising the
-  currently missing `TapeScroll` target.
+- Corrected authoring docs to distinguish camera-facing tapes from transformed
+  free-world objects.
 - 3D world structures (TapeObject, WorldTransform, keyframes, mixed placement) added.
-- **3D design clarification (July 2026):** The target architecture treats a
-  tape as a world object and reserves `TapeScroll` for internal sheet behavior.
-  This remains a design target, not the current high-level tape contract:
-  `add_tape()` currently creates a 2D layout context and rejects physical
-  transforms. `TapeScroll` itself is not present in the current DSL; legacy
-  root-tape behavior is preserved through automatic reveal and `CameraMove`.
+- **Presentation clarification (July 2026):** tapes are isolated camera-facing
+  layouts rather than world objects. `TapeScroll` is available for explicit
+  selection, and legacy root-tape movement remains available through
+  `CameraMove`.
 - Auto-registration of all built-in object kinds; registry dispatch is primary path (no more core if/elif patching for new viz).
-- Enhanced Space3DDemo showcasing rotated tape, add_object, relative anchors, mixed camera keyframes (ObjectAnchor/TapeScroll/WorldPoint).
+- Enhanced spatial examples showcasing `add_object`, relative anchors, and
+  mixed world/tape camera actions.
 - Comprehensive Phase 10 tests for registration, resolution, DSL roundtrips, mixed builder, dispatch parity.
 - Exports for Vector3/World* / Observation* in canvas top-level for easy authoring.
 
@@ -44,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   types.
 
 ### Fixed / Polished
+- Tape/world and tape/tape switches now hard-isolate managed contexts, including
+  tapes whose first reveal is a flex group. Transitions use opacity-only fades
+  around an instantaneous camera cut, so world and tape camera poses are never
+  visibly interpolated.
+- Smooth inspect paths preserve the first authored shot and use continuous
+  linear timing across generated spline subsegments, removing repeated
+  stop-start easing.
 - Existing sheet videos continue to author and render identically; 3D features are opt-in extensions.
 - Registry cutover ensures extensibility for future custom object kinds in both sheet and 3D contexts.
 

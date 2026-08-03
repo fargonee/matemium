@@ -1124,16 +1124,11 @@ class CanvasBuilder:
         dim_others: bool = True,
         dim_opacity: float = 0.15,
     ) -> "CanvasBuilder":
-        """High-level sugar to enter tape-scroll-mode on a TapeObject.
+        """Close a camera-facing tape curtain and scroll within its local layout.
 
-        This activates the tape's internal 2D mechanisms (local scroll, lazy reveal
-        driven by local_y, focus, flex, etc.) while the outer camera respects the
-        tape's world_transform.
-
-        When dim_others=True (default), other 3D objects and other tapes' content
-        are dimmed (to dim_opacity) so attention stays on the active tape.
-
-        Use dim_others=False to keep everything at full opacity.
+        ``dim_others`` and ``dim_opacity`` remain accepted for project-file
+        compatibility. Presentation is intentionally isolated: the selected
+        tape hides the free world and every other tape.
         """
         from .dsl import TapeScroll
         target = TapeScroll(
@@ -1159,12 +1154,10 @@ class CanvasBuilder:
         framing: str = "cinematic",
         **params: Any,
     ) -> "CanvasBuilder":
-        """High-level sugar for normal cinematic 3D observation of any object.
+        """High-level sugar for cinematic observation of a free 3D object.
 
-        Works for free 3D objects AND for TapeObjects (treated as 3D planes,
-        no internal tape logic activated).
-        Use scroll_tape() to activate classic tape scroll + reveal on a tape.
-        Use framing="face_on" to align the camera perfectly with the object's local plane.
+        Use :meth:`scroll_tape` to present camera-facing analytical content.
+        ``framing="face_on"`` remains available for planar free-world objects.
         """
         from .dsl import ObjectAnchor
         target = ObjectAnchor(object_id=object_id, anchor=anchor, framing=framing)
@@ -1183,16 +1176,20 @@ class CanvasBuilder:
         frame_height: Optional[float] = None,
         **kwargs: Any,
     ) -> "TapeBuilder":
-        if "position" in kwargs or "rotation" in kwargs or "scale" in kwargs:
-            raise ValueError(
-                "Tapes are now purely 2D layout canvases and do not exist in 3D space. "
-                "Arguments 'position', 'rotation', and 'scale' are no longer supported in add_tape(). "
-                "To place objects in the 3D world, use add_object() instead."
-            )
-        """Create a new TapeObject (2D canvas context).
+        """Create a camera-facing 2D presentation context.
 
-        Returns a TapeBuilder instance to author content inside its local 2D space.
+        Tapes are deliberately decoupled from free 3D world transforms. When
+        tape content becomes active, the runtime presents that tape face-on in
+        front of the camera and hides the previous world/tape context.
         """
+        unsupported = {"position", "rotation", "scale"} & set(kwargs)
+        if unsupported:
+            names = ", ".join(sorted(unsupported))
+            raise ValueError(
+                f"Tapes are camera-facing presentation contexts; {names} "
+                "cannot be passed to add_tape(). Place free 3D visuals with "
+                "add_object() instead."
+            )
         tape_id = id or self._get_id("tape")
         tape_settings = CanvasSettings(
             frame_width=frame_width or self.settings.frame_width,
@@ -1226,12 +1223,12 @@ class CanvasBuilder:
             raise ValueError("Tapes can no longer be added as WorldObjects. Use add_tape() instead.")
         self.dsl.root_objects.append(wo)
         return wo.id
-        return wo.id
 
     def add_object(
         self,
         type: str,
         *,
+        id: Optional[str] = None,
         relative_to: Optional[str] = None,
         anchor: str = "center",
         content: Optional[Any] = None,
@@ -1267,21 +1264,27 @@ class CanvasBuilder:
         if type.lower() == "tape":
             raise ValueError("Cannot create a Tape via add_object(). Tapes are 2D canvases, not 3D objects. Use add_tape() instead.")
             
+        element_id = id or self._get_id(type.lower())
         if type in _OBJECT_KINDS and _OBJECT_KINDS[type].get("build"):
             # use registered build to create element
-            fake_elem = CanvasElement(id=self._get_id(type.lower()), type=type, content=content or {}, world_transform=wt)
+            fake_elem = CanvasElement(
+                id=element_id,
+                type=type,
+                content=content or {},
+                world_transform=wt,
+            )
             # the build will be used later in render
             elem = fake_elem
         else:
             elem = CanvasElement(
-                id=self._get_id(type.lower()),
+                id=element_id,
                 type=type,
                 content=content,
+                world_transform=wt,
             )
         # place as world object
         wo = WorldObject(id=elem.id, element=elem, transform=wt)
         self.dsl.root_objects.append(wo)
-        return wo.id
         self._placed_transforms[elem.id] = wt
         self._placed_objects[elem.id] = wo
         return elem.id

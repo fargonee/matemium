@@ -122,57 +122,133 @@ struct BundledExample {
     scenes: String,
     helpers: String,
     description: &'static str,
+    passport: Option<&'static str>,
+    tape_content: Option<&'static str>,
+    orchestration: Option<&'static str>,
+    roadmap: Option<&'static str>,
 }
 
+const FOURIER_SCENES: &str = include_str!("../../../projects/fourier_epicycles/scenes.py");
+const FOURIER_HELPERS: &str = include_str!("../../../projects/fourier_epicycles/helpers.py");
 const FOURIER_DESCRIPTION: &str =
     include_str!("../../../projects/fourier_epicycles/brief/description.md");
+const FOURIER_PASSPORT: &str =
+    include_str!("../../../projects/fourier_epicycles/brief/passport.json");
+const FOURIER_TAPE: &str = include_str!("../../../projects/fourier_epicycles/brief/tapes/main.md");
+const FOURIER_ORCHESTRATION: &str =
+    include_str!("../../../projects/fourier_epicycles/brief/orchestration.md");
+const FOURIER_ROADMAP: &str =
+    include_str!("../../../projects/fourier_epicycles/brief/roadmap.json");
+const ORBITAL_SCENES: &str = include_str!("../../../projects/orbital_mechanics/scenes.py");
+const ORBITAL_HELPERS: &str = include_str!("../../../projects/orbital_mechanics/helpers.py");
 const ORBITAL_DESCRIPTION: &str =
     include_str!("../../../projects/orbital_mechanics/brief/description.md");
+const ORBITAL_PASSPORT: &str =
+    include_str!("../../../projects/orbital_mechanics/brief/passport.json");
+const ORBITAL_TAPE: &str = include_str!("../../../projects/orbital_mechanics/brief/tapes/main.md");
+const ORBITAL_ORCHESTRATION: &str =
+    include_str!("../../../projects/orbital_mechanics/brief/orchestration.md");
+const ORBITAL_ROADMAP: &str =
+    include_str!("../../../projects/orbital_mechanics/brief/roadmap.json");
+const SN2_SCENES: &str = include_str!("../../../projects/sn2_reaction/scenes.py");
+const SN2_HELPERS: &str = include_str!("../../../projects/sn2_reaction/helpers.py");
 const SN2_DESCRIPTION: &str = include_str!("../../../projects/sn2_reaction/brief/description.md");
+const SN2_PASSPORT: &str = include_str!("../../../projects/sn2_reaction/brief/passport.json");
+const SN2_TAPE: &str = include_str!("../../../projects/sn2_reaction/brief/tapes/main.md");
+const SN2_ORCHESTRATION: &str =
+    include_str!("../../../projects/sn2_reaction/brief/orchestration.md");
+const SN2_ROADMAP: &str = include_str!("../../../projects/sn2_reaction/brief/roadmap.json");
+const DIJKSTRA_SCENES: &str = include_str!("../../../projects/dijkstra_execution/scenes.py");
+const DIJKSTRA_HELPERS: &str = include_str!("../../../projects/dijkstra_execution/helpers.py");
 const DIJKSTRA_DESCRIPTION: &str =
     include_str!("../../../projects/dijkstra_execution/brief/description.md");
+const DIJKSTRA_PASSPORT: &str =
+    include_str!("../../../projects/dijkstra_execution/brief/passport.json");
+const DIJKSTRA_TAPE: &str =
+    include_str!("../../../projects/dijkstra_execution/brief/tapes/main.md");
+const DIJKSTRA_ORCHESTRATION: &str =
+    include_str!("../../../projects/dijkstra_execution/brief/orchestration.md");
+const DIJKSTRA_ROADMAP: &str =
+    include_str!("../../../projects/dijkstra_execution/brief/roadmap.json");
+const FEEDBACK_SCENES: &str = include_str!("../../../projects/feedback_control/scenes.py");
+const FEEDBACK_HELPERS: &str = include_str!("../../../projects/feedback_control/helpers.py");
 const FEEDBACK_DESCRIPTION: &str =
     include_str!("../../../projects/feedback_control/brief/description.md");
+const FEEDBACK_PASSPORT: &str =
+    include_str!("../../../projects/feedback_control/brief/passport.json");
+const FEEDBACK_TAPE: &str = include_str!("../../../projects/feedback_control/brief/tapes/main.md");
+const FEEDBACK_ORCHESTRATION: &str =
+    include_str!("../../../projects/feedback_control/brief/orchestration.md");
+const FEEDBACK_ROADMAP: &str =
+    include_str!("../../../projects/feedback_control/brief/roadmap.json");
+const SUPPLY_SHOCK_SCENES: &str = include_str!("../../../projects/supply_shock/scenes.py");
+const SUPPLY_SHOCK_HELPERS: &str = include_str!("../../../projects/supply_shock/helpers.py");
 const SUPPLY_SHOCK_DESCRIPTION: &str =
     include_str!("../../../projects/supply_shock/brief/description.md");
+const SUPPLY_SHOCK_PASSPORT: &str =
+    include_str!("../../../projects/supply_shock/brief/passport.json");
+const SUPPLY_SHOCK_TAPE: &str = include_str!("../../../projects/supply_shock/brief/tapes/main.md");
+const SUPPLY_SHOCK_ORCHESTRATION: &str =
+    include_str!("../../../projects/supply_shock/brief/orchestration.md");
+const SUPPLY_SHOCK_ROADMAP: &str =
+    include_str!("../../../projects/supply_shock/brief/roadmap.json");
+const DNA_SCENES: &str = include_str!("../../../projects/dna_to_protein/scenes.py");
+const DNA_HELPERS: &str = include_str!("../../../projects/dna_to_protein/helpers.py");
 const DNA_DESCRIPTION: &str = include_str!("../../../projects/dna_to_protein/brief/description.md");
+const DNA_PASSPORT: &str = include_str!("../../../projects/dna_to_protein/brief/passport.json");
+const DNA_TAPE: &str = include_str!("../../../projects/dna_to_protein/brief/tapes/main.md");
+const DNA_ORCHESTRATION: &str =
+    include_str!("../../../projects/dna_to_protein/brief/orchestration.md");
+const DNA_ROADMAP: &str = include_str!("../../../projects/dna_to_protein/brief/roadmap.json");
+const WWI_SCENES: &str = include_str!("../../../projects/wwi_chain_reaction/scenes.py");
+const WWI_HELPERS: &str = include_str!("../../../projects/wwi_chain_reaction/helpers.py");
 const WWI_DESCRIPTION: &str =
     include_str!("../../../projects/wwi_chain_reaction/brief/description.md");
+const WWI_PASSPORT: &str =
+    include_str!("../../../projects/wwi_chain_reaction/brief/passport.json");
+const WWI_TAPE: &str =
+    include_str!("../../../projects/wwi_chain_reaction/brief/tapes/main.md");
+const WWI_ORCHESTRATION: &str =
+    include_str!("../../../projects/wwi_chain_reaction/brief/orchestration.md");
+const WWI_ROADMAP: &str =
+    include_str!("../../../projects/wwi_chain_reaction/brief/roadmap.json");
 const THESEUS_DESCRIPTION: &str =
     include_str!("../../../projects/ship_of_theseus/brief/description.md");
+const THESEUS_SCENES: &str = include_str!("../../../projects/ship_of_theseus/scenes.py");
+const THESEUS_HELPERS: &str = include_str!("../../../projects/ship_of_theseus/helpers.py");
+const THESEUS_PASSPORT: &str =
+    include_str!("../../../projects/ship_of_theseus/brief/passport.json");
+const THESEUS_TAPE: &str =
+    include_str!("../../../projects/ship_of_theseus/brief/tapes/main.md");
+const THESEUS_ORCHESTRATION: &str =
+    include_str!("../../../projects/ship_of_theseus/brief/orchestration.md");
+const THESEUS_ROADMAP: &str =
+    include_str!("../../../projects/ship_of_theseus/brief/roadmap.json");
 const LANGUAGE_DESCRIPTION: &str =
     include_str!("../../../projects/sentence_across_languages/brief/description.md");
+const LANGUAGE_SCENES: &str = include_str!("../../../projects/sentence_across_languages/scenes.py");
+const LANGUAGE_HELPERS: &str =
+    include_str!("../../../projects/sentence_across_languages/helpers.py");
+const LANGUAGE_PASSPORT: &str =
+    include_str!("../../../projects/sentence_across_languages/brief/passport.json");
+const LANGUAGE_TAPE: &str =
+    include_str!("../../../projects/sentence_across_languages/brief/tapes/main.md");
+const LANGUAGE_ORCHESTRATION: &str =
+    include_str!("../../../projects/sentence_across_languages/brief/orchestration.md");
+const LANGUAGE_ROADMAP: &str =
+    include_str!("../../../projects/sentence_across_languages/brief/roadmap.json");
 const CLEAN_WATER_DESCRIPTION: &str =
     include_str!("../../../projects/clean_water_system/brief/description.md");
-
-fn flagship_authoring_template(title: &str) -> String {
-    format!(
-        r#""""Authoring template for the Matemium flagship project: {title}."""
-
-from __future__ import annotations
-
-from canvas import CanvasScene, CanvasSettings
-from canvas.builder import CanvasBuilder
-
-
-class MyScene(CanvasScene):
-    """Replace this placeholder with the authored flagship explanation."""
-
-    def __init__(self, **kwargs):
-        builder = CanvasBuilder(
-            title={title:?},
-            canvas_settings=CanvasSettings.for_youtube(title={title:?}),
-        )
-        tape = builder.add_tape("main")
-        tape.add_heading({title:?})
-        tape.add_body(
-            "Authoring has not started. Read brief/description.md for the complete "
-            "narrative, visual, accuracy, and acceptance expectations."
-        )
-        super().__init__(dsl=builder.build(), **kwargs)
-"#
-    )
-}
+const CLEAN_WATER_SCENES: &str = include_str!("../../../projects/clean_water_system/scenes.py");
+const CLEAN_WATER_HELPERS: &str = include_str!("../../../projects/clean_water_system/helpers.py");
+const CLEAN_WATER_PASSPORT: &str =
+    include_str!("../../../projects/clean_water_system/brief/passport.json");
+const CLEAN_WATER_TAPE: &str =
+    include_str!("../../../projects/clean_water_system/brief/tapes/main.md");
+const CLEAN_WATER_ORCHESTRATION: &str =
+    include_str!("../../../projects/clean_water_system/brief/orchestration.md");
+const CLEAN_WATER_ROADMAP: &str =
+    include_str!("../../../projects/clean_water_system/brief/roadmap.json");
 
 fn bundled_examples() -> Vec<BundledExample> {
     let examples = [
@@ -185,9 +261,17 @@ fn bundled_examples() -> Vec<BundledExample> {
             "∑",
             "How can simple circular motions reconstruct a complex wave or drawing?",
             "Connect rotating vectors, sinusoidal waves, frequency spectra, and partial-sum reconstruction.",
+            "FourierEpicycles",
+            "landscape",
             "visual-first",
             vec!["Synchronized views", "Vector motion", "Path tracing", "Frequency spectrum"],
+            FOURIER_SCENES,
+            FOURIER_HELPERS,
             FOURIER_DESCRIPTION,
+            Some(FOURIER_PASSPORT),
+            Some(FOURIER_TAPE),
+            Some(FOURIER_ORCHESTRATION),
+            Some(FOURIER_ROADMAP),
         ),
         (
             "physics/orbital-mechanics",
@@ -197,10 +281,18 @@ fn bundled_examples() -> Vec<BundledExample> {
             "Physics",
             "◎",
             "Why does a satellite keep falling toward Earth without hitting it?",
-            "Build orbital intuition from falling objects, sideways velocity, force vectors, and trajectory comparisons.",
+            "Explore one persistent 3D Earth system through moving vectors, controlled trajectory regimes, spatial instruments, and cinematic camera observations.",
+            "OrbitalMechanics",
+            "landscape",
             "visual-first",
-            vec!["World-space motion", "Force vectors", "Parameter sweep", "Camera scale"],
+            vec!["Persistent 3D world", "Curtain tape transitions", "Attached force vectors", "Cinematic camera"],
+            ORBITAL_SCENES,
+            ORBITAL_HELPERS,
             ORBITAL_DESCRIPTION,
+            Some(ORBITAL_PASSPORT),
+            Some(ORBITAL_TAPE),
+            Some(ORBITAL_ORCHESTRATION),
+            Some(ORBITAL_ROADMAP),
         ),
         (
             "chemistry/sn2-reaction",
@@ -211,9 +303,17 @@ fn bundled_examples() -> Vec<BundledExample> {
             "⚗",
             "How can bond formation and bond breaking occur in one coordinated event?",
             "Coordinate molecular geometry, electron movement, stereochemical inversion, and an energy profile.",
+            "SN2Reaction",
+            "portrait",
             "visual-first",
             vec!["Molecular geometry", "Reaction states", "Energy plot", "Spatial camera"],
+            SN2_SCENES,
+            SN2_HELPERS,
             SN2_DESCRIPTION,
+            Some(SN2_PASSPORT),
+            Some(SN2_TAPE),
+            Some(SN2_ORCHESTRATION),
+            Some(SN2_ROADMAP),
         ),
         (
             "computer-science/dijkstra-execution",
@@ -224,9 +324,17 @@ fn bundled_examples() -> Vec<BundledExample> {
             "{ }",
             "How does a computer discover the shortest path without trying every complete route?",
             "Synchronize a weighted graph, tentative distances, priority queue, pseudocode, and execution trace.",
+            "DijkstraExecution",
+            "landscape",
             "visual-first",
             vec!["Graph layout", "Execution trace", "Mutable state", "Pseudocode sync"],
+            DIJKSTRA_SCENES,
+            DIJKSTRA_HELPERS,
             DIJKSTRA_DESCRIPTION,
+            Some(DIJKSTRA_PASSPORT),
+            Some(DIJKSTRA_TAPE),
+            Some(DIJKSTRA_ORCHESTRATION),
+            Some(DIJKSTRA_ROADMAP),
         ),
         (
             "engineering/feedback-control",
@@ -237,9 +345,17 @@ fn bundled_examples() -> Vec<BundledExample> {
             "↻",
             "How does a system detect a disturbance and correct itself?",
             "Connect cruise-control behavior to a feedback loop, live signals, and response plots.",
+            "FeedbackControl",
+            "landscape",
             "visual-first",
             vec!["Block diagrams", "Signal flow", "Live plots", "Scenario comparison"],
+            FEEDBACK_SCENES,
+            FEEDBACK_HELPERS,
             FEEDBACK_DESCRIPTION,
+            Some(FEEDBACK_PASSPORT),
+            Some(FEEDBACK_TAPE),
+            Some(FEEDBACK_ORCHESTRATION),
+            Some(FEEDBACK_ROADMAP),
         ),
         (
             "economics/supply-shock",
@@ -250,9 +366,17 @@ fn bundled_examples() -> Vec<BundledExample> {
             "↗",
             "How can one disruption change prices, quantities, and human decisions?",
             "Trace a concrete disruption through causal flows, supply-demand graphs, and alternative scenarios.",
+            "SupplyShock",
+            "landscape",
             "visual-first",
             vec!["Causal chains", "Economic graphs", "Scenarios", "Assumption labels"],
+            SUPPLY_SHOCK_SCENES,
+            SUPPLY_SHOCK_HELPERS,
             SUPPLY_SHOCK_DESCRIPTION,
+            Some(SUPPLY_SHOCK_PASSPORT),
+            Some(SUPPLY_SHOCK_TAPE),
+            Some(SUPPLY_SHOCK_ORCHESTRATION),
+            Some(SUPPLY_SHOCK_ROADMAP),
         ),
         (
             "biology/dna-to-protein",
@@ -263,9 +387,17 @@ fn bundled_examples() -> Vec<BundledExample> {
             "DNA",
             "How does information stored in DNA become a working protein?",
             "Follow information through transcription, RNA processing, translation, folding, and function.",
+            "DNAToProtein",
+            "landscape",
             "visual-first",
             vec!["Multiscale camera", "Sequence transforms", "Process stages", "Spatial compartments"],
+            DNA_SCENES,
+            DNA_HELPERS,
             DNA_DESCRIPTION,
+            Some(DNA_PASSPORT),
+            Some(DNA_TAPE),
+            Some(DNA_ORCHESTRATION),
+            Some(DNA_ROADMAP),
         ),
         (
             "history/wwi-chain-reaction",
@@ -275,10 +407,18 @@ fn bundled_examples() -> Vec<BundledExample> {
             "History",
             "1914",
             "How did a regional assassination become a European war within weeks?",
-            "Combine maps, a precise timeline, decisions, alliances, and multiple layers of historical cause.",
+            "Combine a precise chronology, selected decision relationships, schematic geography, contingency, and layered historical cause.",
+            "WWIChainReaction",
+            "landscape",
             "visual-first",
-            vec!["Animated maps", "Timeline", "Decision network", "Causal layers"],
+            vec!["Chronology", "Semantic relationships", "Schematic geography", "Causal layers"],
+            WWI_SCENES,
+            WWI_HELPERS,
             WWI_DESCRIPTION,
+            Some(WWI_PASSPORT),
+            Some(WWI_TAPE),
+            Some(WWI_ORCHESTRATION),
+            Some(WWI_ROADMAP),
         ),
         (
             "philosophy/ship-of-theseus",
@@ -289,9 +429,17 @@ fn bundled_examples() -> Vec<BundledExample> {
             "◇",
             "What makes an object remain the same object while its parts change?",
             "Navigate claims, intuitions, objections, counterexamples, and competing criteria for identity.",
+            "ShipOfTheseus",
+            "landscape",
             "visual-first",
             vec!["Argument map", "Branching reasoning", "Object transformation", "Concept focus"],
+            THESEUS_SCENES,
+            THESEUS_HELPERS,
             THESEUS_DESCRIPTION,
+            Some(THESEUS_PASSPORT),
+            Some(THESEUS_TAPE),
+            Some(THESEUS_ORCHESTRATION),
+            Some(THESEUS_ROADMAP),
         ),
         (
             "language-learning/sentence-across-languages",
@@ -301,10 +449,18 @@ fn bundled_examples() -> Vec<BundledExample> {
             "Language Learning",
             "Aa",
             "How can languages organize the same intended meaning in different ways?",
-            "Transform semantic roles through word order, morphology, sentence structure, and pronunciation timing.",
+            "Transform stable semantic roles through word order, morphology, and silent timed reading cues.",
+            "SentenceAcrossLanguages",
+            "landscape",
             "visual-first",
-            vec!["Token transforms", "Syntax structure", "Morphology", "Audio timing"],
+            vec!["Token transforms", "Syntax contrast", "Morphology", "Timed token cues"],
+            LANGUAGE_SCENES,
+            LANGUAGE_HELPERS,
             LANGUAGE_DESCRIPTION,
+            Some(LANGUAGE_PASSPORT),
+            Some(LANGUAGE_TAPE),
+            Some(LANGUAGE_ORCHESTRATION),
+            Some(LANGUAGE_ROADMAP),
         ),
         (
             "general-education/clean-water-system",
@@ -314,10 +470,18 @@ fn bundled_examples() -> Vec<BundledExample> {
             "General Education",
             "H₂O",
             "What happens between a natural water source and safe water arriving at a tap?",
-            "Travel across infrastructure, treatment stages, microscopic processes, distribution, and monitoring.",
+            "Trace infrastructure, distinct treatment barriers, distribution, monitored response, and system boundaries.",
+            "CleanWaterSystem",
+            "landscape",
             "visual-first",
-            vec!["System diagram", "Multiscale camera", "Process flow", "Monitoring feedback"],
+            vec!["Semantic system map", "Numbered process flow", "Monitoring sequence", "Safety boundaries"],
+            CLEAN_WATER_SCENES,
+            CLEAN_WATER_HELPERS,
             CLEAN_WATER_DESCRIPTION,
+            Some(CLEAN_WATER_PASSPORT),
+            Some(CLEAN_WATER_TAPE),
+            Some(CLEAN_WATER_ORCHESTRATION),
+            Some(CLEAN_WATER_ROADMAP),
         ),
     ];
 
@@ -333,13 +497,25 @@ fn bundled_examples() -> Vec<BundledExample> {
                 symbol,
                 question,
                 description,
+                scene_class,
+                orientation,
                 production_path,
                 capabilities,
+                scenes,
+                helpers,
                 project_description,
+                passport,
+                tape_content,
+                orchestration,
+                roadmap,
             )| {
-                let scenes = flagship_authoring_template(title);
-                let helpers = HELPERS_TEMPLATE.to_string();
-                let source_bytes = scenes.len() + helpers.len() + project_description.len();
+                let source_bytes = scenes.len()
+                    + helpers.len()
+                    + project_description.len()
+                    + passport.map_or(0, str::len)
+                    + tape_content.map_or(0, str::len)
+                    + orchestration.map_or(0, str::len)
+                    + roadmap.map_or(0, str::len);
                 BundledExample {
                     summary: BundledExampleSummary {
                         id: id.to_string(),
@@ -350,16 +526,20 @@ fn bundled_examples() -> Vec<BundledExample> {
                         symbol: symbol.to_string(),
                         question: question.to_string(),
                         description: description.to_string(),
-                        scene_class: "MyScene".to_string(),
-                        orientation: "landscape".to_string(),
+                        scene_class: scene_class.to_string(),
+                        orientation: orientation.to_string(),
                         production_path: production_path.to_string(),
-                        stage: "brief-ready".to_string(),
+                        stage: "source-ready".to_string(),
                         capabilities: capabilities.into_iter().map(str::to_string).collect(),
                         source_bytes,
                     },
-                    scenes,
-                    helpers,
+                    scenes: scenes.to_string(),
+                    helpers: helpers.to_string(),
                     description: project_description,
+                    passport,
+                    tape_content,
+                    orchestration,
+                    roadmap,
                 }
             },
         )
@@ -383,6 +563,18 @@ pub fn open_bundled_example(example_id: &str) -> Result<BundledExampleOpen, Stri
     files.insert("scenes".to_string(), example.scenes);
     files.insert("helpers".to_string(), example.helpers);
     files.insert("description".to_string(), example.description.to_string());
+    if let Some(passport) = example.passport {
+        files.insert("passport".to_string(), passport.to_string());
+    }
+    if let Some(tape_content) = example.tape_content {
+        files.insert("tape_content".to_string(), tape_content.to_string());
+    }
+    if let Some(orchestration) = example.orchestration {
+        files.insert("orchestration".to_string(), orchestration.to_string());
+    }
+    if let Some(roadmap) = example.roadmap {
+        files.insert("roadmap".to_string(), roadmap.to_string());
+    }
     Ok(BundledExampleOpen {
         summary: example.summary,
         files,
@@ -1056,10 +1248,26 @@ pub fn create_project_from_bundled_example(
             .map_err(|e| format!("write bundled scenes.py: {e}"))?;
         fs::write(paths.helpers_path(&id), &example.helpers)
             .map_err(|e| format!("write bundled helpers.py: {e}"))?;
-        fs::create_dir_all(workspace.join("brief"))
+        fs::create_dir_all(workspace.join("brief/tapes"))
             .map_err(|e| format!("create bundled example brief: {e}"))?;
         fs::write(workspace.join("brief/description.md"), example.description)
             .map_err(|e| format!("write bundled description: {e}"))?;
+        if let Some(passport) = example.passport {
+            fs::write(workspace.join("brief/passport.json"), passport)
+                .map_err(|e| format!("write bundled passport: {e}"))?;
+        }
+        if let Some(tape_content) = example.tape_content {
+            fs::write(workspace.join("brief/tapes/main.md"), tape_content)
+                .map_err(|e| format!("write bundled tape content: {e}"))?;
+        }
+        if let Some(orchestration) = example.orchestration {
+            fs::write(workspace.join("brief/orchestration.md"), orchestration)
+                .map_err(|e| format!("write bundled orchestration: {e}"))?;
+        }
+        if let Some(roadmap) = example.roadmap {
+            fs::write(workspace.join("brief/roadmap.json"), roadmap)
+                .map_err(|e| format!("write bundled roadmap: {e}"))?;
+        }
 
         let meta = ProjectMeta {
             id: id.clone(),
@@ -1187,9 +1395,9 @@ fn zip_relative_name(base: &Path, path: &Path) -> Result<String, String> {
     for component in relative.components() {
         match component {
             Component::Normal(part) => {
-                let part = part
-                    .to_str()
-                    .ok_or_else(|| format!("archive path is not valid UTF-8: {}", path.display()))?;
+                let part = part.to_str().ok_or_else(|| {
+                    format!("archive path is not valid UTF-8: {}", path.display())
+                })?;
                 parts.push(part.to_string());
             }
             Component::CurDir => {}
@@ -1288,6 +1496,54 @@ fn validate_archive_entry_name(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn find_archive_root(archive: &mut ZipArchive<File>) -> Result<Option<PathBuf>, String> {
+    let mut project_json_parent: Option<PathBuf> = None;
+
+    for index in 0..archive.len() {
+        let entry = archive
+            .by_index(index)
+            .map_err(|e| format!("read archive entry {index}: {e}"))?;
+        let enclosed = entry
+            .enclosed_name()
+            .ok_or_else(|| format!("archive contains an unsafe path: {}", entry.name()))?
+            .to_path_buf();
+        validate_archive_entry_name(&enclosed)?;
+        if !enclosed.ends_with("project.json") {
+            continue;
+        }
+
+        let parent = enclosed.parent().unwrap_or_else(|| Path::new(""));
+        if parent.as_os_str().is_empty() {
+            return Ok(None);
+        }
+
+        if let Some(existing) = &project_json_parent {
+            if existing != parent {
+                return Err("archive contains multiple project.json locations".to_string());
+            }
+        } else {
+            project_json_parent = Some(parent.to_path_buf());
+        }
+    }
+
+    Ok(project_json_parent)
+}
+
+fn strip_archive_root(path: &Path, root: Option<&Path>) -> Result<PathBuf, String> {
+    if let Some(root) = root {
+        let stripped = path.strip_prefix(root).map_err(|e| {
+            format!(
+                "archive entry {} does not match expected root {}: {e}",
+                path.display(),
+                root.display()
+            )
+        })?;
+        Ok(stripped.to_path_buf())
+    } else {
+        Ok(path.to_path_buf())
+    }
+}
+
 pub fn import_project_archive(paths: &AppPaths, source: &str) -> Result<ProjectOpen, String> {
     let source = PathBuf::from(source);
     let file = File::open(&source).map_err(|e| format!("open {}: {e}", source.display()))?;
@@ -1305,9 +1561,9 @@ pub fn import_project_archive(paths: &AppPaths, source: &str) -> Result<ProjectO
     }
 
     let result = (|| {
-        fs::create_dir_all(&temp_workspace)
-            .map_err(|e| format!("create import workspace: {e}"))?;
+        fs::create_dir_all(&temp_workspace).map_err(|e| format!("create import workspace: {e}"))?;
 
+        let archive_root = find_archive_root(&mut archive)?;
         let mut has_project_json = false;
         let mut has_scenes = false;
         for index in 0..archive.len() {
@@ -1323,10 +1579,15 @@ pub fn import_project_archive(paths: &AppPaths, source: &str) -> Result<ProjectO
                 continue;
             }
 
-            has_project_json |= enclosed == Path::new("project.json");
-            has_scenes |= enclosed == Path::new("scenes.py");
+            let relative = strip_archive_root(&enclosed, archive_root.as_deref())?;
+            if relative.as_os_str().is_empty() {
+                continue;
+            }
 
-            let target = temp_workspace.join(&enclosed);
+            has_project_json |= relative == Path::new("project.json");
+            has_scenes |= relative == Path::new("scenes.py");
+
+            let target = temp_workspace.join(&relative);
             if entry.is_dir() {
                 fs::create_dir_all(&target)
                     .map_err(|e| format!("create {}: {e}", target.display()))?;
@@ -1360,12 +1621,8 @@ pub fn import_project_archive(paths: &AppPaths, source: &str) -> Result<ProjectO
         write_json(&project_json_path, &meta)?;
         ensure_workspace_structure(&temp_workspace, &meta.name)?;
 
-        fs::rename(&temp_workspace, &workspace).map_err(|e| {
-            format!(
-                "move imported project into {}: {e}",
-                workspace.display()
-            )
-        })?;
+        fs::rename(&temp_workspace, &workspace)
+            .map_err(|e| format!("move imported project into {}: {e}", workspace.display()))?;
         open_project(paths, &id)
     })();
 
@@ -1437,7 +1694,9 @@ mod tests {
         )
         .unwrap();
         fs::write(
-            paths.workspace_dir(&created.id).join("assets/images/source.txt"),
+            paths
+                .workspace_dir(&created.id)
+                .join("assets/images/source.txt"),
             "portable asset",
         )
         .unwrap();
@@ -1451,8 +1710,12 @@ mod tests {
         assert_eq!(imported.name, "Archive Demo");
         assert!(imported.files["scenes"].contains("ArchiveScene"));
         assert_eq!(
-            fs::read_to_string(paths.workspace_dir(&imported.id).join("assets/images/source.txt"))
-                .unwrap(),
+            fs::read_to_string(
+                paths
+                    .workspace_dir(&imported.id)
+                    .join("assets/images/source.txt")
+            )
+            .unwrap(),
             "portable asset"
         );
         let meta: ProjectMeta =
@@ -1476,6 +1739,38 @@ mod tests {
         let error = import_project_archive(&paths, archive.to_str().unwrap()).unwrap_err();
         assert!(error.contains("unsafe path"));
         assert_eq!(list_projects(&paths).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn project_archive_import_accepts_wrapped_workspace_directory() {
+        let paths = temp_paths();
+        paths.ensure().unwrap();
+        let archive = paths.data_root.join("wrapped.matemium.zip");
+        let file = File::create(&archive).unwrap();
+        let mut writer = ZipWriter::new(file);
+        let options = SimpleFileOptions::default();
+        writer.add_directory("Archive Demo/", options).unwrap();
+        writer
+            .start_file("Archive Demo/project.json", options)
+            .unwrap();
+        writer
+            .write_all(
+                br#"{"id":"original","name":"Archive Demo","description":"","scene_class":"MyScene","orientation":"portrait","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"}"#,
+            )
+            .unwrap();
+        writer
+            .start_file("Archive Demo/scenes.py", options)
+            .unwrap();
+        writer.write_all(b"print('hello')\n").unwrap();
+        writer.finish().unwrap();
+
+        let imported = import_project_archive(&paths, archive.to_str().unwrap()).unwrap();
+        assert_eq!(imported.name, "Archive Demo");
+        assert_eq!(
+            fs::read_to_string(paths.workspace_dir(&imported.id).join("scenes.py")).unwrap(),
+            "print('hello')\n"
+        );
+        assert!(paths.project_json_path(&imported.id).is_file());
     }
 
     #[test]
@@ -1510,7 +1805,7 @@ mod tests {
                 "physics",
             ])
         );
-        assert!(catalog.iter().all(|example| example.stage == "brief-ready"));
+        assert!(catalog.iter().all(|example| example.stage == "source-ready"));
         assert!(catalog.iter().all(|example| example.source_bytes > 0));
         assert!(
             catalog
@@ -1523,10 +1818,14 @@ mod tests {
         for example in catalog {
             let opened = open_bundled_example(&example.id).expect("open bundled source");
             assert!(opened.files["scenes"].contains(&example.scene_class));
-            assert!(opened.files["scenes"].contains(&example.title));
             assert!(opened.files.contains_key("helpers"));
             assert!(opened.files["description"].contains("## Acceptance criteria"));
-            assert_eq!(opened.files.len(), 3);
+            let passport: serde_json::Value =
+                serde_json::from_str(&opened.files["passport"]).expect("passport json");
+            assert_eq!(passport["production_path"], "mute_video");
+            assert!(opened.files.contains_key("tape_content"));
+            assert!(opened.files.contains_key("orchestration"));
+            assert!(opened.files.contains_key("roadmap"));
         }
         assert!(open_bundled_example("../unknown").is_err());
     }
@@ -1541,6 +1840,29 @@ mod tests {
         let first =
             create_project_from_bundled_example(&paths, example_id).expect("create first copy");
         assert_eq!(first.files["scenes"], bundled.files["scenes"]);
+        assert_eq!(first.files["tape_content"], bundled.files["tape_content"]);
+        assert_eq!(first.files["orchestration"], bundled.files["orchestration"]);
+        let bundled_passport: serde_json::Value =
+            serde_json::from_str(&bundled.files["passport"]).expect("bundled passport");
+        let first_passport: serde_json::Value =
+            serde_json::from_str(&first.files["passport"]).expect("copied passport");
+        assert_eq!(
+            first_passport["production_path"],
+            bundled_passport["production_path"]
+        );
+        assert_eq!(first_passport["title"], bundled_passport["title"]);
+        let bundled_roadmap: serde_json::Value =
+            serde_json::from_str(&bundled.files["roadmap"]).expect("bundled roadmap");
+        let first_roadmap: serde_json::Value =
+            serde_json::from_str(&first.files["roadmap"]).expect("copied roadmap");
+        assert_eq!(
+            first_roadmap["production_path"],
+            bundled_roadmap["production_path"]
+        );
+        assert_eq!(
+            first_roadmap["current_phase"],
+            bundled_roadmap["current_phase"]
+        );
         assert_eq!(first.project_json["origin"]["kind"], "bundled_example");
         assert_eq!(first.project_json["origin"]["example_id"], example_id);
         assert_eq!(first.project_json["origin"]["example_version"], 1);

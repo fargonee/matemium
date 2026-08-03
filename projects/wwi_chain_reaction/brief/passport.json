@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "project_slug": "wwi_chain_reaction",
+  "title": "The Chain Reaction That Began World War I",
+  "production_path": "mute_video",
+  "production_path_basis": "Dates, relationships, geography, and causal distinctions must remain understandable without narration.",
+  "audience": "General history learners and secondary-school students",
+  "assumed_knowledge": ["European states competed before 1914", "Austria-Hungary and Serbia were distinct states", "mobilization prepares armed forces for war"],
+  "central_message": "The Sarajevo assassination triggered a crisis whose widening depended on structures, constraints, and consequential decisions rather than automatic alliance dominoes.",
+  "takeaway": "Chronology shows what followed; historical explanation must also examine relationships, geography, alternatives, and choices.",
+  "platform": "website showcase and bundled desktop example",
+  "orientation": "landscape",
+  "aspect_ratio": "16:9",
+  "resolution_master": "1920x1080",
+  "duration_target_seconds": {"minimum": 50, "maximum": 75},
+  "language": "English",
+  "historical_depth": "introductory July Crisis chronology from 28 June through 4 August 1914 with explicit causal boundaries",
+  "visual_direction": "dark documentary tape with dated evidence, restrained country nodes, schematic geography, contingency cards, and causal layers",
+  "tone": "evidence-led, sober, non-deterministic",
+  "pacing": "question, chronology, relationships, geography, contingency, layered synthesis",
+  "audio": {"final_track": "none", "must_remain_understandable_without_sound": true},
+  "constraints": [
+    "offline and deterministic",
+    "preserve event order and dates",
+    "do not imply alliances made escalation automatic",
+    "label schematic geography as non-cartographic",
+    "separate documented events from causal interpretation"
+  ],
+  "success_criteria": [
+    "all nine events remain legible and ordered",
+    "selected relationships are explicitly named",
+    "at least two moments of contingency are visible",
+    "trigger, structures, constraints, and decisions remain distinct",
+    "the final synthesis answers the central question without claiming one total cause"
+  ],
+  "readiness": {"status": "ready", "missing_fields": []},
+  "last_updated": "2026-07-30"
+}

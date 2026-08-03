@@ -8,12 +8,12 @@
     {"id": "passport", "label": "Passport and mute path", "status": "complete", "evidence": ["brief/passport.json"]},
     {"id": "tape_content", "label": "Visible content", "status": "complete", "evidence": ["brief/tapes/main.md"]},
     {"id": "orchestration", "label": "Visual orchestration", "status": "complete", "evidence": ["brief/orchestration.md"]},
-    {"id": "authoring", "label": "Scene and helper authoring", "status": "complete", "evidence": ["scenes.py", "helpers.py", "check_project: 44 timeline items, no diagnostics"]},
-    {"id": "render_repair", "label": "Preview render and visual repair", "status": "complete", "evidence": ["three 960x540 preview iterations", "repaired semantic-node emphasis, transcription layout, residue geometry, connector crossings, and four-residue scientific boundary", "accepted duration 52.064 seconds; 67 animations; silent H.264"]},
-    {"id": "mute_delivery", "label": "Validated mute-video delivery", "status": "pending", "evidence": ["preview accepted", "final 1920x1080 master pending"]}
+    {"id": "authoring", "label": "Scene and helper authoring", "status": "complete", "evidence": ["scenes.py", "helpers.py", "strict validation: 86 timeline items, six tapes, one world"]},
+    {"id": "render_repair", "label": "30 fps draft and visual repair", "status": "complete", "evidence": ["1440x810 H.264 draft at 30 fps", "71.292839 seconds and 115 animations", "contact sheet plus eight full-frame inspections", "six 810-pixel tape exports"]},
+    {"id": "mute_delivery", "label": "Validated mute-video delivery", "status": "pending", "evidence": ["30 fps draft accepted", "final 1920x1080 master pending", "independent molecular-biology review pending"]}
   ],
   "invalidated_phases": [],
   "blockers": [],
-  "next_action": "Render and inspect the 1920x1080 final-quality master during the showcase export cycle.",
-  "last_updated": "2026-07-27"
+  "next_action": "Obtain independent molecular-biology review, then render and inspect the 1920x1080 final master.",
+  "last_updated": "2026-08-03"
 }

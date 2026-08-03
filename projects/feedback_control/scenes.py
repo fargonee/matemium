@@ -1,8 +1,13 @@
-"""Landscape engineering flagship: feedback as measured correction."""
+"""Cinematic engineering flagship: feedback as measured correction in motion.
+
+One deterministic vehicle world persists while isolated tapes inspect its
+signals, loop structure, and response history.  World and tapes share authored
+simulation snapshots; the project does not claim an engine-level reactive clock.
+"""
 
 from __future__ import annotations
 
-from canvas import CanvasScene, CanvasSettings
+from canvas import CanvasElement, CanvasScene, CanvasSettings, LayoutBox
 from canvas.builder import CanvasBuilder
 
 from .helpers import (
@@ -11,65 +16,153 @@ from .helpers import (
     DISTURBANCE,
     ERROR,
     MEASURED,
+    MUTED,
     TARGET,
+    TARGET_SPEED,
     TUNINGS,
     WHITE,
     control_loop_diagram,
-    correction_cards,
-    one_response_series,
-    physical_hill_diagram,
     response_series,
     sample_near,
     simulate,
+    vehicle_world_state,
 )
 
+WORLD_ID = "feedback_vehicle_world"
 PLOT_OPTIONS = {
     "x_range": [0.0, 20.0, 5.0],
-    "y_range": [17.0, 27.0, 1.0],
-    "width": 10.8,
-    "height": 3.7,
+    "y_range": [17.0, 27.0, 2.0],
+    "width": 9.4,
+    "height": 3.25,
     "tips": False,
 }
 
 
-def part_opening(b: CanvasBuilder) -> None:
-    b.add_heading(
+def state_sample(time: float, *, feedback: bool = True, tuning: str = "balanced"):
+    gains = TUNINGS[tuning]
+    return sample_near(
+        simulate(float(gains["kp"]), float(gains["ki"]), feedback=feedback),
+        time,
+    )
+
+
+def car_position(time: float) -> tuple[float, float, float]:
+    # Camera target offsets match the deterministic world path in helpers.py.
+    x = -4.0 + 0.4 * time
+    start, end = -2.8, 1.25
+    if x <= start:
+        y = -0.8
+    elif x >= end:
+        y = 0.75
+    else:
+        u = (x - start) / (end - start)
+        y = -0.8 + 1.55 * u * u * (3.0 - 2.0 * u)
+    return (x, 0.0, y + 0.94)
+
+
+def world_target(
+    time: float,
+    *,
+    feedback: bool = True,
+    tuning: str = "balanced",
+    stage: str = "overview",
+):
+    return CanvasElement(
+        id=WORLD_ID,
+        type="FeedbackVehicleWorld",
+        content=vehicle_world_state(time, feedback=feedback, tuning=tuning, stage=stage),
+        auto_focus=False,
+    )
+
+
+def response_markers(time: float, *, feedback: bool = True, tuning: str = "balanced"):
+    sample = state_sample(time, feedback=feedback, tuning=tuning)
+    return [
+        {
+            "id": "now",
+            "point": [sample["time"], sample["speed"]],
+            "color": WHITE,
+            "radius": 0.11,
+        }
+    ]
+
+
+def response_target(time: float) -> CanvasElement:
+    return CanvasElement(
+        id="live_response",
+        type="DataPlot",
+        content={
+            "series": [
+                item
+                for item in response_series(active="balanced")
+                if item["id"] in {"target", "hill", "balanced"}
+            ],
+            "markers": response_markers(time),
+            **PLOT_OPTIONS,
+        },
+        layout=LayoutBox(width=9.8, height=3.65, margin_bottom=0.2),
+    )
+
+
+def metric(b: CanvasBuilder, label: str, value: str, color: str) -> dict:
+    return b.text_spec(
         [
-            b.run("FEEDBACK", color=COMMAND, bold=True),
-            b.run("  /  MEASURE, COMPARE, CORRECT", color=WHITE, bold=True),
+            b.run(f"{label}\n", color=color, bold=True, font_size=23),
+            b.run(value, color=WHITE, font_size=25),
         ],
-        style={"width": 13.2, "margin-bottom": 0.4},
-    )
-    b.add_body(
-        "The target stays at 25 m/s. The road changes underneath the car.",
-        style={"width": 11.8, "align": "center", "margin-bottom": 0.4},
-    )
-    nodes, edges = physical_hill_diagram()
-    b.add_diagram(
-        nodes,
-        edges,
-        id="physical_hill",
-        style={"width": 11.8, "height": 4.1, "margin-bottom": 0.45},
-        run_time=1.5,
-    )
-    b.add_body(
-        "Open loop: the same command cannot respond to an unmeasured disturbance.",
-        style={"width": 11.8, "align": "center", "margin-bottom": 0.8},
+        style={"width": 2.25, "height": 1.0, "align": "center"},
     )
 
 
-def part_loop(b: CanvasBuilder) -> None:
-    b.add_heading(
-        "01  CLOSE THE LOOP",
-        style={"margin-top": 2.6, "margin-bottom": 0.35},
+def author_principle(b: CanvasBuilder, tape) -> None:
+    tape.add_heading(
+        [b.run("A HILL CHANGES THE CAR", color=DISTURBANCE, bold=True, font_size=34)],
+        style={"width": 10.4, "margin-bottom": 0.18},
     )
+    tape.add_heading(
+        [b.run("FEEDBACK CHANGES THE RESPONSE", color=COMMAND, bold=True, font_size=34)],
+        style={"width": 10.4, "margin-bottom": 0.42},
+    )
+    tape.add_body(
+        "Target speed stays fixed. Measurement decides whether the command must change.",
+        style={"width": 9.6, "align": "center", "margin-bottom": 0.2},
+    )
+
+
+def author_dashboard(b: CanvasBuilder, tape, *, time: float, feedback: bool) -> None:
+    sample = state_sample(time, feedback=feedback)
+    title = "OPEN LOOP · NOTHING MEASURES THE LOSS" if not feedback else "CLOSED LOOP · ONE CORRECTION"
+    tape.add_heading(title, style={"width": 10.2, "margin-bottom": 0.32})
+    tape.add_flex_row(
+        [
+            metric(b, "TARGET", f"{TARGET_SPEED:.2f} m/s", TARGET),
+            metric(b, "MEASURED", f"{sample['speed']:.2f} m/s", MEASURED),
+            metric(b, "ERROR", f"{sample['error']:.2f} m/s", ERROR),
+            metric(b, "COMMAND", f"{sample['command']:.2f}", COMMAND if feedback else MUTED),
+        ],
+        gap=0.24,
+        justify_content="center",
+        style={"margin-bottom": 0.28},
+    )
+    tape.add_body(
+        (
+            "The fixed command cannot react to an unmeasured hill load."
+            if not feedback
+            else "Measurement creates error; PI action raises the actuator command."
+        ),
+        style={"width": 9.4, "align": "center", "margin-bottom": 0.18},
+    )
+
+
+def author_loop(b: CanvasBuilder, tape) -> None:
+    tape.add_heading("THE LOOP KEEPS ASKING AGAIN", style={"width": 10.8, "margin-bottom": 0.48})
     nodes, edges = control_loop_diagram()
-    loop_id = b.add_diagram(
+    loop_id = tape.add_diagram(
         nodes,
         edges,
         id="control_loop",
-        style={"width": 12.8, "height": 5.2, "margin-bottom": 0.4},
-        run_time=1.6,
+        style={"width": 10.7, "height": 3.45, "margin-bottom": 0.18},
+        run_time=1.25,
     )
     for edge_id, color in (
         ("output", MEASURED),
@@ -78,158 +171,198 @@ def part_loop(b: CanvasBuilder) -> None:
         ("command", COMMAND),
         ("drive", COMMAND),
     ):
-        b.add_state_transition(
-            [
-                {
-                    "target_id": f"{loop_id}::edge:{edge_id}",
-                    "changes": {"stroke_color": color, "stroke_width": 10},
-                }
-            ],
-            run_time=0.45,
+        tape.add_state_transition(
+            [{"target_id": f"{loop_id}::edge:{edge_id}", "changes": {"stroke_color": color, "stroke_width": 5}}],
+            run_time=0.32,
         )
-    b.add_math(
-        r"e(t)=r(t)-y(t)",
-        style={"width": 6.5, "margin-bottom": 0.25},
-        run_time=1.1,
-    )
-    b.add_body(
-        "Measure speed → compute error → change throttle → measure again.",
-        style={"width": 11.6, "align": "center", "margin-bottom": 0.7},
-    )
 
 
-def part_one_correction(b: CanvasBuilder) -> None:
-    tuning = TUNINGS["balanced"]
-    sample = sample_near(
-        simulate(float(tuning["kp"]), float(tuning["ki"])),
-        4.5,
-    )
-    b.add_heading(
-        "02  FOLLOW ONE CORRECTION",
-        style={"margin-top": 2.6, "margin-bottom": 0.35},
-    )
-    nodes, edges = correction_cards(sample)
-    b.add_diagram(
-        nodes,
-        edges,
-        id="one_correction",
-        style={"width": 11.5, "height": 2.2, "margin-bottom": 0.65},
-        run_time=1.3,
-    )
-    b.add_body(
-        "The disturbance is not removed. The controller changes the input until measured output returns to target.",
-        style={"width": 12.0, "align": "center", "margin-bottom": 0.65},
-    )
-
-
-def part_recovery(b: CanvasBuilder) -> None:
-    b.add_heading(
-        "03  RECOVERY IS A TIME HISTORY",
-        style={"margin-top": 2.6, "margin-bottom": 0.8},
-    )
-    balanced_id = b.add_data_plot(
-        one_response_series("balanced"),
-        markers=[],
-        id="balanced_response",
-        style={"width": 11.0, "height": 4.0, "margin-bottom": 0.9},
-        run_time=1.6,
+def author_response(b: CanvasBuilder, tape) -> str:
+    tape.add_heading("THE PHYSICAL RECOVERY HAS A TIME HISTORY", style={"width": 10.8, "margin-bottom": 0.25})
+    plot_id = tape.add_data_plot(
+        [
+            item
+            for item in response_series(active="balanced")
+            if item["id"] in {"target", "hill", "balanced"}
+        ],
+        markers=response_markers(6.0),
+        id="live_response",
+        style={"width": 9.8, "height": 3.65, "margin-bottom": 0.2},
+        run_time=1.2,
         **PLOT_OPTIONS,
     )
-    b.add_state_transition(
+    tape.add_body(
         [
-            {
-                "target_id": f"{balanced_id}::series:balanced",
-                "changes": {"stroke_color": COMMAND, "stroke_width": 9},
-            },
-            {
-                "target_id": f"{balanced_id}::series:hill",
-                "changes": {"stroke_color": DISTURBANCE, "stroke_width": 7},
-            },
+            b.run("gold target", color=TARGET, bold=True, font_size=20),
+            b.run("  ·  "),
+            b.run("orange disturbance", color=DISTURBANCE, bold=True, font_size=20),
+            b.run("  ·  "),
+            b.run("mint response", color=COMMAND, bold=True, font_size=20),
         ],
-        run_time=0.9,
+        style={"width": 9.4, "align": "center", "margin-bottom": 0.12},
     )
-    b.add_body(
-        "Orange: hill begins at 3 s. Gold: target. Mint: balanced closed-loop response.",
-        style={"width": 11.8, "align": "center", "margin-bottom": 0.7},
-    )
+    return plot_id
 
 
-def part_tuning(b: CanvasBuilder) -> None:
-    b.add_heading(
-        "04  TUNING CHANGES THE SHAPE",
-        style={"margin-top": 2.6, "margin-bottom": 0.8},
-    )
-    tuning_id = b.add_data_plot(
+def author_comparison(b: CanvasBuilder, tape) -> None:
+    tape.add_heading("SAME HILL · FOUR CONTROL CHOICES", style={"width": 10.6, "margin-bottom": 0.25})
+    tape.add_data_plot(
         response_series(),
         markers=[],
-        id="tuning_plot",
-        style={"width": 11.0, "height": 4.0, "margin-bottom": 0.9},
-        run_time=1.6,
+        id="tuning_comparison",
+        style={"width": 9.8, "height": 3.65, "margin-bottom": 0.18},
+        run_time=1.2,
         **PLOT_OPTIONS,
     )
-    for name in ("slow", "balanced", "aggressive", "open"):
-        b.add_state_transition(
-            [
-                {
-                    "target_id": f"{tuning_id}::series:{name}",
-                    "changes": {"stroke_width": 9},
-                }
-            ],
-            run_time=0.55,
-        )
-    b.add_body(
-        "gray slow  ·  mint balanced  ·  red aggressive  ·  violet open loop",
-        style={"width": 12.6, "align": "center", "margin-bottom": 0.55},
-    )
-    b.add_math(
-        r"u(t)=K_p e(t)+K_i\int e(t)\,dt",
-        style={"width": 8.0, "margin-bottom": 0.65},
-        run_time=1.3,
-    )
-
-
-def part_finale(b: CanvasBuilder) -> None:
-    b.add_heading(
-        "STABILITY IS NOT A ONE-TIME COMMAND",
-        style={"margin-top": 2.6, "margin-bottom": 0.35},
-    )
-    b.add_body(
+    tape.add_body(
         [
-            b.run("MEASURE", color=MEASURED, bold=True, font_size=38),
-            b.run("  →  "),
-            b.run("COMPARE", color=ERROR, bold=True, font_size=38),
-            b.run("  →  "),
-            b.run("CORRECT", color=COMMAND, bold=True, font_size=38),
-            b.run("  →  REPEAT", color=TARGET, bold=True, font_size=38),
+            b.run("slow", color=str(TUNINGS["slow"]["color"]), bold=True),
+            b.run("  ·  "),
+            b.run("balanced", color=COMMAND, bold=True),
+            b.run("  ·  "),
+            b.run("aggressive", color=ERROR, bold=True),
+            b.run("  ·  "),
+            b.run("open loop", color="#9a6cff", bold=True),
         ],
-        id="feedback_cycle",
-        style={"width": 13.0, "align": "center", "margin-bottom": 0.55},
+        style={"width": 9.5, "align": "center", "margin-bottom": 0.12},
     )
-    b.add_body(
-        "Cruise control is one example. The same loop language describes temperature, motion, voltage, and process control.",
-        style={"width": 11.8, "align": "center", "margin-bottom": 0.7},
+
+
+def author_finale(b: CanvasBuilder, tape) -> None:
+    tape.add_heading(
+        [b.run("STABILITY IS A LOOP", color=WHITE, bold=True, font_size=37)],
+        style={"width": 10.2, "margin-bottom": 0.18},
     )
-    b.add_camera_focus(
-        "feedback_cycle",
-        mode="isolate",
-        zoom=1.18,
-        hold_time=0.9,
-        run_time=0.65,
-        reset_run_time=0.55,
+    tape.add_heading(
+        [b.run("NOT A ONE-TIME COMMAND", color=COMMAND, bold=True, font_size=37)],
+        style={"width": 10.2, "margin-bottom": 0.42},
     )
+    tape.add_body(
+        [
+            b.run("MEASURE", color=MEASURED, bold=True, font_size=30),
+            b.run("  →  "),
+            b.run("COMPARE", color=ERROR, bold=True, font_size=30),
+            b.run("  →  "),
+            b.run("CORRECT", color=COMMAND, bold=True, font_size=30),
+            b.run("  →  REPEAT", color=TARGET, bold=True, font_size=30),
+        ],
+        style={"width": 10.8, "align": "center", "margin-bottom": 0.15},
+    )
+
+
+def build_production() -> CanvasBuilder:
+    b = CanvasBuilder(
+        canvas_settings=CanvasSettings.for_youtube(
+            title="How Feedback Stabilizes a System",
+            background_color=BG,
+        )
+    )
+    principle = b.add_tape("principle", frame_width=11.6, frame_height=5.4)
+    open_dashboard = b.add_tape("open_dashboard", frame_width=11.6, frame_height=5.2)
+    loop = b.add_tape("control_loop", frame_width=11.8, frame_height=5.6)
+    closed_dashboard = b.add_tape("closed_dashboard", frame_width=11.6, frame_height=5.2)
+    response = b.add_tape("response", frame_width=11.8, frame_height=5.7)
+    comparison = b.add_tape("comparison", frame_width=11.8, frame_height=5.7)
+    finale = b.add_tape("finale", frame_width=11.6, frame_height=5.2)
+
+    b.add_object(
+        "FeedbackVehicleWorld",
+        id=WORLD_ID,
+        content=vehicle_world_state(0.0, feedback=True, stage="overview"),
+    )
+    start = car_position(0.0)
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[
+            b.inspect_shot(phi=67, theta=-72, zoom=0.72, target_offset=(0.0, 0.0, 0.0), run_time=1.5, hold=0.5),
+            b.inspect_shot(phi=76, theta=-90, zoom=1.55, target_offset=start, run_time=2.0, hold=0.8),
+        ],
+        return_to_sheet=False,
+    )
+    author_principle(b, principle)
+
+    # The same road disturbance is first observed with no feedback.
+    open_time = 6.0
+    b.add_element_morph(
+        WORLD_ID,
+        world_target(open_time, feedback=False, stage="disturbance"),
+        run_time=1.7,
+    )
+    open_pos = car_position(open_time)
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[
+            b.inspect_shot(phi=74, theta=-92, zoom=1.48, target_offset=open_pos, run_time=1.6, hold=0.7),
+            b.inspect_shot(phi=66, theta=-68, zoom=1.38, target_offset=open_pos, run_time=2.0, hold=0.9),
+        ],
+        return_to_sheet=False,
+    )
+    author_dashboard(b, open_dashboard, time=open_time, feedback=False)
+    author_loop(b, loop)
+
+    # Close the loop at the identical physical time and road position. Only the
+    # controller state, speed, error, and command differ.
+    b.add_element_morph(
+        WORLD_ID,
+        world_target(open_time, feedback=True, stage="measurement"),
+        run_time=1.5,
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[b.inspect_shot(phi=75, theta=-88, zoom=1.52, target_offset=open_pos, run_time=1.7, hold=1.0)],
+        return_to_sheet=False,
+    )
+    author_dashboard(b, closed_dashboard, time=open_time, feedback=True)
+    b.add_element_morph(
+        WORLD_ID,
+        world_target(open_time, feedback=True, stage="correction"),
+        run_time=1.2,
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[b.inspect_shot(phi=69, theta=-76, zoom=1.50, target_offset=open_pos, run_time=1.4, hold=0.8)],
+        return_to_sheet=False,
+    )
+    response_plot_id = author_response(b, response)
+
+    # Advance the deterministic state: car motion, measured speed, command,
+    # and response cursor all come from the same authored time.
+    recovered_time = 14.0
+    b.add_element_morph(
+        WORLD_ID,
+        world_target(recovered_time, feedback=True, stage="recovery"),
+        run_time=2.2,
+    )
+    recovered_pos = car_position(recovered_time)
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[
+            b.inspect_shot(phi=75, theta=-92, zoom=1.42, target_offset=recovered_pos, run_time=1.7, hold=0.65),
+            b.inspect_shot(phi=64, theta=-70, zoom=0.76, target_offset=(0.0, 0.0, 0.1), run_time=2.3, hold=1.0),
+        ],
+        return_to_sheet=False,
+    )
+    response.add_element_morph(response_plot_id, response_target(recovered_time), run_time=1.0)
+    response.add_body(
+        "The hill remains. Error shrinks because the controller changed the input.",
+        style={"width": 9.4, "align": "center", "margin-bottom": 0.12},
+    )
+    author_comparison(b, comparison)
+
+    b.add_element_morph(
+        WORLD_ID,
+        world_target(20.0, feedback=True, stage="recovery"),
+        run_time=1.7,
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[b.inspect_shot(phi=66, theta=-72, zoom=0.72, target_offset=(0.0, 0.0, 0.15), run_time=2.0, hold=1.0)],
+        return_to_sheet=False,
+    )
+    author_finale(b, finale)
+    return b
 
 
 class FeedbackControl(CanvasScene):
     def __init__(self, **kwargs):
-        settings = CanvasSettings.for_youtube(
-            title="How Feedback Stabilizes a System",
-            background_color=BG,
-        )
-        builder = CanvasBuilder(canvas_settings=settings)
-        part_opening(builder)
-        part_loop(builder)
-        part_one_correction(builder)
-        part_recovery(builder)
-        part_tuning(builder)
-        part_finale(builder)
-        super().__init__(dsl=builder.build(), **kwargs)
+        super().__init__(dsl=build_production().build(), **kwargs)

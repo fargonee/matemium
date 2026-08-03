@@ -1,460 +1,397 @@
-"""Flagship physics showcase: orbit as continuous free fall."""
+"""Cinematic flagship: orbit as continuous free fall.
+
+The production alternates between one persistent spatial model and three
+camera-facing tapes. A tape closes over the free 3D world like a curtain,
+presents one readable analytical context, then opens back to the world.
+"""
 
 from __future__ import annotations
 
-from canvas import CanvasElement, CanvasScene, CanvasSettings, LayoutBox
+from canvas import CanvasElement, CanvasScene, CanvasSettings
 from canvas.builder import CanvasBuilder
 
 from .helpers import (
     ACCELERATION_CORAL,
     ALTITUDE_KM,
     EARTH_BLUE,
+    ELLIPSE_VIOLET,
     ESCAPE_GOLD,
-    MUTED,
     ORBIT_CYAN,
     REENTRY_CORAL,
     VELOCITY_GOLD,
     circular_speed,
     gravity_at_altitude,
     gravity_fraction,
-    launch_markers,
-    launch_trials,
-    local_vector_diagram,
-    one_trial_plot_series,
-    orbit_plot_series,
+    orbital_world_state,
 )
 
-BG = "#07111f"
+BG = "#030914"
 WHITE = "#f4f8ff"
 SOFT = "#b9c7da"
-PLOT_STYLE = {"width": 9.2, "height": 4.65, "margin-bottom": 0.55}
-PLOT_OPTIONS = {
-    "markers": launch_markers(),
-    "x_range": [-3.2, 3.2, 1],
-    "y_range": [-3.2, 3.2, 1],
-    "width": 6.8,
-    "height": 4.25,
-    "tips": False,
-}
+WORLD_ID = "orbital_world"
 
 
-def trial_plot_target(trial_id: str) -> CanvasElement:
-    """Morph target with the same resolved footprint as the source plot."""
+def world_target(
+    regime: str,
+    *,
+    vectors: bool = True,
+    animate_satellite: bool | None = None,
+) -> CanvasElement:
+    """Morph target for the registered project-local spatial model."""
 
     return CanvasElement(
-        id=f"launch_experiment_{trial_id}",
-        type="DataPlot",
-        content={
-            "series": one_trial_plot_series(trial_id),
-            **PLOT_OPTIONS,
-        },
-        layout=LayoutBox(
-            width=9.2,
-            height=4.65,
-            margin_bottom=0.55,
+        id=WORLD_ID,
+        type="OrbitalWorld",
+        content=orbital_world_state(
+            regime,
+            vectors=vectors,
+            animate_satellite=animate_satellite,
         ),
+        auto_focus=False,
     )
 
 
-def card(
+def metric_card(
     b: CanvasBuilder,
-    title: str,
+    label: str,
     value: str,
     color: str,
     *,
-    width: float = 3.6,
+    width: float = 2.7,
 ) -> dict:
     return b.text_spec(
+        [b.run(f"{label}\n{value}", color=color, bold=True, font_size=22)],
+        style={"width": width, "height": 1.05, "wrap": True},
+    )
+
+
+def author_title_tape(b: CanvasBuilder, tape) -> None:
+    tape.add_heading(
         [
-            b.run(f"{title}\n{value}", color=color, font_size=24),
+            b.run("WHY AN ORBIT IS A ", color=WHITE, bold=True, font_size=31),
+            b.run("CONTINUOUS FALL", color=ORBIT_CYAN, bold=True, font_size=31),
         ],
-        style={"width": width, "height": 1.35, "wrap": True},
+        id="hero_title",
+        style={"width": 6.1, "margin-bottom": 0.28},
     )
-
-
-# ---DIV: Opening question---
-def part_opening(b: CanvasBuilder) -> None:
-    b.add_heading(
-        [
-            b.run("ORBIT", color=ORBIT_CYAN, bold=True, font_size=52),
-            b.run(" IS A CONTINUOUS FALL", color=WHITE, bold=True, font_size=52),
+    tape.add_body(
+        "Gravity never switches off. Sideways motion keeps moving the miss.",
+        id="hero_premise",
+        style={"width": 5.6, "align": "center", "margin-bottom": 0.32},
+    )
+    tape.add_solid(
+        "sphere",
+        id="embedded_earth",
+        size=0.72,
+        color=EARTH_BLUE,
+        opacity=0.9,
+        lift=0.24,
+        style={"width": 1.15, "height": 1.15, "margin-bottom": 0.2},
+    )
+    tape.add_solid_rotation(
+        "embedded_earth",
+        path=[
+            b.rotate_shot(axis="x", angle=18, run_time=0.55),
+            b.rotate_shot(axis="y", angle=105, run_time=0.85, hold=0.25),
         ],
-        style={"width": 13.0, "margin-bottom": 0.45},
-    )
-    b.add_body(
-        "A satellite is always falling toward Earth. The puzzle is why it never arrives.",
-        style={"width": 10.8, "align": "center", "margin-bottom": 1.0},
-    )
-    b.add_flex_row(
-        [
-            card(b, "GRAVITY", "still pulls inward", ACCELERATION_CORAL),
-            card(b, "VELOCITY", "carries it sideways", VELOCITY_GOLD),
-            card(b, "CURVATURE", "Earth falls away below", EARTH_BLUE),
-        ],
-        gap=0.55,
-        justify_content="center",
-        style={"margin-bottom": 1.5},
     )
 
 
-# ---DIV: Gravity is still present---
-def part_gravity(b: CanvasBuilder) -> None:
-    fraction = gravity_fraction()
+def author_telemetry_tape(b: CanvasBuilder, tape) -> None:
     gravity = gravity_at_altitude()
-    b.add_heading(
-        "Weightless does not mean gravity-free",
-        style={"width": 11.0, "margin-bottom": 0.45},
-    )
-    b.add_flex_row(
-        [
-            card(
-                b,
-                f"AT {ALTITUDE_KM:.0f} km",
-                f"g ≈ {gravity:.2f} m/s²",
-                EARTH_BLUE,
-                width=4.1,
-            ),
-            card(
-                b,
-                "THAT IS",
-                f"{100.0 * fraction:.0f}% of surface gravity",
-                ACCELERATION_CORAL,
-                width=4.5,
-            ),
-        ],
-        gap=0.7,
-        justify_content="center",
-        style={"margin-bottom": 0.65},
-    )
-    b.add_body(
-        "Astronauts float because spacecraft and occupants accelerate together in free fall.",
-        style={"width": 10.7, "align": "center", "margin-bottom": 1.35},
-    )
-
-
-# ---DIV: Three controlled launches---
-def part_launch_experiment(b: CanvasBuilder) -> None:
-    trials = launch_trials()
-    b.add_heading(
-        "One launch point. Only the sideways speed changes.",
-        style={"width": 12.4, "margin-bottom": 0.35},
-    )
-    b.add_body(
-        "Normalized teaching view • altitude is exaggerated • drag is ignored",
-        style={"width": 10.5, "align": "center", "margin-bottom": 0.55},
-    )
-    plot_id = b.add_data_plot(
-        one_trial_plot_series("reentry"),
-        id="launch_experiment",
-        style=PLOT_STYLE,
-        run_time=1.5,
-        **PLOT_OPTIONS,
-    )
-    b.add_flex_row(
-        [
-            card(
-                b,
-                "TRIAL 1 · TOO SLOW",
-                f"{trials[0]['speed_km_s']:.2f} km/s → intersects Earth",
-                REENTRY_CORAL,
-                width=5.0,
-            ),
-            card(
-                b,
-                "WHAT CHANGED?",
-                "sideways distance before falling inward",
-                SOFT,
-                width=5.0,
-            ),
-        ],
-        gap=0.65,
-        justify_content="center",
-        style={"margin-bottom": 0.8},
-    )
-    b.add_element_morph(
-        plot_id,
-        trial_plot_target("circular"),
-        run_time=1.35,
-    )
-    b.add_flex_row(
-        [
-            card(
-                b,
-                "TRIAL 2 · CIRCULAR",
-                f"{trials[1]['speed_km_s']:.2f} km/s → keeps missing",
-                ORBIT_CYAN,
-                width=5.0,
-            ),
-            card(
-                b,
-                "THE BALANCE",
-                "the path bends as fast as Earth curves away",
-                ORBIT_CYAN,
-                width=5.0,
-            ),
-        ],
-        gap=0.65,
-        justify_content="center",
-        style={"margin-bottom": 0.8},
-    )
-    b.add_element_morph(
-        plot_id,
-        trial_plot_target("escape"),
-        run_time=1.35,
-    )
-    b.add_flex_row(
-        [
-            card(
-                b,
-                "TRIAL 3 · ESCAPE",
-                f"{trials[2]['speed_km_s']:.2f} km/s → positive energy",
-                ESCAPE_GOLD,
-                width=5.0,
-            ),
-            card(
-                b,
-                "NOT JUST “HIGH”",
-                "speed exceeds the local escape threshold",
-                ESCAPE_GOLD,
-                width=5.0,
-            ),
-        ],
-        gap=0.65,
-        justify_content="center",
-        style={"margin-bottom": 1.5},
-    )
-
-
-# ---DIV: Compare the regimes---
-def part_comparison(b: CanvasBuilder) -> None:
-    b.add_heading(
-        "The same gravity produces three different paths",
-        style={"width": 11.8, "margin-bottom": 0.45},
-    )
-    comparison_id = b.add_data_plot(
-        orbit_plot_series(),
-        id="regime_comparison",
-        style=PLOT_STYLE,
-        run_time=1.5,
-        **PLOT_OPTIONS,
-    )
-    b.add_flex_row(
-        [
-            card(b, "TOO SLOW", "re-entry", REENTRY_CORAL, width=3.35),
-            card(b, "JUST RIGHT", "circular orbit", ORBIT_CYAN, width=3.35),
-            card(b, "ESCAPE", "positive energy", ESCAPE_GOLD, width=3.35),
-        ],
-        gap=0.55,
-        justify_content="center",
-        style={"margin-bottom": 0.65},
-    )
-    b.add_state_transition(
-        [
-            {
-                "target_id": f"{comparison_id}::series:reentry",
-                "changes": {"stroke_width": 8},
-            },
-            {
-                "target_id": f"{comparison_id}::series:circular",
-                "changes": {"stroke_opacity": 0.22},
-            },
-            {
-                "target_id": f"{comparison_id}::series:escape",
-                "changes": {"stroke_opacity": 0.22},
-            },
-        ],
-        run_time=0.8,
-    )
-    b.add_state_transition(
-        [
-            {
-                "target_id": f"{comparison_id}::series:reentry",
-                "changes": {"stroke_opacity": 0.22, "stroke_width": 4},
-            },
-            {
-                "target_id": f"{comparison_id}::series:circular",
-                "changes": {"stroke_opacity": 1.0, "stroke_width": 8},
-            },
-        ],
-        run_time=0.8,
-    )
-    b.add_state_transition(
-        [
-            {
-                "target_id": f"{comparison_id}::series:circular",
-                "changes": {"stroke_opacity": 0.22, "stroke_width": 4},
-            },
-            {
-                "target_id": f"{comparison_id}::series:escape",
-                "changes": {"stroke_opacity": 1.0, "stroke_width": 8},
-            },
-        ],
-        run_time=0.8,
-    )
-    b.add_state_transition(
-        [
-            {
-                "target_id": f"{comparison_id}::series:reentry",
-                "changes": {"stroke_opacity": 1.0},
-            },
-            {
-                "target_id": f"{comparison_id}::series:circular",
-                "changes": {"stroke_opacity": 1.0},
-            },
-        ],
-        run_time=0.65,
-    )
-
-
-# ---DIV: Local vector geometry---
-def part_vectors(b: CanvasBuilder) -> None:
-    nodes, edges = local_vector_diagram()
-    b.add_heading(
-        "Freeze one instant on the circular path",
-        style={"width": 11.0, "margin-bottom": 0.45},
-    )
-    vector_id = b.add_diagram(
-        nodes,
-        edges,
-        id="orbital_vectors",
-        style={"width": 8.4, "height": 4.35, "margin-bottom": 0.45},
-        run_time=1.35,
-    )
-    b.add_state_transition(
-        [
-            {
-                "target_id": f"{vector_id}::edge:velocity",
-                "changes": {"stroke_width": 9, "stroke_color": VELOCITY_GOLD},
-            },
-            {
-                "target_id": f"{vector_id}::edge:acceleration",
-                "changes": {"stroke_opacity": 0.22},
-            },
-        ],
-        run_time=0.75,
-    )
-    b.add_body(
-        [
-            b.run(
-                "Velocity points tangent to the path.",
-                color=VELOCITY_GOLD,
-                bold=True,
-            ),
-        ],
-        style={"width": 8.8, "align": "center", "margin-bottom": 0.35},
-    )
-    b.add_state_transition(
-        [
-            {
-                "target_id": f"{vector_id}::edge:velocity",
-                "changes": {"stroke_opacity": 0.22, "stroke_width": 6},
-            },
-            {
-                "target_id": f"{vector_id}::edge:acceleration",
-                "changes": {"stroke_opacity": 1.0, "stroke_width": 9},
-            },
-            {
-                "target_id": f"{vector_id}::edge-label:acceleration",
-                "changes": {"color": ACCELERATION_CORAL},
-            },
-        ],
-        run_time=0.75,
-    )
-    b.add_body(
-        [
-            b.run(
-                "Acceleration points inward. Here, gravity is the centripetal force.",
-                color=ACCELERATION_CORAL,
-                bold=True,
-            ),
-        ],
-        style={"width": 10.1, "align": "center", "margin-bottom": 1.2},
-    )
-
-
-# ---DIV: Governing relationship---
-def part_equation(b: CanvasBuilder) -> None:
+    fraction = gravity_fraction()
     speed = circular_speed()
-    b.add_heading(
-        "Now the geometry becomes an equation",
-        style={"width": 10.8, "margin-bottom": 0.75},
+    tape.add_heading(
+        "LOW-ORBIT TELEMETRY",
+        id="telemetry_title",
+        style={"width": 5.8, "margin-bottom": 0.25},
     )
-    b.add_flex_row(
+    tape.add_flex_row(
         [
-            b.math_spec(
-                r"\underbrace{\frac{GMm}{r^2}}_{\text{gravity inward}}",
-                style={"width": 3.65, "height": 2.1},
+            metric_card(
+                b,
+                f"ALTITUDE {ALTITUDE_KM:.0f} km",
+                f"g = {gravity:.2f} m/s²",
+                ACCELERATION_CORAL,
             ),
-            b.math_spec(
-                r"=\underbrace{\frac{mv^2}{r}}_{\text{curved motion}}",
-                style={"width": 3.65, "height": 2.1},
+            metric_card(
+                b,
+                "SURFACE GRAVITY",
+                f"{100.0 * fraction:.0f}% remains",
+                EARTH_BLUE,
             ),
         ],
-        gap=0.5,
+        gap=0.28,
         justify_content="center",
-        style={"margin-bottom": 0.55},
+        style={"margin-bottom": 0.25},
     )
-    b.add_math(
-        r"v_{\mathrm{circular}}=\sqrt{\frac{GM}{r}}",
-        id="circular_speed_law",
-        style={"width": 7.2, "margin-bottom": 0.55},
-        run_time=1.4,
+    tape.add_math(
+        r"v_{\rm circular}=\sqrt{\frac{GM}{r}}",
+        id="speed_law",
+        style={"width": 4.5, "margin-bottom": 0.2},
+        run_time=1.0,
     )
-    b.add_camera_focus(
-        "circular_speed_law",
-        mode="isolate",
-        zoom=1.55,
-        hold_time=1.0,
-        run_time=0.8,
-        reset_run_time=0.65,
-    )
-    b.add_body(
-        f"At {ALTITUDE_KM:.0f} km:  v ≈ {speed:.2f} km/s",
-        style={"width": 8.0, "align": "center", "margin-bottom": 1.3},
+    tape.add_body(
+        f"At this altitude: {speed:.2f} km/s",
+        id="speed_value",
+        style={"width": 4.8, "align": "center", "margin-bottom": 0.15},
     )
 
 
-# ---DIV: Final synthesis---
-def part_finale(b: CanvasBuilder) -> None:
-    b.add_heading(
+def author_regime_heading(b: CanvasBuilder, tape) -> None:
+    tape.add_heading(
+        "ONE LAUNCH POINT · ONLY SPEED CHANGES",
+        id="regime_title",
+        style={"width": 6.0, "margin-bottom": 0.26},
+    )
+    tape.add_body(
         [
-            b.run("FALLING", color=ACCELERATION_CORAL, bold=True, font_size=48),
-            b.run(" + ", color=MUTED, bold=True, font_size=48),
-            b.run("MISSING", color=ORBIT_CYAN, bold=True, font_size=48),
+            b.run(
+                "Normalized two-body model · altitude exaggerated · drag omitted",
+                color=SOFT,
+                font_size=18,
+            )
         ],
-        style={"width": 10.6, "margin-bottom": 0.5},
+        id="model_disclosure",
+        style={"width": 6.0, "height": 0.52, "align": "center", "margin-bottom": 0.25},
     )
-    b.add_body(
-        "Orbit is not a place where gravity stops.",
-        style={"width": 9.4, "align": "center", "margin-bottom": 0.4},
-    )
-    b.add_body(
-        "It is the motion of falling around Earth—again and again—without reaching the ground.",
-        style={"width": 11.0, "align": "center", "margin-bottom": 1.2},
-    )
-    b.add_body(
-        "INWARD GRAVITY  +  TANGENT VELOCITY\n=  CONTINUOUS FREE FALL",
+
+
+def author_regime_result(
+    b: CanvasBuilder,
+    tape,
+    *,
+    element_id: str,
+    label: str,
+    outcome: str,
+    color: str,
+) -> None:
+    tape.add_body(
+        [
+            b.run(f"{label}\n", color=color, bold=True, font_size=25),
+            b.run(outcome, color=SOFT, font_size=21),
+        ],
+        id=element_id,
         style={
-            "width": 10.8,
+            "width": 5.5,
+            "height": 0.92,
             "align": "center",
-            "margin-bottom": 0.4,
+            "margin-bottom": 0.22,
         },
     )
 
 
-# ---DIV: Main scene---
+def build_production() -> CanvasBuilder:
+    settings = CanvasSettings.for_youtube(
+        title="Why an Orbit Is a Continuous Fall",
+        background_color=BG,
+    )
+    b = CanvasBuilder(canvas_settings=settings)
+
+    # Tapes are foreground presentation contexts. They deliberately have no
+    # world pose: the runtime closes the selected tape over the camera.
+    title_tape = b.add_tape(
+        "principle_panel",
+        frame_width=6.6,
+        frame_height=4.6,
+    )
+    telemetry_tape = b.add_tape(
+        "telemetry_panel",
+        frame_width=6.4,
+        frame_height=4.8,
+    )
+    regime_tape = b.add_tape(
+        "regime_panel",
+        frame_width=6.5,
+        frame_height=5.4,
+    )
+    closing_tape = b.add_tape(
+        "closing_panel",
+        frame_width=6.4,
+        frame_height=4.8,
+    )
+
+    # Persistent center of the production: it exists before the first shot and
+    # survives every analytical insert.
+    b.add_object(
+        "OrbitalWorld",
+        id=WORLD_ID,
+        content=orbital_world_state("circular", vectors=False),
+    )
+    # Establish the whole system from above the limb, then make one deliberate
+    # move to the pole-on teaching view. The speed experiment stays locked there.
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[
+            b.inspect_shot(
+                phi=68,
+                theta=-90,
+                zoom=1.15,
+                hold=1.8,
+                run_time=0.01,
+                target_offset=(0.0, 0.0, 0.28),
+            ),
+            b.inspect_shot(
+                phi=2,
+                theta=-90,
+                zoom=1.45,
+                hold=1.6,
+                run_time=3.2,
+            ),
+        ],
+        return_to_sheet=False,
+    )
+
+    author_title_tape(b, title_tape)
+
+    # Replay the same release while adding only tangential speed. Each path and
+    # moving satellite comes from the same deterministic two-body integration.
+    b.add_element_morph(
+        WORLD_ID,
+        world_target("drop", animate_satellite=True),
+        run_time=0.9,
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[b.inspect_shot(phi=2, theta=-90, zoom=1.45, hold=2.5, run_time=0.01)],
+        return_to_sheet=False,
+    )
+    b.add_element_morph(
+        WORLD_ID,
+        world_target("short_arc", animate_satellite=True),
+        run_time=0.85,
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[b.inspect_shot(phi=2, theta=-90, zoom=1.45, hold=2.1, run_time=0.01)],
+        return_to_sheet=False,
+    )
+    b.add_element_morph(
+        WORLD_ID,
+        world_target("long_arc", animate_satellite=True),
+        run_time=0.85,
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[b.inspect_shot(phi=2, theta=-90, zoom=1.45, hold=2.1, run_time=0.01)],
+        return_to_sheet=False,
+    )
+    b.add_element_morph(
+        WORLD_ID,
+        world_target("reentry", animate_satellite=True),
+        run_time=0.85,
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[b.inspect_shot(phi=2, theta=-90, zoom=1.45, hold=2.2, run_time=0.01)],
+        return_to_sheet=False,
+    )
+    b.add_element_morph(
+        WORLD_ID,
+        world_target("circular", animate_satellite=True),
+        run_time=1.0,
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[b.inspect_shot(phi=2, theta=-90, zoom=1.45, hold=4.0, run_time=0.01)],
+        return_to_sheet=False,
+    )
+
+    author_telemetry_tape(b, telemetry_tape)
+
+    # Continue above circular speed without changing the observation axis.
+    # The first faster case is deliberately still bound; only the final state
+    # exceeds escape speed and opens the trajectory.
+    b.add_element_morph(
+        WORLD_ID,
+        world_target("ellipse", animate_satellite=True),
+        run_time=1.15,
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[b.inspect_shot(phi=2, theta=-90, zoom=1.15, hold=4.2, run_time=0.01)],
+        return_to_sheet=False,
+    )
+    b.add_element_morph(
+        WORLD_ID,
+        world_target("escape", animate_satellite=True),
+        run_time=1.15,
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[
+            b.inspect_shot(
+                phi=2,
+                theta=-90,
+                zoom=0.9,
+                hold=4.2,
+                run_time=0.01,
+                target_offset=(0.45, 0.0, 0.0),
+            )
+        ],
+        return_to_sheet=False,
+    )
+
+    # One compact recap follows the uninterrupted visual experiment.
+    author_regime_heading(b, regime_tape)
+    author_regime_result(
+        b,
+        regime_tape,
+        element_id="circular_result",
+        label="CIRCULAR SPEED",
+        outcome="falling inward exactly matches curvature",
+        color=ORBIT_CYAN,
+    )
+    author_regime_result(
+        b,
+        regime_tape,
+        element_id="ellipse_result",
+        label="FASTER THAN CIRCULAR",
+        outcome="the path widens, but remains bound",
+        color=ELLIPSE_VIOLET,
+    )
+    author_regime_result(
+        b,
+        regime_tape,
+        element_id="escape_result",
+        label="ABOVE ESCAPE SPEED",
+        outcome="positive energy opens the trajectory",
+        color=ESCAPE_GOLD,
+    )
+
+    # Resolve the speed experiment back into the central claim and finish with
+    # one stable world observation before the final tape closes.
+    b.add_element_morph(
+        WORLD_ID,
+        world_target("circular", animate_satellite=True),
+        run_time=1.25,
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[b.inspect_shot(phi=2, theta=-90, zoom=1.35, hold=3.2, run_time=0.01)],
+        return_to_sheet=False,
+    )
+    closing_tape.add_heading(
+        [
+            b.run("ORBIT IS ", color=WHITE, bold=True, font_size=30),
+            b.run("CONTINUOUS FALL", color=ORBIT_CYAN, bold=True, font_size=30),
+        ],
+        id="closing_title",
+        style={"width": 6.0, "margin-bottom": 0.42},
+    )
+    closing_tape.add_body(
+        [
+            b.run("FALLING INWARD", color=ACCELERATION_CORAL, bold=True, font_size=27),
+            b.run(" + ", color=SOFT, bold=True, font_size=27),
+            b.run("MOVING SIDEWAYS", color=VELOCITY_GOLD, bold=True, font_size=27),
+            b.run("\n= CONTINUALLY MISSING EARTH", color=ORBIT_CYAN, bold=True, font_size=27),
+        ],
+        id="final_synthesis",
+        style={"width": 6.0, "height": 1.5, "align": "center", "margin-bottom": 0.2},
+    )
+    return b
+
+
 class OrbitalMechanics(CanvasScene):
     def __init__(self, **kwargs):
-        settings = CanvasSettings.for_youtube(
-            title="Why an Orbit Is a Continuous Fall",
-            background_color=BG,
-        )
-        builder = CanvasBuilder(canvas_settings=settings)
-        part_opening(builder)
-        part_gravity(builder)
-        part_launch_experiment(builder)
-        part_comparison(builder)
-        part_vectors(builder)
-        part_equation(builder)
-        part_finale(builder)
-        super().__init__(dsl=builder.build(), **kwargs)
+        super().__init__(dsl=build_production().build(), **kwargs)

@@ -1,34 +1,45 @@
-# Authoring feedback: World War I chain reaction
+# Authoring feedback — World War I chain reaction
 
-> **Historical evidence:** Recorded against the pre-mutation engine. The current
-> engine now provides semantic diagrams, addressable node/edge state,
-> synchronized transitions, and morphs. These address part of the gap, but this
-> scene has not been reauthored, source-reviewed, or visually accepted;
-> map/timeline layout remains project-level or future general work.
+## Current evidence
 
-## Current pass
+- One structured event dataset drives nine dated July Crisis entries.
+- Semantic diagrams express the selected decision network and relative
+  geography without pretending to be a complete alliance chart or border map.
+- Three contingency cards and four causal layers distinguish chronology from
+  historical interpretation.
+- `check_project` passes with 35 authored timeline items and no diagnostics.
+- One 2180×8160 full-tape PNG was inspected as the economical authoring gate.
 
-- Nine dated July Crisis events, locations, four causal layers, alternative moments, and interpretation
-  boundaries are represented.
-- Dates remain visible as evidence rather than being replaced with undated “dominoes.”
+## Engine changes required
 
-## What the current engine could express
+None. Text, rich runs, flex layout, semantic diagrams, root-tape travel, and
+focus cover this explanation without history-specific engine behavior.
 
-Precise textual timelines, aligned rows, causal categories, and staged narrative work.
+## Authoring and visual findings
 
-## What prevented flagship-quality execution
+- Auto-sized text inside three-column timeline rows made short place names much
+  larger than long ones. Uniform rich-text event lines produced a stable
+  chronology.
+- Directed connector arrowheads crossed compact country labels. A connector-free
+  semantic node map plus explicit relationship statements remained clearer.
+- The geography is deliberately schematic and is labelled as such on screen.
+- Chronology, network, geography, contingency, and causal interpretation remain
+  separate sections so that their evidential roles are not conflated.
 
-- There is no general timeline component with scale, dated markers, intervals, and addressable events.
-- Maps need a vector-shape/path layer with geographic coordinates and data-bound labels; image-only maps
-  would not be sufficiently editable or semantic.
-- Actor/decision networks need routed connectors and branch states.
-- Timeline selection cannot drive map emphasis and evidence notes as linked views.
-- Source/evidence metadata has no first-class inspectable representation.
+## Honest remaining limitations
 
-The general abstractions are temporal scales, vector layers, graph connectors, linked selections, and
-provenance metadata—not a WWI-specific map.
+- The project does not include a historically precise 1914 vector border map.
+- The relationship display is selected explanatory evidence, not a complete
+  diplomatic or alliance network.
+- There is no linked temporal cursor that drives simultaneous timeline, map,
+  and network state.
+- Full-tape acceptance does not replace a final 1920×1080 mute-video master or
+  independent historian review.
 
-## Evidence level
+## Generalizable maturity conclusion
 
-Importable and structurally valid; chronology is internally consistent but still requires a formal historian/
-source review. Geographic, network, linked-view, and production acceptance remain unmet.
+The engine can explain historical escalation through structured chronology,
+semantic relationships, spatial context, contingency, and layered causation.
+Temporal scales, routed connectors, linked selections, and inspectable source
+metadata remain useful general engine directions, but should be designed across
+domains rather than patched specifically for the July Crisis.

@@ -6,18 +6,18 @@
   "production_path_basis": "The full information-flow explanation must remain understandable without narration or music.",
   "audience": "Secondary-school and introductory biology learners",
   "assumed_knowledge": ["cells contain DNA", "sequences have direction", "proteins are amino-acid polymers"],
-  "central_message": "Cells preserve and transform sequence information through transcription, RNA processing, and translation before folding and maturation contribute to function.",
+  "central_message": "Cells preserve and transform sequence information through transcription, RNA processing, export, and translation into an amino-acid sequence.",
   "takeaway": "A traceable nucleotide sequence can become an amino-acid sequence, but real gene expression and protein maturation are richer than a linear cartoon.",
   "platform": "website showcase and bundled desktop example",
   "orientation": "landscape",
   "aspect_ratio": "16:9",
   "resolution_master": "1920x1080",
-  "duration_target_seconds": {"minimum": 45, "maximum": 60},
+  "duration_target_seconds": {"minimum": 65, "maximum": 75},
   "language": "English",
   "scientific_depth": "introductory eukaryotic transcription directionality, complementary RNA, processing/export, codon translation, stop signaling, and folding boundaries",
-  "visual_direction": "dark molecular storyboard with stable colors for DNA, RNA, exons, ribosome context, and amino-acid sequence",
+  "visual_direction": "dark multiscale spatial journey with large high-contrast sans-serif labels and stable colors for gene, DNA, RNA, pore, ribosome, peptide, and schematic protein",
   "tone": "traceable, spatial, biologically cautious",
-  "pacing": "function hook, scale ladder, transcription, processing/export, translation, folding boundary, synthesis",
+  "pacing": "cell entry, nucleus and gene approach, sequence tape, transcription, pore export, translation, folding boundary, synthesis",
   "audio": {"final_track": "none", "must_remain_understandable_without_sound": true},
   "constraints": [
     "offline and deterministic",
@@ -30,9 +30,11 @@
     "DNA template and mRNA are exactly complementary",
     "codons map to Met-Pro-Lys-Gly followed by Stop",
     "cell, nucleus, gene, and sequence contexts remain explicit",
+    "RNA assembly, intron removal, exon joining, and nuclear-pore export are visibly staged",
+    "translation repeats codon highlight, tRNA arrival, amino-acid delivery, and ribosome movement",
     "processing and export precede translation",
     "folding limitations appear before the final synthesis"
   ],
   "readiness": {"status": "ready", "missing_fields": []},
-  "last_updated": "2026-07-27"
+  "last_updated": "2026-08-03"
 }

@@ -14,8 +14,6 @@ class TraceScene(CanvasScene):
         b = CanvasBuilder(title="CacheBust")
         tape = b.add_tape("main")
         tape.add_heading("Tape A")
-        tid = b.add_tape("tape_b", position=(10, 10, 10))
-        with b.in_object_space(tid):
-            tape.add_heading("Tape B")
+        tape_b = b.add_tape("tape_b")
+        tape_b.add_heading("Tape B")
         super().__init__(dsl=b.build(), **kwargs)
-

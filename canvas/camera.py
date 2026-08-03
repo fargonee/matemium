@@ -1,11 +1,11 @@
-"""Camera controller supporting both legacy tape and the unified 3D world model.
+"""Camera controller for free-world observation and camera-facing tapes.
 
 Coordinate model
 ----------------
-* Objects (including TapeObject) live in world space via WorldTransform.
-* Default observation for any target (including TapeObjects): cinematic 3D.
-* TapeScroll target: activates tape-scroll-mode using the tape's internal local coords + full world transform.
-* Legacy sheet behavior fully preserved for default (identity) root tape.
+* Free objects live in world space via ``WorldTransform``.
+* A selected tape is a flat foreground presentation context.
+* ``TapeScroll`` moves through the selected tape's local 2D coordinates.
+* Switching back to a world target opens the tape curtain.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from .coords import (
     frame_center_for_scroll,
     WorldTransform,
     SHEET_PLANE_Z,
+    get_tape_scroll_camera_pose,
     local_to_world_point,
 )
 from .inspect_path import CameraPose
@@ -59,6 +60,7 @@ def _camera_rotation_from_angles(phi_deg: float, theta_deg: float, gamma_deg: fl
     # Match Manim ThreeDCamera.generate_rotation_matrix order:
     # rotz(gamma) @ rotx(-phi) @ rotz(-theta-90)
     return _rot_z(gamma) @ _rot_x(beta) @ _rot_z(alpha)
+
 
 class CameraController:
     """Pan, zoom, and optional tilt over the XY sheet at z = 0."""
@@ -206,6 +208,90 @@ class CameraController:
             phi=self._phi.get_value(),
             theta=self._theta.get_value(),
             zoom=max(self._zoom.get_value(), 0.05),
+        )
+
+    def snap_to_sheet(
+        self,
+        *,
+        target_x: float = 0.0,
+        target_y: float = 0.0,
+        zoom: float = 1.0,
+    ) -> None:
+        """Assign a tape camera pose without creating a visible camera move."""
+        self._view_mode = "sheet"
+        self._x.set_value(float(target_x))
+        self._y.set_value(float(target_y))
+        self._inspect_x.set_value(float(target_x))
+        self._inspect_y.set_value(float(target_y))
+        self._inspect_z.set_value(0.0)
+        self._phi.set_value(SHEET_PHI_DEG)
+        self._theta.set_value(SHEET_THETA_DEG)
+        self._gamma.set_value(0.0)
+        self._zoom.set_value(max(float(zoom), 0.05))
+        self.camera.use_orthographic_projection = True
+        self._sync_camera(self._dummy, 0.0)
+
+    def snap_to_pose(self, pose: CameraPose) -> None:
+        """Assign an inspect pose without interpolating through intermediate views."""
+        self._view_mode = "inspect"
+        self._x.set_value(float(pose.target_x))
+        self._y.set_value(float(pose.target_y))
+        self._inspect_x.set_value(float(pose.target_x))
+        self._inspect_y.set_value(float(pose.target_y))
+        self._inspect_z.set_value(float(pose.target_z))
+        self._phi.set_value(float(pose.phi))
+        self._theta.set_value(float(pose.theta))
+        self._gamma.set_value(0.0)
+        self._zoom.set_value(max(float(pose.zoom), 0.05))
+        self.camera.use_orthographic_projection = False
+        self._sync_camera(self._dummy, 0.0)
+
+    def resolve_observation_pose(
+        self,
+        target: "ObservationTarget",
+        *,
+        tape: Optional["TapeObject"] = None,
+        target_transform: Optional["WorldTransform"] = None,
+        target_pos_world: Optional[tuple[float, float, float]] = None,
+    ) -> CameraPose:
+        """Resolve the stable endpoint used for a world-observation cut."""
+        face_on = False
+        if target_pos_world is not None:
+            pos = target_pos_world
+            face_on = (
+                isinstance(target, ObjectAnchor)
+                and getattr(target, "framing", "cinematic") == "face_on"
+            )
+        elif hasattr(target, "position"):
+            pos = target.position
+        elif isinstance(target, ObjectAnchor):
+            pos = (0.0, 0.0, 0.0)
+            if tape and getattr(target, "object_id", None) in (
+                getattr(tape, "id", None),
+                "root_tape",
+            ):
+                local_anchor = tape.get_anchor(getattr(target, "anchor", "center"))
+                transform = getattr(tape, "world_transform", None)
+                if transform is not None:
+                    pos = local_to_world_point(
+                        (local_anchor.x, local_anchor.y, local_anchor.z),
+                        transform,
+                    )
+                    target_transform = target_transform or transform
+            face_on = getattr(target, "framing", "cinematic") == "face_on"
+        else:
+            pos = (0.0, 0.0, 0.0)
+
+        phi, theta = 60.0, -45.0
+        if face_on and target_transform is not None:
+            phi, theta = get_tape_scroll_camera_pose(target_transform)
+        return CameraPose(
+            target_x=float(pos[0]),
+            target_y=float(pos[1]),
+            target_z=float(pos[2]) if len(pos) > 2 else 0.0,
+            phi=phi,
+            theta=theta,
+            zoom=self.current_zoom,
         )
 
     def pose_anims(
@@ -365,8 +451,8 @@ class CameraController:
         self._apply_sheet_camera_settings()
 
     # === Phase 3 additions: generalized 3D observation (per clarified model) ===
-    # Default for any target (WorldPoint, ObjectAnchor on tape or other) is normal cinematic 3D.
-    # Only explicit TapeScroll activates tape-scroll-mode (internal tape logic + local measurements).
+    # WorldPoint/ObjectAnchor select free-world observation. TapeScroll selects
+    # one isolated, camera-facing tape context.
 
     def observe_target(
         self,
@@ -377,17 +463,7 @@ class CameraController:
         target_transform: Optional["WorldTransform"] = None,
         target_pos_world: Optional[tuple[float, float, float]] = None,
     ) -> None:
-        """Observe a target using the clarified 3D world model.
-
-        - Normal 3D observation (WorldPoint, ObjectAnchor on anything including tapes):
-          Cinematic 3D look/follow using world coordinates. No internal tape sheet logic.
-        - TapeScroll: explicitly activates tape-scroll-mode.
-          Uses tape's *local* measurement at local_y, transforms to world via the tape's
-          full world_transform (pos+rot+scale), and activates scoped internal tape
-          behaviors (the caller in scene decides when to drive reveal/focus from it).
-
-        Legacy CameraMove on default tape maps to tape-scroll for exact old behavior.
-        """
+        """Observe a free-world target or scroll an isolated foreground tape."""
         # Normalize dict targets from serialization
         if isinstance(target, dict):
             kind = target.get("kind", "world_point")
@@ -443,11 +519,6 @@ class CameraController:
                 self.camera.use_orthographic_projection = True
 
                 phi, theta, gamma = self._phi.get_value(), self._theta.get_value(), self._gamma.get_value()
-                if tape and getattr(tape, "world_transform", None):
-                    phi, theta, gamma = get_tape_straight_above_angles(tape.world_transform)
-                    phi = _closest_angle(self._phi.get_value(), phi)
-                    theta = _closest_angle(self._theta.get_value(), theta)
-                    gamma = _closest_angle(self._gamma.get_value(), gamma)
 
                 local_x = self.tape_center_x  # 0 for content center; focus drives per-elem x
 
@@ -511,10 +582,8 @@ class CameraController:
             
             if is_face_on and target_transform:
                 self.camera.use_orthographic_projection = True
-                phi, theta, gamma = get_tape_straight_above_angles(target_transform)
-                phi = _closest_angle(self._phi.get_value(), phi)
-                theta = _closest_angle(self._theta.get_value(), theta)
-                gamma = _closest_angle(self._gamma.get_value(), gamma)
+                phi, theta = get_tape_scroll_camera_pose(target_transform)
+                gamma = 0.0
                 self.scene.play(
                     self._x.animate(rate_func=rate_func, run_time=run_time).set_value(x),
                     self._y.animate(rate_func=rate_func, run_time=run_time).set_value(y),
@@ -539,4 +608,3 @@ class CameraController:
                     run_time=run_time,
                 )
             self.camera.frame_center = np.array([x, y, z or SHEET_PLANE_Z])
-

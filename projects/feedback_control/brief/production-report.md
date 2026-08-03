@@ -2,29 +2,37 @@
 
 ## Outcome
 
-- **Project behavior completed:** Physical disturbance, semantic feedback loop,
-  one numerical correction, balanced recovery, tuning comparison, open-loop
-  boundary, and synthesis.
+- **Project behavior:** One persistent 3D vehicle encounters the same hill in
+  open- and closed-loop states. Numerical dashboard, causal loop, recovery
+  plot, tuning comparison, and physical world share deterministic model data.
 - **Engine behavior changed:** None.
-- **Authoring check:** 32 authored timeline items with no diagnostics.
-- **Accepted preview:** 960×540, 15 fps, 47.865690 seconds, 1,601,350 bytes,
-  and 57 rendered animations.
-- **Mute verification:** One H.264 video stream and no audio stream.
+- **Project-local work:** Rebuilt `FeedbackVehicleWorld` in native `z`-up 3D
+  coordinates with surfaced terrain, detailed vehicle, wheel motion, staged
+  attached signal callouts, and stable semantic parts. Reframed every physical
+  shot from a consistent above-road camera side. Repaired heading spacing and
+  causal-diagram connector overlap.
+- **Structural gate:** Strict DSL validation passed with 44 timeline items,
+  seven tapes, and one world object.
+- **Economical full preview:** 480×270 landscape, 10 fps, 57.9 seconds, 86
+  animations.
 
-## Visual repair record
+## Visual inspection
 
-1. The first preview exposed overlong block labels, four colliding flex cards,
-   plot titles inside chart areas, and a legend touching the x-axis.
-2. Labels were reduced to semantic essentials and the exact PI law moved to
-   Math.
-3. A four-node diagram replaced the correction flex row.
-4. Plot footprints were reduced and title/legend margins increased.
-5. Full-resolution repaired frames show clean physical/loop diagrams,
-   separated values, unobstructed response charts, and a clear final cycle.
+The full preview established that all world/tape transitions render together.
+Its contact sheet exposed residual car occlusion and label density, which were
+repaired. Final 960×540 still renders then verified disturbance, measurement,
+correction, wheel visibility, road contact, windows, lights, leader lines, and
+side/three-quarter camera readability. Direct 540 px tape exports verified the
+principle, causal loop, and finale after typography and overlap repairs.
+The final Cairo depth-order repair was visually checked at theta `-68°`,
+`-90°`, and `-92°`, plus an out-of-corridor `-100°` stress angle. Camera-side
+body skin, windows, wheel faces, lamps, vectors, and labels remain visible at
+every inspected angle.
 
 ## Honest readiness
 
-The preview is accepted as a bundled flagship candidate. Public delivery still
-requires an inspected 1920×1080 master and independent controls sign-off. The
-scene uses staged model snapshots and sampled curves rather than claiming a
-reactive shared-clock simulation.
+Repaired website-showcase candidate. The final small geometry refinements have
+focused still evidence but have not received another full-sequence render.
+Final preview/master and independent controls review remain pending. Model
+views share explicit timestamps but are not a continuously reactive engine
+binding.

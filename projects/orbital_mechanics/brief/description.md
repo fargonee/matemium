@@ -4,7 +4,7 @@
 
 - **Subject:** Physics
 - **Project slug:** `orbital_mechanics`
-- **Status:** Flagship reauthoring complete; preview visually accepted; final-quality website master pending
+- **Status:** Cinematic reauthoring and visual preview pass; human showcase acceptance and final master pending
 - **Central question:** Why does a satellite keep falling toward Earth without hitting it?
 - **Primary audience:** General science learners with an intuitive understanding of velocity and gravity
 - **Target format:** 16:9 flagship master, approximately 50–70 seconds; a longer narrated adaptation may follow
@@ -27,18 +27,22 @@ The viewer should understand:
 
 ## Narrative arc
 
-1. **The misconception:** Place an astronaut and satellite above Earth and ask whether gravity has vanished.
-2. **Ordinary fall:** Drop an object vertically and show its velocity growing downward.
-3. **Sideways launch:** Give the object horizontal velocity and draw the curved path.
-4. **Newton’s mountain:** Increase launch speed through several controlled trials as Earth curves away beneath the object.
-5. **Force and velocity:** Freeze a point on the successful orbit and display tangent velocity and inward acceleration vectors.
-6. **The governing relationship:** Connect `GMm/r² = mv²/r` to the already understood geometry.
-7. **Three outcomes:** Compare re-entry, circular orbit, and escape-like trajectory with the same initial position.
-8. **Synthesis:** Return to the opening satellite and state that orbit is falling while continually missing the ground.
+1. **Establish the world:** Approach one persistent Earth/orbit system
+   cinematographically.
+2. **State the puzzle:** Close a compact principle tape over the camera.
+3. **Force and velocity:** Observe tangent velocity and inward gravity on the
+   moving circular satellite assembly.
+4. **Quantify:** Pause the world behind a camera-facing telemetry tape, then
+   reopen it.
+5. **Controlled launch experiment:** Morph the same physical world through
+   re-entry, circular, and escape states while changing only initial speed.
+6. **Synthesis:** Pull back to the world, then close with the principle tape:
+   orbit is falling while continually missing Earth.
 
 ## Visual and motion direction
 
-- Use a restrained, physically legible space scene rather than a cinematic star field.
+- Use a restrained but cinematic physical scene; camera motion must reveal
+  geometry rather than decorate it.
 - Keep trajectory, velocity, and acceleration colors consistent.
 - Exaggerate Earth curvature only when explicitly identified as a teaching view.
 - Display trials from the same launch point so speed is the meaningful changing variable.
@@ -53,7 +57,10 @@ The viewer should understand:
 - camera movement across large spatial scales;
 - equations connected to physical objects;
 - traces, annotations, and freeze-frame inspection;
-- optional 3D perspective used only where it improves orbital understanding.
+- a persistent volumetric world alternating with multiple readable tapes;
+- world → tape, tape → tape, and tape → world curtain transitions;
+- solid 3D content embedded on a tape;
+- cinematic camera observations that preserve spatial continuity.
 
 ## Required source and assets
 
@@ -77,4 +84,7 @@ The viewer should understand:
 - Physics claims and numerical labels receive an explicit review.
 - The scene has no spatial discontinuities during camera transitions.
 - It renders from source alone and can be modified by changing a small set of initial conditions.
-- The output is suitable as Matemium’s primary physics showcase.
+- The source passes structural validation and a complete low-resolution runtime
+  smoke.
+- The final output is accepted by a human as Matemium’s primary physics
+  showcase.

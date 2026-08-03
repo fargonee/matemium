@@ -155,7 +155,7 @@ async def list_tools() -> list[Tool]:
                     "scene_name": {"type": "string"},
                     "quality": {
                         "type": "string",
-                        "enum": ["preview", "draft", "low", "medium", "high", "final"],
+                        "enum": ["fast_preview", "preview", "draft", "low", "medium", "high", "final"],
                         "default": "preview",
                     },
                 },

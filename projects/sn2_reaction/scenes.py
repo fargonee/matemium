@@ -1,263 +1,182 @@
-"""Portrait chemistry flagship: a concerted SN2 substitution."""
+"""Mobile-first SN2 flagship: one event, one locked spatial reference.
+
+The key mechanism stays in a persistent project-local 3D world. One ordinary
+tape is used only for the closing synthesis; it is not falsely composited over
+the molecule. Molecular geometry and the energy marker are generated from the
+same authored reaction-progress state.
+"""
 
 from __future__ import annotations
 
-from canvas import CanvasElement, CanvasScene, CanvasSettings, LayoutBox
+from canvas import CanvasElement, CanvasScene, CanvasSettings
 from canvas.builder import CanvasBuilder
 
 from .helpers import (
     BG,
-    BREAKING,
-    BROMINE,
     ENERGY,
     FORMING,
-    OXYGEN,
+    GROUP_3,
     SOFT,
-    WHITE,
-    energy_marker,
-    energy_plot_series,
-    mechanism_diagram,
-    steric_access_diagram,
+    reaction_world_state,
 )
 
-DIAGRAM_STYLE = {"width": 7.6, "height": 5.15, "margin-bottom": 0.55}
-PLOT_STYLE = {"width": 7.6, "height": 4.15, "margin-bottom": 0.55}
-PLOT_OPTIONS = {
-    "x_range": [0.0, 1.0, 0.25],
-    "y_range": [-0.25, 1.1, 0.25],
-    "width": 6.2,
-    "height": 3.55,
-    "tips": False,
+WORLD_ID = "sn2_world"
+
+# After one short establishing move, every chemically important change uses
+# this exact camera. The C--Br axis therefore remains a stable screen-space
+# reference and molecular inversion cannot be mistaken for camera rotation.
+LOCKED_SHOT = {
+    "phi": 76.0,
+    "theta": -78.0,
+    "zoom": 1.08,
+    "run_time": 0.35,
+    "hold": 0.0,
 }
 
 
-def diagram_target(state: str) -> CanvasElement:
-    nodes, edges = mechanism_diagram(state)
+def world_target(
+    progress: float,
+    *,
+    cue: str,
+    show_energy: bool = False,
+    show_reference_plane: bool = False,
+    comparison: bool = False,
+) -> CanvasElement:
     return CanvasElement(
-        id=f"mechanism_{state}",
-        type="Diagram",
-        content={"nodes": nodes, "edges": edges},
-        layout=LayoutBox(width=7.6, height=5.15, margin_bottom=0.55),
+        id=WORLD_ID,
+        type="SN2ReactionWorld",
+        content=reaction_world_state(
+            progress,
+            cue=cue,
+            show_energy=show_energy,
+            show_reference_plane=show_reference_plane,
+            comparison=comparison,
+        ),
+        auto_focus=False,
     )
 
 
-def energy_target(state: str) -> CanvasElement:
-    return CanvasElement(
-        id=f"energy_{state}",
-        type="DataPlot",
-        content={
-            "series": energy_plot_series(),
-            "markers": energy_marker(state),
-            **PLOT_OPTIONS,
-        },
-        layout=LayoutBox(width=7.6, height=4.15, margin_bottom=0.55),
-    )
+def add_locked_hold(b: CanvasBuilder, seconds: float) -> None:
+    shot = dict(LOCKED_SHOT)
+    shot["run_time"] = 0.20
+    shot["hold"] = seconds
+    b.add_camera_inspect(WORLD_ID, path=[shot], return_to_sheet=False)
 
 
-def steric_target(crowded: bool) -> CanvasElement:
-    nodes, edges = steric_access_diagram(crowded)
-    state = "crowded" if crowded else "open"
-    return CanvasElement(
-        id=f"steric_{state}",
-        type="Diagram",
-        content={"nodes": nodes, "edges": edges},
-        layout=LayoutBox(width=7.6, height=4.7, margin_bottom=0.55),
+def author_final_tape(b: CanvasBuilder, tape) -> None:
+    tape.add_heading(
+        "ONE CONCERTED EVENT:",
+        id="final_title",
+        style={"width": 7.2, "align": "center", "font-size": 43, "margin-bottom": 0.48},
     )
-
-
-# ---DIV: Opening---
-def part_opening(b: CanvasBuilder) -> None:
-    b.add_heading(
-        [b.run("ONE STEP.", color=FORMING, bold=True, font_size=48)],
-        style={"width": 7.6, "margin-bottom": 0.08},
-    )
-    b.add_heading(
-        [b.run("TWO BONDS.", color=BREAKING, bold=True, font_size=48)],
-        style={"width": 7.6, "margin-bottom": 0.55},
-    )
-    b.add_body(
-        "How can a new bond form at the same moment another bond breaks?",
-        style={"width": 7.2, "align": "center", "margin-bottom": 0.6},
-    )
-    b.add_math(
-        r"\mathrm{Nu^- + R{-}Br \longrightarrow R{-}Nu + Br^-}",
-        style={"width": 7.2, "margin-bottom": 0.9},
-        run_time=1.3,
-    )
-    b.add_body(
-        "SN2 is a concerted substitution: one coordinated passage, not two separate reactions.",
-        style={"width": 7.2, "align": "center", "margin-bottom": 1.1},
-    )
-
-
-# ---DIV: Roles and backside attack---
-def part_mechanism(b: CanvasBuilder) -> None:
-    nodes, edges = mechanism_diagram("reactants")
-    b.add_heading(
-        "Backside attack sets the geometry",
-        style={"width": 7.5, "margin-bottom": 0.4},
-    )
-    mechanism_id = b.add_diagram(
-        nodes,
-        edges,
-        id="sn2_mechanism",
-        style=DIAGRAM_STYLE,
-        run_time=1.35,
-    )
-    b.add_body(
-        "HO⁻ approaches the electrophilic carbon opposite the C—Br bond.",
-        style={"width": 7.2, "align": "center", "margin-bottom": 1.05},
-    )
-    b.add_state_transition(
+    tape.add_body(
         [
-            {
-                "target_id": f"{mechanism_id}::node:nu",
-                "changes": {"fill_opacity": 0.75, "scale": 1.1},
-            },
-            {
-                "target_id": f"{mechanism_id}::edge:leaving",
-                "changes": {"stroke_width": 9},
-            },
+            b.run("BACKSIDE ATTACK", color=FORMING, bold=True, font_size=32),
+            b.run("  ·  ", color=SOFT, font_size=30),
+            b.run("SIMULTANEOUS BOND CHANGE", color=ENERGY, bold=True, font_size=32),
+            b.run("\nINVERSION", color=GROUP_3, bold=True, font_size=32),
         ],
+        id="final_synthesis",
+        style={"width": 7.2, "height": 1.50, "align": "center", "margin-bottom": 0.34},
+    )
+
+
+def build_production() -> CanvasBuilder:
+    b = CanvasBuilder(
+        canvas_settings=CanvasSettings.for_reels(
+            title="Inside an SN2 Reaction",
+            background_color=BG,
+        )
+    )
+    finale = b.add_tape("finale", frame_width=7.5, frame_height=4.4)
+
+    # 1. Enter directly into the persistent molecule. Its first state carries
+    # the large reaction identity and atom labels inside the spatial world.
+    b.add_object(
+        "SN2ReactionWorld",
+        id=WORLD_ID,
+        content=reaction_world_state(0.0, cue="identity"),
+    )
+    b.add_camera_inspect(
+        WORLD_ID,
+        path=[
+            b.inspect_shot(phi=66, theta=-48, zoom=0.90, run_time=1.15, hold=0.30),
+            b.inspect_shot(**LOCKED_SHOT),
+        ],
+        return_to_sheet=False,
+    )
+    add_locked_hold(b, 1.35)
+
+    # 2. Establish the axis, its two sides, the attack arrow, and 180 degrees.
+    b.add_element_morph(
+        WORLD_ID,
+        world_target(0.0, cue="alignment"),
         run_time=0.75,
     )
+    add_locked_hold(b, 2.55)
+
+    # 3. Keep the camera fixed while both bonds and the umbrella geometry
+    # change. The transition state freezes with two equally prominent dashes.
     b.add_element_morph(
-        mechanism_id,
-        diagram_target("transition"),
-        run_time=1.4,
-    )
-    b.add_body(
-        "TRANSITION STATE\nBoth C···O and C···Br are partial. There is no isolable intermediate.",
-        style={"width": 7.2, "align": "center", "margin-bottom": 0.65},
-    )
-    b.add_element_morph(
-        mechanism_id,
-        diagram_target("products"),
-        run_time=1.4,
-    )
-    b.add_body(
-        "The three substituents emerge on the opposite side: stereochemical inversion.",
-        style={"width": 7.2, "align": "center", "margin-bottom": 1.0},
-    )
-
-
-# ---DIV: Energy coordinate---
-def part_energy(b: CanvasBuilder) -> None:
-    b.add_heading(
-        "One mechanism. One energy barrier.",
-        style={"width": 7.5, "margin-bottom": 0.4},
-    )
-    plot_id = b.add_data_plot(
-        energy_plot_series(),
-        markers=energy_marker("reactants"),
-        id="sn2_energy",
-        style=PLOT_STYLE,
-        run_time=1.3,
-        **PLOT_OPTIONS,
-    )
-    b.add_body(
-        "REACTANTS\nseparate nucleophile and substrate",
-        style={"width": 6.9, "align": "center", "margin-bottom": 0.45},
-    )
-    b.add_element_morph(plot_id, energy_target("transition"), run_time=1.0)
-    b.add_body(
-        "ENERGY MAXIMUM\none transition state with two partial bonds",
-        style={"width": 6.9, "align": "center", "margin-bottom": 0.45},
-    )
-    b.add_state_transition(
-        [
-            {
-                "target_id": f"{plot_id}::series:profile",
-                "changes": {"stroke_color": ENERGY, "stroke_width": 9},
-            },
-            {
-                "target_id": f"{plot_id}::marker:progress",
-                "changes": {"scale": 1.45},
-            },
-        ],
-        run_time=0.7,
-    )
-    b.add_element_morph(plot_id, energy_target("products"), run_time=1.0)
-    b.add_body(
-        "PRODUCTS\nnew C—O bond; bromide has departed",
-        style={"width": 6.9, "align": "center", "margin-bottom": 0.45},
-    )
-    b.add_body(
-        "STANDARD ELEMENTARY CASE",
-        style={"width": 6.9, "align": "center", "margin-bottom": 0.25},
-    )
-    b.add_math(
-        r"\mathrm{rate}=k[\mathrm{Nu^-}][\mathrm{R{-}Br}]",
-        style={"width": 6.4, "margin-bottom": 1.0},
-        run_time=1.2,
-    )
-
-
-# ---DIV: Steric access---
-def part_sterics(b: CanvasBuilder) -> None:
-    nodes, edges = steric_access_diagram(False)
-    b.add_heading(
-        "Backside access can be blocked",
-        style={"width": 7.4, "margin-bottom": 0.4},
-    )
-    steric_id = b.add_diagram(
-        nodes,
-        edges,
-        id="steric_access",
-        style={"width": 7.6, "height": 4.7, "margin-bottom": 0.55},
+        WORLD_ID,
+        world_target(0.22, cue="concerted", show_reference_plane=True),
         run_time=1.25,
     )
-    b.add_body(
-        "LESS CROWDED\nThe nucleophile can reach the carbon along the backside path.",
-        style={"width": 7.2, "align": "center", "margin-bottom": 0.55},
+    b.add_element_morph(
+        WORLD_ID,
+        world_target(0.50, cue="concerted", show_reference_plane=True),
+        run_time=1.65,
     )
-    b.add_element_morph(steric_id, steric_target(True), run_time=1.25)
-    b.add_body(
-        "MORE CROWDED\nBulky groups obstruct approach and slow the SN2 pathway.",
-        style={"width": 7.2, "align": "center", "margin-bottom": 1.0},
+    add_locked_hold(b, 1.15)
+    b.add_element_morph(
+        WORLD_ID,
+        world_target(0.78, cue="concerted", show_reference_plane=True),
+        run_time=1.25,
     )
+    b.add_element_morph(
+        WORLD_ID,
+        world_target(1.0, cue="concerted", show_reference_plane=True),
+        run_time=1.20,
+    )
+    add_locked_hold(b, 0.45)
 
+    # 4. Replay the same authored progress with a large energy coordinate in
+    # the same registered world. The dot and molecular state share `progress`.
+    for progress, run_time, hold in (
+        (0.0, 0.80, 0.10),
+        (0.25, 0.90, 0.0),
+        (0.50, 1.05, 0.55),
+        (0.75, 0.90, 0.0),
+        (1.0, 0.90, 0.20),
+    ):
+        b.add_element_morph(
+            WORLD_ID,
+            world_target(progress, cue="energy", show_energy=True),
+            run_time=run_time,
+        )
+        if hold:
+            add_locked_hold(b, hold)
 
-# ---DIV: Synthesis---
-def part_finale(b: CanvasBuilder) -> None:
-    b.add_heading(
-        "CONCERTED",
-        style={"width": 7.3, "margin-bottom": 0.45},
+    # 5. Clear the graph back to the product before opening the fixed-camera,
+    # fixed-plane comparison. This avoids a graph-to-stereochemistry tangle
+    # and does not ask the viewer to remember a prior rotating view.
+    b.add_element_morph(
+        WORLD_ID,
+        world_target(1.0, cue="inversion", show_reference_plane=True),
+        run_time=0.60,
     )
-    b.add_body(
-        "BACKSIDE APPROACH\n+  BOND-MAKING\n+  BOND-BREAKING\n+  INVERSION",
-        style={"width": 7.0, "align": "center", "margin-bottom": 0.8},
+    b.add_element_morph(
+        WORLD_ID,
+        world_target(1.0, cue="inversion", comparison=True),
+        run_time=0.80,
     )
-    b.add_body(
-        "Four observations. One molecular event.",
-        style={"width": 7.0, "align": "center", "margin-bottom": 0.55},
-    )
-    b.add_math(
-        r"\mathrm{Nu^- \;\cdots\; C \;\cdots\; Br}",
-        id="sn2_signature",
-        style={"width": 6.2, "margin-bottom": 0.7},
-        run_time=1.2,
-    )
-    b.add_camera_focus(
-        "sn2_signature",
-        mode="isolate",
-        zoom=1.35,
-        hold_time=0.9,
-        run_time=0.7,
-        reset_run_time=0.6,
-    )
+    add_locked_hold(b, 2.65)
+
+    # 6. End with exactly the requested synthesis, at mobile scale.
+    author_final_tape(b, finale)
+    return b
 
 
 class SN2Reaction(CanvasScene):
     def __init__(self, **kwargs):
-        settings = CanvasSettings.for_reels(
-            title="Inside an SN2 Reaction",
-            background_color=BG,
-        )
-        builder = CanvasBuilder(canvas_settings=settings)
-        part_opening(builder)
-        part_mechanism(builder)
-        part_energy(builder)
-        part_sterics(builder)
-        part_finale(builder)
-        super().__init__(dsl=builder.build(), **kwargs)
+        super().__init__(dsl=build_production().build(), **kwargs)

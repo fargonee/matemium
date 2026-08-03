@@ -4,10 +4,10 @@
 
 - **Subject:** Biology
 - **Project slug:** `dna_to_protein`
-- **Status:** Flagship preview accepted; final 1920×1080 master and independent molecular-biology sign-off pending
+- **Status:** Revised 1440×810, 30 fps flagship draft visually inspected; final 1920×1080 master and independent molecular-biology sign-off pending
 - **Central question:** How does information stored in DNA become a working protein?
 - **Primary audience:** Secondary-school and introductory biology learners
-- **Target format:** 16:9 mute flagship master, approximately 45–60 seconds
+- **Target format:** 16:9 mute flagship master, approximately 65–75 seconds
 
 ## Purpose
 
@@ -28,19 +28,20 @@ The viewer should understand:
 
 ## Narrative arc
 
-1. **Begin with function:** Show a protein performing a simplified cellular role, then ask where its structure came from.
-2. **Move inward:** Travel from cell to nucleus to a specific region of DNA.
-3. **Transcription:** Open a local DNA region and build RNA while preserving base-pair correspondence.
-4. **Processing and export:** Condense the essential idea of splicing and move mature mRNA through the nuclear boundary.
-5. **Translation:** Follow codons through a ribosome as matching tRNAs deliver amino acids.
-6. **Growing chain:** Keep codons and amino acids synchronized.
-7. **Folding:** Transition from linear chain to a restrained schematic protein form.
-8. **Return to function:** Reconnect the completed protein to the opening cellular role.
-9. **Model boundary:** Note that regulation, folding, and cellular machinery are richer than the compact explanation.
+1. **Move inward:** Establish cell, nucleus, chromosome, and one DNA region with large labels.
+2. **Expose DNA:** Open the selected region before any RNA appears.
+3. **Transcription:** Assemble complementary RNA codon-by-codon along the template.
+4. **Processing:** Separate introns, move exons together, and identify mature mRNA.
+5. **Export:** Move mature mRNA through a clearly labelled nuclear pore.
+6. **Translation:** Repeat codon highlight, matching tRNA arrival, amino-acid delivery, and ribosome movement.
+7. **Growing chain:** Keep codons and amino acids synchronized through the stop signal.
+8. **Model boundary:** State that the four-residue trace is not a real protein or structure prediction.
+9. **Synthesis:** Close on `DNA → RNA → CODONS → PROTEIN` without claiming an unshown function.
 
 ## Visual and motion direction
 
-- Establish a stable scale ladder: cell, nucleus, DNA region, molecular machinery.
+- Establish a stable camera journey through authored levels of detail: cell,
+  nucleus, DNA region, molecular machinery.
 - Use consistent base and amino-acid color mapping without relying on color alone.
 - Keep directionality explicit: template reading direction, RNA growth, and ribosome movement.
 - Use spatial transitions to show location changes rather than arbitrary scene cuts.
@@ -50,7 +51,7 @@ The viewer should understand:
 ## Matemium capabilities this project must demonstrate
 
 - multiscale camera transitions;
-- staged biological processes;
+- a persistent multiscale 3D world with staged biological processes;
 - sequence transformations;
 - repeated data-driven molecular units;
 - synchronized codon, tRNA, and amino-acid states;
@@ -77,6 +78,6 @@ The viewer should understand:
 - A biology reviewer verifies complementarity, directionality, codon grouping, and cellular locations.
 - One highlighted information segment remains traceable from DNA through amino-acid sequence.
 - Scale transitions preserve orientation and narrative continuity.
-- The protein’s final role clearly connects to the opening.
+- The conclusion stops at protein unless a specific protein function is actually visualized.
 - The scene renders from source with no required external video.
 - The output demonstrates that Matemium can explain complex, multiscale living processes.
