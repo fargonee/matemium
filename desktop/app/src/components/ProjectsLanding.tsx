@@ -30,6 +30,7 @@ interface GalleryItem {
   description?: string;
   youtube_id?: string;
   video_src?: string;
+  video_webm_src?: string;
   poster_src?: string;
   orientation?: "portrait" | "landscape";
   tags?: string[];
@@ -43,6 +44,7 @@ const FLAGSHIP_OUTCOMES: GalleryItem[] = [
     title: "Why an Orbit Is a Continuous Fall",
     description: "Tangent velocity, inward gravity, and three launch speeds inside one persistent 3D world.",
     video_src: "/showcase/orbital-mechanics.mp4",
+    video_webm_src: "/showcase/orbital-mechanics.webm",
     poster_src: "/showcase/orbital-mechanics.jpg",
     orientation: "portrait",
     tags: ["physics", "3D world"],
@@ -54,6 +56,7 @@ const FLAGSHIP_OUTCOMES: GalleryItem[] = [
     title: "Inside an SN2 Reaction",
     description: "Backside attack, simultaneous bond change, and inversion held in one stable molecular view.",
     video_src: "/showcase/sn2-reaction.mp4",
+    video_webm_src: "/showcase/sn2-reaction.webm",
     poster_src: "/showcase/sn2-reaction.jpg",
     orientation: "portrait",
     tags: ["chemistry", "3D molecule"],
@@ -65,6 +68,7 @@ const FLAGSHIP_OUTCOMES: GalleryItem[] = [
     title: "From DNA to Protein",
     description: "A multiscale journey through transcription, RNA processing, export, and translation.",
     video_src: "/showcase/dna-to-protein.mp4",
+    video_webm_src: "/showcase/dna-to-protein.webm",
     poster_src: "/showcase/dna-to-protein.jpg",
     orientation: "landscape",
     tags: ["biology", "multiscale"],
@@ -76,6 +80,7 @@ const FLAGSHIP_OUTCOMES: GalleryItem[] = [
     title: "How Feedback Stabilizes a System",
     description: "Cruise control connects a physical disturbance to measurement, correction, and recovery.",
     video_src: "/showcase/feedback-control.mp4",
+    video_webm_src: "/showcase/feedback-control.webm",
     poster_src: "/showcase/feedback-control.jpg",
     orientation: "landscape",
     tags: ["engineering", "systems"],
@@ -697,14 +702,16 @@ export function ProjectsLanding({
                   >
                     <div className="flagship-media-modern">
                       <video
-                        src={item.video_src}
                         poster={item.poster_src}
                         muted
                         loop
                         playsInline
                         preload="metadata"
                         aria-label={`${item.title} outcome preview`}
-                      />
+                      >
+                        {item.video_webm_src && <source src={item.video_webm_src} type="video/webm" />}
+                        {item.video_src && <source src={item.video_src} type="video/mp4" />}
+                      </video>
                       <span className="flagship-badge-modern">FLAGSHIP</span>
                       <div className="inspiration-play-overlay-modern">
                         <div className="play-button-ring-modern">
@@ -1099,13 +1106,15 @@ export function ProjectsLanding({
               {selectedVideo.video_src ? (
                 <video
                   className={`flagship-modal-video-modern flagship-modal-${selectedVideo.orientation}`}
-                  src={selectedVideo.video_src}
                   poster={selectedVideo.poster_src}
                   controls
                   autoPlay
                   muted
                   playsInline
-                />
+                >
+                  {selectedVideo.video_webm_src && <source src={selectedVideo.video_webm_src} type="video/webm" />}
+                  <source src={selectedVideo.video_src} type="video/mp4" />
+                </video>
               ) : (
                 <iframe
                   width="100%"

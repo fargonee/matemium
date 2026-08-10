@@ -125,6 +125,7 @@ screenshots/
 !desktop/app/public/showcase/
 !desktop/app/public/showcase/**/*.jpg
 !desktop/app/public/showcase/**/*.mp4
+!desktop/app/public/showcase/**/*.webm
 !public/**/*.png
 !public/**/*.jpg
 !public/**/*.svg
