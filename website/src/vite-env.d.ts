@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+declare module "virtual:matemium-articles" {
+  const articles: unknown[];
+  export default articles;
+}
+
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string;
   readonly VITE_SUPABASE_ANON_KEY: string;

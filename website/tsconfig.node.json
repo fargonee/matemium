@@ -8,5 +8,5 @@
     "strict": true,
     "noEmit": true
   },
-  "include": ["vite.config.ts", "openapi-config.mjs"]
+  "include": ["vite.config.ts", "article-content-plugin.ts", "openapi-config.mjs"]
 }

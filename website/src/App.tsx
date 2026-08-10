@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { AuthProvider } from "@/components/AuthProvider";
@@ -8,6 +9,7 @@ import { AdminLLMPage } from "@/pages/admin/AdminLLMPage";
 import { AdminOverviewPage } from "@/pages/admin/AdminOverviewPage";
 import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
 import { AuthCallbackPage } from "@/pages/AuthCallbackPage";
+import { ArticlesPage } from "@/pages/ArticlesPage";
 import { DashboardAccountPage } from "@/pages/dashboard/DashboardAccountPage";
 import { DashboardBillingPage } from "@/pages/dashboard/DashboardBillingPage";
 import { DashboardDownloadsPage } from "@/pages/dashboard/DashboardDownloadsPage";
@@ -32,6 +34,10 @@ import { TermsOfServicePage } from "@/pages/TermsOfServicePage";
 import { AdminGuard } from "@/routes/AdminGuard";
 import { AuthGuard } from "@/routes/AuthGuard";
 
+const ArticlePage = lazy(() =>
+  import("@/pages/ArticlePage").then((module) => ({ default: module.ArticlePage })),
+);
+
 export function App() {
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
@@ -41,6 +47,15 @@ export function App() {
             <Route index element={<HomePage />} />
             <Route path="showcase" element={<ShowcasePage />} />
             <Route path="showcase/:slug" element={<ShowcaseProjectPage />} />
+            <Route path="articles" element={<ArticlesPage />} />
+            <Route
+              path="articles/:slug"
+              element={(
+                <Suspense fallback={<div className="article-loading">Loading article…</div>}>
+                  <ArticlePage />
+                </Suspense>
+              )}
+            />
             <Route path="download" element={<DownloadPage />} />
             <Route path="support" element={<SupportPage />} />
             <Route path="connect" element={<ConnectPage />} />

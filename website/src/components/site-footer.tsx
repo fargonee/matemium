@@ -5,7 +5,7 @@ import { SocialLinkStrip } from "@/components/social-links";
 const GROUPS = [
   {
     title: "Explore",
-    links: [["Showcase", "/showcase"], ["Download", "/download"], ["Roadmap", "/roadmap"], ["Support", "/support"], ["Connect", "/connect"]],
+    links: [["Showcase", "/showcase"], ["Articles", "/articles"], ["Download", "/download"], ["Roadmap", "/roadmap"], ["Support", "/support"], ["Connect", "/connect"]],
   },
   {
     title: "Project",

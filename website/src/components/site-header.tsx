@@ -6,6 +6,7 @@ import type { RootState } from "@/store";
 
 const NAV_ITEMS = [
   ["/showcase", "Showcase"],
+  ["/articles", "Articles"],
   ["/roadmap", "Roadmap"],
   ["/source", "Source"],
   ["/support", "Support"],
@@ -72,7 +73,7 @@ export function SiteHeader() {
       {open ? (
         <div className="mobile-menu lg:hidden">
           {NAV_ITEMS.map(([to, label]) => (
-            <NavLink key={to} to={to} onClick={close} className={location.pathname === to ? "active" : ""}>
+            <NavLink key={to} to={to} onClick={close} className={location.pathname === to || location.pathname.startsWith(`${to}/`) ? "active" : ""}>
               {label}
             </NavLink>
           ))}
