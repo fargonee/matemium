@@ -3,6 +3,7 @@ name: Build Windows Desktop
 # Mirrors the proven Linux strategy for robustness and cost control.
 # - Cheap verification (cargo check + dummy sidecar) on PRs.
 # - Full production builds (.nsis + .msi) ONLY on version tags (v*) and manual dispatch.
+# - Full release-debug builds can be run with windows-debug-* tags.
 # - Sidecar **must** be built natively on Windows (PyInstaller).
 #
 # Expected outputs on release:
@@ -13,6 +14,7 @@ on:
   push:
     tags:
       - 'v*'
+      - 'windows-debug-*'
   pull_request:
     branches: [main]
     paths:
@@ -81,7 +83,7 @@ jobs:
         id: ver
         shell: bash
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             raw="${{ github.ref_name }}"
             ver="${raw#v}"
             echo "version=$ver" >> $GITHUB_OUTPUT
@@ -89,6 +91,7 @@ jobs:
           else
             echo "version=0.0.0-dev" >> $GITHUB_OUTPUT
             echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "Debug/manual build (no release version override)"
           fi
 
       - name: Validate tagged release metadata
