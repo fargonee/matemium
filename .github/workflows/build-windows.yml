@@ -117,7 +117,11 @@ jobs:
           choco install ffmpeg -y --no-progress
           # MiKTeX is large and slow. Install portable/basic for build-time + runtime support.
           # If this step is too slow/unreliable in future, consider documenting user-installed TeX.
-          choco install miktex -y --params="'/NoDesktopShortcuts /NoStartMenuShortcuts'" --no-progress || echo "MiKTeX install attempted (may require PATH refresh)"
+          choco install miktex -y --params="'/NoDesktopShortcuts /NoStartMenuShortcuts'" --no-progress
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "MiKTeX install attempted (may require PATH refresh)"
+            $global:LASTEXITCODE = 0
+          }
           # Ensure common paths
           echo "C:\Program Files\MiKTeX\miktex\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "C:\Program Files\ffmpeg\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
