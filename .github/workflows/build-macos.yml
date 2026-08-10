@@ -3,6 +3,7 @@ name: Build macOS Desktop
 # Full cross-architecture support (Apple Silicon + Intel).
 # - Verify job for fast PR feedback (dummy sidecar).
 # - Full builds on v* tags and workflow_dispatch only.
+# - Full release-debug builds can be run with macos-debug-* tags.
 # - Produces native .dmg / .app for each architecture.
 # - Signing happens before bundling; Tauri notarizes when Apple secrets are present.
 
@@ -10,6 +11,7 @@ on:
   push:
     tags:
       - 'v*'
+      - 'macos-debug-*'
   pull_request:
     branches: [main]
     paths:
@@ -96,7 +98,7 @@ jobs:
       - name: Determine version
         id: ver
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             raw="${{ github.ref_name }}"
             ver="${raw#v}"
             echo "version=$ver" >> $GITHUB_OUTPUT
@@ -104,6 +106,7 @@ jobs:
           else
             echo "version=0.0.0-dev" >> $GITHUB_OUTPUT
             echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "Debug/manual build (no release version override)"
           fi
 
       - name: Validate tagged release metadata
