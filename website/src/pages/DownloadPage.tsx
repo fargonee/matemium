@@ -1,28 +1,57 @@
+import { useEffect, useState } from "react";
+
+import {
+  formatReleaseDate,
+  getPlatformLinks,
+  getReleasesUrl,
+  loadLatestRelease,
+  type DownloadPlatform,
+  type DownloadLink,
+  type LatestRelease,
+} from "@/lib/githubReleases";
+
 const PLATFORMS = [
   {
+    id: "linux",
     platform: "Linux",
     detail: "Ubuntu 24.04+ · x86_64",
-    status: "Launch platform",
-    statusClass: "available",
     body: "At launch: .deb and .AppImage installers with the Matemium UI, Rust shell, and native sidecar.",
   },
   {
+    id: "windows",
     platform: "Windows",
     detail: "Windows 10/11 · x86_64",
-    status: "Launch platform",
-    statusClass: "available",
     body: "At launch: native NSIS .exe and .msi installers. Unsigned builds may show a SmartScreen warning.",
   },
   {
+    id: "macos",
     platform: "macOS",
     detail: "macOS 12+ · Apple Silicon & Intel",
-    status: "Launch platform",
-    statusClass: "available",
     body: "At launch: separate .dmg installers for Apple Silicon and Intel. Notarization depends on release credentials.",
   },
-];
+] satisfies Array<{
+  id: DownloadPlatform;
+  platform: string;
+  detail: string;
+  body: string;
+}>;
 
 export function DownloadPage() {
+  const [release, setRelease] = useState<LatestRelease | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    loadLatestRelease().then((latest) => {
+      if (!active) return;
+      setRelease(latest);
+      setLoaded(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <>
       <section className="page-hero">
@@ -34,32 +63,40 @@ export function DownloadPage() {
         </p>
       </section>
       <section className="section-shell pt-0">
+        <div className="mx-auto mb-8 max-w-3xl rounded-3xl border border-border bg-bg-card p-5 text-center">
+          <p className="text-sm font-semibold">
+            {release ? `Latest release: ${release.name}` : loaded ? "Downloads publish through GitHub Releases" : "Checking latest release..."}
+          </p>
+          <p className="mt-2 text-xs text-text-subtle">
+            {release?.publishedAt
+              ? `Published ${formatReleaseDate(release.publishedAt)}. Links below update automatically from release assets.`
+              : "If direct links are not shown yet, use GitHub Releases while the release is being published."}
+          </p>
+        </div>
         <div className="grid gap-5 md:grid-cols-3">
-          {PLATFORMS.map((item) => (
+          {PLATFORMS.map((item) => {
+            const links = getPlatformLinks(release, item.id);
+            return (
             <article key={item.platform} className="download-card">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-semibold">{item.platform}</h2>
                   <p className="mt-1 text-xs text-text-subtle">{item.detail}</p>
                 </div>
-                <span className={`release-status ${item.statusClass}`}>{item.status}</span>
+                <span className={`release-status ${links.length ? "available" : "progress"}`}>
+                  {links.length ? "Available" : "Release"}
+                </span>
               </div>
               <p className="mt-8 min-h-20 leading-7 text-text-muted">{item.body}</p>
-              <a
-                href="https://github.com/fargonee/matemium/releases"
-                target="_blank"
-                rel="noreferrer"
-                className="button-primary mt-8 w-full"
-              >
-                Check GitHub releases <span aria-hidden>↗</span>
-              </a>
+              <DownloadLinks links={links} fallbackHref={release?.htmlUrl || getReleasesUrl()} />
             </article>
-          ))}
+            );
+          })}
         </div>
         <p className="mx-auto mt-6 max-w-3xl text-center text-xs leading-5 text-text-subtle">
-          All four native targets are included in the launch release. Before launch,
-          GitHub Releases may be empty or contain drafts while every installer completes
-          clean-machine validation, signing where credentials are available, and smoke testing.
+          Direct download buttons are generated from the latest published GitHub
+          Release assets. Draft releases and Actions artifacts are intentionally
+          not exposed as stable public downloads.
         </p>
         <div className="mt-12 grid gap-8 border-t border-border pt-12 md:grid-cols-3">
           {[
@@ -75,5 +112,42 @@ export function DownloadPage() {
         </div>
       </section>
     </>
+  );
+}
+
+function DownloadLinks({
+  links,
+  fallbackHref,
+}: {
+  links: DownloadLink[];
+  fallbackHref: string;
+}) {
+  if (!links.length) {
+    return (
+      <a
+        href={fallbackHref}
+        target="_blank"
+        rel="noreferrer"
+        className="button-primary mt-8 w-full"
+      >
+        Check GitHub releases <span aria-hidden>↗</span>
+      </a>
+    );
+  }
+
+  return (
+    <div className="mt-8 grid gap-2">
+      {links.map((link) => (
+        <a
+          key={link.href}
+          href={link.href}
+          className="download-link"
+          rel="noreferrer"
+        >
+          <span>{link.label}</span>
+          {link.sizeLabel ? <small>{link.sizeLabel}</small> : null}
+        </a>
+      ))}
+    </div>
   );
 }

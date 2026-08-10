@@ -829,6 +829,14 @@
     @apply border-warning/25 bg-warning/10 text-warning;
   }
 
+  .download-link {
+    @apply flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-border-strong bg-bg-elevated/50 px-4 py-2.5 text-sm font-semibold text-text hover:border-accent hover:text-white;
+  }
+
+  .download-link small {
+    @apply shrink-0 font-mono text-[10px] font-medium text-text-subtle;
+  }
+
   .founder-note {
     @apply mx-auto max-w-4xl border-l border-accent px-6 py-4 md:px-12;
   }

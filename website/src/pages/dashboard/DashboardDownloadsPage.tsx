@@ -1,4 +1,14 @@
+import { useEffect, useState } from "react";
+
 import { Card } from "@/components/ui/card";
+import {
+  formatReleaseDate,
+  getPlatformLinks,
+  getReleasesUrl,
+  loadLatestRelease,
+  type DownloadPlatform,
+  type LatestRelease,
+} from "@/lib/githubReleases";
 
 const PLATFORMS = [
   {
@@ -22,22 +32,51 @@ const PLATFORMS = [
     status: "At launch",
     note: "Separate Apple Silicon and Intel .dmg installers.",
   },
-];
+] satisfies Array<{
+  id: DownloadPlatform;
+  name: string;
+  meta: string;
+  status: string;
+  note: string;
+}>;
 
 export function DashboardDownloadsPage() {
+  const [release, setRelease] = useState<LatestRelease | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    loadLatestRelease().then((latest) => {
+      if (!active) return;
+      setRelease(latest);
+      setLoaded(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="space-y-5">
       <Card>
         <h2 className="text-lg font-semibold">Installers</h2>
         <p className="mt-2 text-sm text-text-muted">
-          Matemium is free to use. Linux, Windows, Apple Silicon macOS, and Intel
-          macOS installers all publish with the launch release. GitHub Releases is
-          authoritative for artifacts currently available to download.
+          Matemium is free to use. This page reads the latest published GitHub
+          Release and lists the assets currently available to download.
+        </p>
+        <p className="mt-3 text-xs text-text-subtle">
+          {release
+            ? `Latest release: ${release.name}${release.publishedAt ? ` · ${formatReleaseDate(release.publishedAt)}` : ""}`
+            : loaded
+              ? "No published release assets found yet."
+              : "Checking latest release..."}
         </p>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {PLATFORMS.map((platform) => (
+        {PLATFORMS.map((platform) => {
+          const links = getPlatformLinks(release, platform.id);
+          return (
           <Card key={platform.id}>
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -45,20 +84,34 @@ export function DashboardDownloadsPage() {
                 <p className="text-xs text-text-subtle">{platform.meta}</p>
               </div>
               <span className="rounded-full bg-success/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-success">
-                {platform.status}
+                {links.length ? "Available" : platform.status}
               </span>
             </div>
             <p className="mt-3 text-sm text-text-muted">{platform.note}</p>
-            <a
-              href="https://github.com/fargonee/matemium/releases"
-              target="_blank"
-              rel="noreferrer"
-              className="mt-5 block w-full rounded-[10px] border border-border-strong px-4 py-2.5 text-center text-sm font-semibold text-text-muted hover:border-accent hover:text-text"
-            >
-              Check releases ↗
-            </a>
+            <div className="mt-5 grid gap-2">
+              {links.length ? links.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  rel="noreferrer"
+                  className="block w-full rounded-[10px] border border-border-strong px-4 py-2.5 text-center text-sm font-semibold text-text-muted hover:border-accent hover:text-text"
+                >
+                  {link.label}{link.sizeLabel ? ` · ${link.sizeLabel}` : ""}
+                </a>
+              )) : (
+                <a
+                  href={release?.htmlUrl || getReleasesUrl()}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block w-full rounded-[10px] border border-border-strong px-4 py-2.5 text-center text-sm font-semibold text-text-muted hover:border-accent hover:text-text"
+                >
+                  Check releases ↗
+                </a>
+              )}
+            </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
