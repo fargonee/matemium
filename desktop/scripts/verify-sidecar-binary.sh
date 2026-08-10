@@ -25,12 +25,19 @@ echo "==> IPC list_scenes (demo workspace)"
 WS="$(mktemp -d)"
 trap 'rm -rf "$WS"' EXIT
 cp "$DEMO" "$WS/scenes.py"
-resp="$(echo "{\"type\":\"request\",\"id\":\"2\",\"command\":\"list_scenes\",\"params\":{\"workspace\":\"$WS\"}}" | "$BIN" 2>/dev/null | tail -1)"
+WS_IPC="$WS"
+if command -v cygpath >/dev/null 2>&1; then
+  # Git Bash paths such as /tmp/... are not always visible to native Windows
+  # binaries. Use a Windows-native path with forward slashes so it is also
+  # safe to embed in JSON without escaping backslashes.
+  WS_IPC="$(cygpath -m "$WS")"
+fi
+resp="$(echo "{\"type\":\"request\",\"id\":\"2\",\"command\":\"list_scenes\",\"params\":{\"workspace\":\"$WS_IPC\"}}" | "$BIN" 2>/dev/null | tail -1)"
 echo "$resp"
 echo "$resp" | grep -q 'PortraitDemo' || { echo "FAIL: list_scenes"; exit 1; }
 
 echo "==> IPC check_project"
-resp="$(echo "{\"type\":\"request\",\"id\":\"3\",\"command\":\"check_project\",\"params\":{\"workspace\":\"$WS\",\"scene\":\"PortraitDemo\"}}" | "$BIN" 2>/dev/null | tail -1)"
+resp="$(echo "{\"type\":\"request\",\"id\":\"3\",\"command\":\"check_project\",\"params\":{\"workspace\":\"$WS_IPC\",\"scene\":\"PortraitDemo\"}}" | "$BIN" 2>/dev/null | tail -1)"
 echo "$resp"
 echo "$resp" | grep -q '"ok": true' || { echo "FAIL: check_project"; exit 1; }
 
@@ -38,7 +45,11 @@ if command -v ffmpeg >/dev/null 2>&1; then
   echo "==> IPC render_project (preview — requires ffmpeg + LaTeX)"
   out="$WS/renders"
   mkdir -p "$out"
-  resp="$(echo "{\"type\":\"request\",\"id\":\"4\",\"command\":\"render_project\",\"params\":{\"workspace\":\"$WS\",\"scene\":\"PortraitDemo\",\"quality\":\"preview\",\"output_dir\":\"$out\"}}" | "$BIN" 2>/dev/null | tail -1 || true)"
+  out_ipc="$out"
+  if command -v cygpath >/dev/null 2>&1; then
+    out_ipc="$(cygpath -m "$out")"
+  fi
+  resp="$(echo "{\"type\":\"request\",\"id\":\"4\",\"command\":\"render_project\",\"params\":{\"workspace\":\"$WS_IPC\",\"scene\":\"PortraitDemo\",\"quality\":\"preview\",\"output_dir\":\"$out_ipc\"}}" | "$BIN" 2>/dev/null | tail -1 || true)"
   echo "$resp"
   if echo "$resp" | grep -q '"video"'; then
     echo "Render smoke passed"
