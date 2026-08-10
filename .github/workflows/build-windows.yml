@@ -58,7 +58,7 @@ jobs:
           pip install -e .
 
       - name: Verify engine imports
-        run: python -c "import canvas, matemium; print('✅ Engine imports OK')"
+        run: python -c "import canvas, matemium; print('Engine imports OK')"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
