@@ -46,7 +46,7 @@ export function DownloadPage() {
               </div>
               <p className="mt-8 min-h-20 leading-7 text-text-muted">{item.body}</p>
               <a
-                href="https://github.com/fargonee/math/releases"
+                href="https://github.com/fargonee/matemium/releases"
                 target="_blank"
                 rel="noreferrer"
                 className="button-primary mt-8 w-full"

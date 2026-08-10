@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   ["/roadmap", "Roadmap"],
   ["/source", "Source"],
   ["/support", "Support"],
+  ["/connect", "Connect"],
 ];
 
 export function SiteHeader() {

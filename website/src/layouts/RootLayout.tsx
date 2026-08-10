@@ -14,6 +14,7 @@ export function RootLayout() {
       "/showcase": "Showcase — Matemium",
       "/download": "Download — Matemium",
       "/support": "Support Matemium",
+      "/connect": "Connect with Matemium",
       "/roadmap": "Roadmap — Matemium",
       "/source": "Source & license — Matemium",
       "/login": "Sign in — Matemium",

@@ -50,7 +50,7 @@ export function DashboardDownloadsPage() {
             </div>
             <p className="mt-3 text-sm text-text-muted">{platform.note}</p>
             <a
-              href="https://github.com/fargonee/math/releases"
+              href="https://github.com/fargonee/matemium/releases"
               target="_blank"
               rel="noreferrer"
               className="mt-5 block w-full rounded-[10px] border border-border-strong px-4 py-2.5 text-center text-sm font-semibold text-text-muted hover:border-accent hover:text-text"

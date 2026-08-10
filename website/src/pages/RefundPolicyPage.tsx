@@ -44,8 +44,8 @@ export function RefundPolicyPage() {
         <h2>4. Contact</h2>
         <p>
           For account or access questions, email{" "}
-          <a href="mailto:contact@matemium.fargonee.space" className="text-accent">
-            contact@matemium.fargonee.space
+          <a href="mailto:matemiumm@gmail.com" className="text-accent">
+            matemiumm@gmail.com
           </a>.
         </p>
       </div>

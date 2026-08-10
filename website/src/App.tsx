@@ -14,6 +14,7 @@ import { DashboardDownloadsPage } from "@/pages/dashboard/DashboardDownloadsPage
 import { DashboardOverviewPage } from "@/pages/dashboard/DashboardOverviewPage";
 import { DashboardUsagePage } from "@/pages/dashboard/DashboardUsagePage";
 import { AcceptableUsePage } from "@/pages/AcceptableUsePage";
+import { ConnectPage } from "@/pages/ConnectPage";
 import { EULAPage } from "@/pages/EULAPage";
 import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
@@ -42,6 +43,7 @@ export function App() {
             <Route path="showcase/:slug" element={<ShowcaseProjectPage />} />
             <Route path="download" element={<DownloadPage />} />
             <Route path="support" element={<SupportPage />} />
+            <Route path="connect" element={<ConnectPage />} />
             <Route path="roadmap" element={<RoadmapPage />} />
             <Route path="source" element={<SourcePage />} />
             <Route path="pricing" element={<PricingPage />} />

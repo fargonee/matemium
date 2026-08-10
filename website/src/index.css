@@ -882,6 +882,155 @@
   .roadmap-now { @apply border-accent/50 bg-accent/5; }
   .roadmap-now li i { @apply bg-accent; box-shadow: 0 0 10px rgba(116,103,240,.8); }
 
+  .connect-page-hero {
+    background:
+      radial-gradient(circle at 18% 45%, rgba(97, 221, 176, 0.08), transparent 25rem),
+      radial-gradient(circle at 82% 12%, rgba(116, 103, 240, 0.14), transparent 28rem);
+  }
+
+  .connect-intro {
+    @apply mb-12 grid gap-6 border-b border-border pb-10 lg:grid-cols-[1fr_0.8fr] lg:items-end;
+  }
+
+  .connect-intro > p {
+    @apply max-w-2xl text-base leading-7 text-text-muted lg:justify-self-end;
+  }
+
+  .social-link-grid {
+    @apply grid gap-3 sm:grid-cols-2 lg:grid-cols-5;
+  }
+
+  .home-connect-section .social-link-grid {
+    @apply mt-12;
+  }
+
+  .social-link-card {
+    @apply relative flex min-h-56 flex-col overflow-hidden rounded-2xl border border-border bg-bg-card p-5 text-text transition-all;
+    background:
+      radial-gradient(circle at 6% 2%, color-mix(in srgb, var(--social-accent) 12%, transparent), transparent 9rem),
+      var(--color-bg-card);
+  }
+
+  .social-link-card::after {
+    content: "";
+    @apply absolute inset-x-0 bottom-0 h-px opacity-70 transition-all;
+    background: linear-gradient(90deg, transparent, var(--social-accent), transparent);
+  }
+
+  .social-link-card:hover {
+    border-color: color-mix(in srgb, var(--social-accent) 42%, var(--color-border));
+    transform: translateY(-4px);
+    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.24);
+  }
+
+  .social-link-card:hover::after {
+    @apply h-0.5 opacity-100;
+  }
+
+  .social-link-card-top {
+    @apply mb-8 flex items-start justify-between;
+  }
+
+  .social-link-mark {
+    @apply inline-flex h-10 min-w-10 items-center justify-center rounded-xl border px-2 font-mono text-[10px] font-bold tracking-[-0.02em];
+    color: var(--social-accent, var(--color-accent));
+    border-color: color-mix(in srgb, var(--social-accent, var(--color-accent)) 30%, transparent);
+    background: color-mix(in srgb, var(--social-accent, var(--color-accent)) 9%, transparent);
+  }
+
+  .social-link-arrow {
+    @apply text-lg text-text-subtle transition-all;
+  }
+
+  .social-link-card:hover .social-link-arrow {
+    color: var(--social-accent);
+    transform: translate(2px, -2px);
+  }
+
+  .social-link-card > strong {
+    @apply text-lg font-semibold;
+  }
+
+  .social-link-handle {
+    @apply mt-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[10px] text-text-subtle;
+  }
+
+  .social-link-card > p {
+    @apply mt-auto pt-6 text-xs leading-5 text-text-muted;
+  }
+
+  .social-link-grid-compact .social-link-card {
+    @apply min-h-40;
+  }
+
+  .social-link-grid-compact .social-link-card-top {
+    @apply mb-5;
+  }
+
+  .social-link-grid-compact .social-link-card > p {
+    @apply hidden;
+  }
+
+  .connect-contact-card {
+    @apply mt-16 grid gap-8 rounded-3xl border border-border bg-bg-elevated p-7 md:grid-cols-[1fr_0.8fr] md:items-center md:p-10;
+    background:
+      radial-gradient(circle at 0 50%, rgba(97, 221, 176, 0.08), transparent 26rem),
+      var(--color-bg-elevated);
+  }
+
+  .connect-contact-card > div:first-child {
+    @apply flex items-center gap-5;
+  }
+
+  .connect-contact-card > div:last-child {
+    @apply md:text-right;
+  }
+
+  .connect-contact-card h2 {
+    @apply mt-1 text-xl font-semibold md:text-2xl;
+  }
+
+  .connect-contact-card > div:last-child > a {
+    @apply font-mono text-sm text-success hover:text-text md:text-base;
+  }
+
+  .connect-contact-card > div:last-child > p {
+    @apply mt-3 text-sm leading-6 text-text-muted;
+  }
+
+  .footer-social-row {
+    @apply mt-12 flex flex-col gap-6 border-t border-border pt-8 lg:flex-row lg:items-center lg:justify-between;
+  }
+
+  .footer-social-row > div:first-child > span {
+    @apply font-mono text-[9px] uppercase tracking-[0.16em] text-text-subtle;
+  }
+
+  .footer-social-row > div:first-child > p {
+    @apply mt-1 text-xs text-text-subtle;
+  }
+
+  .social-link-strip {
+    @apply flex flex-wrap gap-2;
+  }
+
+  .social-link-strip a {
+    @apply inline-flex min-h-9 items-center gap-2 rounded-full border border-border bg-bg-card px-3 text-text-muted hover:text-text;
+  }
+
+  .social-link-strip a:hover {
+    border-color: color-mix(in srgb, var(--social-accent) 42%, var(--color-border));
+  }
+
+  .social-link-strip a > span {
+    @apply font-mono text-[8px] font-bold;
+    color: var(--social-accent);
+  }
+
+  .social-link-strip a > strong {
+    @apply text-[11px] font-medium;
+  }
+
   .footer-link {
     @apply w-fit text-sm text-text-muted hover:text-text;
   }

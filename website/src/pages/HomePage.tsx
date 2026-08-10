@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { OutputCard } from "@/components/output-card";
+import { SocialLinkGrid } from "@/components/social-links";
 import { SHOWCASE_PROJECTS, SUBJECT_AREAS, subjectById } from "@/content/showcase";
 
 const WORKFLOW = [
@@ -377,6 +378,23 @@ export function HomePage() {
         </div>
       </section>
 
+      <section className="section-shell home-connect-section">
+        <div className="section-heading">
+          <div>
+            <p className="section-kicker">Follow the work</p>
+            <h2>See what Matemium<br /><span className="text-text-muted">is becoming.</span></h2>
+          </div>
+          <div className="max-w-md">
+            <p>
+              Watch finished films, follow launch work, read the technical story,
+              or join the conversation wherever you already spend time.
+            </p>
+            <Link to="/connect" className="text-link mt-5">Every channel and contact <ArrowIcon /></Link>
+          </div>
+        </div>
+        <SocialLinkGrid compact />
+      </section>
+
       <section className="section-shell">
         <div className="support-panel">
           <div className="support-orbit" aria-hidden />
@@ -412,7 +430,7 @@ export function HomePage() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link to="/download" className="button-primary">Get Matemium <ArrowIcon /></Link>
-            <a href="https://github.com/fargonee/math" target="_blank" rel="noreferrer" className="button-secondary">
+            <a href="https://github.com/fargonee/matemium" target="_blank" rel="noreferrer" className="button-secondary">
               View source
             </a>
           </div>

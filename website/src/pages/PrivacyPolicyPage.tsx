@@ -61,8 +61,8 @@ export function PrivacyPolicyPage() {
         <h2>6. Contact</h2>
         <p>
           To ask privacy questions or request account deletion, email{" "}
-          <a href="mailto:contact@matemium.fargonee.space" className="text-accent">
-            contact@matemium.fargonee.space
+          <a href="mailto:matemiumm@gmail.com" className="text-accent">
+            matemiumm@gmail.com
           </a>.
         </p>
       </div>

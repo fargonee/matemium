@@ -150,7 +150,7 @@ export const SHOWCASE_PROJECTS: ShowcaseProject[] = [
     productionPath: "Visual-first",
     capabilities: ["Persistent 3D world", "Vector animation", "Camera choreography", "Parameter sweep"],
     sourcePath: "projects/orbital_mechanics/scenes.py",
-    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/orbital_mechanics/scenes.py",
+    sourceUrl: "https://github.com/fargonee/matemium/blob/main/projects/orbital_mechanics/scenes.py",
     sourceExcerpt: `b.add_object(
     "OrbitalWorld",
     id=WORLD_ID,
@@ -184,7 +184,7 @@ b.add_camera_inspect(
     productionPath: "Visual-first",
     capabilities: ["3D solids", "Object lift", "Inspect path", "Camera orbit"],
     sourcePath: "projects/inscribed_sphere/scenes.py",
-    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/inscribed_sphere/scenes.py",
+    sourceUrl: "https://github.com/fargonee/matemium/blob/main/projects/inscribed_sphere/scenes.py",
     sourceExcerpt: `builder = CanvasBuilder(title="Inscribed Sphere")
 tape = builder.add_tape("main")
 
@@ -217,7 +217,7 @@ builder.add_camera_inspect(
     productionPath: "Visual-first",
     capabilities: ["Multiscale 3D world", "Sequence transforms", "Molecular states", "Spatial transport"],
     sourcePath: "projects/dna_to_protein/scenes.py",
-    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/dna_to_protein/scenes.py",
+    sourceUrl: "https://github.com/fargonee/matemium/blob/main/projects/dna_to_protein/scenes.py",
     sourceExcerpt: `b.add_element_morph(
     WORLD_ID,
     world_target("dna_open"),
@@ -248,7 +248,7 @@ author_sequence_tape(b, sequence)`,
     productionPath: "Visual-first",
     capabilities: ["System diagrams", "Signal flow", "Time-series plots", "Physical simulation"],
     sourcePath: "projects/feedback_control/scenes.py",
-    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/feedback_control/scenes.py",
+    sourceUrl: "https://github.com/fargonee/matemium/blob/main/projects/feedback_control/scenes.py",
     sourceExcerpt: `open_time = 6.0
 b.add_element_morph(
     WORLD_ID,
@@ -279,7 +279,7 @@ author_loop(b, loop)`,
     productionPath: "Visual-first",
     capabilities: ["3D molecular world", "Identity-preserving morphs", "Synchronized energy", "Fixed reference view"],
     sourcePath: "projects/sn2_reaction/scenes.py",
-    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/sn2_reaction/scenes.py",
+    sourceUrl: "https://github.com/fargonee/matemium/blob/main/projects/sn2_reaction/scenes.py",
     sourceExcerpt: `b.add_element_morph(
     WORLD_ID,
     world_target(

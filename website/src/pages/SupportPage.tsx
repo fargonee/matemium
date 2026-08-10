@@ -77,7 +77,7 @@ export function SupportPage() {
             </p>
           </div>
           <a
-            href="https://github.com/fargonee/math/blob/main/CONTRIBUTING.md"
+            href="https://github.com/fargonee/matemium/blob/main/CONTRIBUTING.md"
             target="_blank"
             rel="noreferrer"
             className="button-secondary"
