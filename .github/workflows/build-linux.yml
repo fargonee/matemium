@@ -2,10 +2,9 @@ name: Build Linux Desktop
 
 # Desktop app build strategy (commercial release artifact):
 # - Full production builds (.deb + .AppImage) ONLY on version tags (v*) and manual dispatch.
-# - Lightweight verification (engine smoke + cargo check) runs on PRs and main pushes
-#   that touch relevant paths.
+# - Lightweight verification (engine smoke + cargo check) runs on PRs.
 # - Full matrix: Linux + Windows + macOS (see build-windows.yml and build-macos.yml).
-# - Path filters avoid wasting minutes when only website/ or unrelated server code changes.
+# - Full release-debug builds can be run per-OS with workflow_dispatch.
 # - Tag builds upload workflow artifacts; publish-release.yml assembles one draft release.
 #
 # This aligns with the project documentation: release pipeline uses tags.
@@ -14,17 +13,6 @@ on:
   push:
     tags:
       - 'v*'
-    branches: [main]
-    paths:
-      # Changes that affect the desktop app or the matemium sidecar it embeds
-      - 'desktop/**'
-      - 'matemium/**'
-      - 'canvas/**'
-      - 'projects/**'
-      - 'shared/**'
-      - 'pyproject.toml'
-      - 'fixtures/**'
-      - '.github/workflows/build-linux.yml'
   pull_request:
     branches: [main]
     paths:
@@ -43,10 +31,11 @@ permissions:
 
 jobs:
   # Fast, cheap verification job.
-  # Runs for PRs and ordinary pushes to main (when path filter matches).
+  # Runs for PRs. Ordinary pushes to main do not trigger this workflow; use
+  # workflow_dispatch for targeted release debugging.
   # Skips the heavy PyInstaller + full Tauri bundle + texlive work.
   desktop-verify:
-    if: (github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))) && !(github.event_name == 'push' && contains(github.event.head_commit.message, '[skip desktop-verify]'))
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
