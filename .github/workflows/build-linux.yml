@@ -171,12 +171,6 @@ jobs:
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2.0.0" --locked
 
-      - name: Set desktop app version in tauri.conf.json + Cargo.toml (tags only)
-        if: steps.ver.outputs.is_release == 'true'
-        working-directory: desktop/src-tauri
-        run: |
-          cargo tauri set-version "${{ steps.ver.outputs.version }}"
-
       - name: Build Linux desktop artifacts
         # The script creates .venv (already prepared above), builds the real sidecar (PyInstaller),
         # installs it to binaries/ (overwriting any dummy), builds frontend, then cargo tauri build.

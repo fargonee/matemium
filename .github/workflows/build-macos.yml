@@ -161,11 +161,6 @@ jobs:
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2.0.0" --locked
 
-      - name: Set version (release tags)
-        if: steps.ver.outputs.is_release == 'true'
-        working-directory: desktop/src-tauri
-        run: cargo tauri set-version "${{ steps.ver.outputs.version }}"
-
       - name: Configure macOS signing
         if: steps.ver.outputs.is_release == 'true'
         env:
