@@ -4,7 +4,7 @@ name: Build Linux Desktop
 # - Full production builds (.deb + .AppImage) ONLY on version tags (v*) and manual dispatch.
 # - Lightweight verification (engine smoke + cargo check) runs on PRs.
 # - Full matrix: Linux + Windows + macOS (see build-windows.yml and build-macos.yml).
-# - Full release-debug builds can be run per-OS with workflow_dispatch.
+# - Full release-debug builds can be run per-OS with workflow_dispatch or linux-debug-* tags.
 # - Tag builds upload workflow artifacts; publish-release.yml assembles one draft release.
 #
 # This aligns with the project documentation: release pipeline uses tags.
@@ -13,6 +13,7 @@ on:
   push:
     tags:
       - 'v*'
+      - 'linux-debug-*'
   pull_request:
     branches: [main]
     paths:
@@ -89,7 +90,7 @@ jobs:
         run: cargo check
 
   # Full production build job.
-  # Only executes for version tags and workflow_dispatch.
+  # Only executes for release/debug tags and workflow_dispatch.
   # Expensive: full texlive, PyInstaller of manim/canvas/matemium, Tauri bundle.
   build-linux:
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
@@ -97,10 +98,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Determine version (from tag when applicable)
+      - name: Determine version (from release tag when applicable)
         id: ver
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             raw="${{ github.ref_name }}"
             ver="${raw#v}"
             echo "version=$ver" >> $GITHUB_OUTPUT
@@ -109,7 +110,7 @@ jobs:
           else
             echo "version=0.0.0-dev" >> $GITHUB_OUTPUT
             echo "is_release=false" >> $GITHUB_OUTPUT
-            echo "Dispatch/manual build (no version override)"
+            echo "Debug/manual build (no release version override)"
           fi
 
       - name: Validate tagged release metadata
