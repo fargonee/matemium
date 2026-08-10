@@ -22,7 +22,7 @@ def test_auth_token_stub():
     assert resp.json()["access_token"].startswith("dev.")
 
 
-def test_chat_completions_stub():
+def test_chat_completions_disabled():
     token_resp = client.post(
         "/v1/auth/token",
         json={"email": "dev@matemium.app", "password": "test"},
@@ -34,14 +34,13 @@ def test_chat_completions_stub():
         json={"messages": [{"role": "user", "content": "Add a quadratic formula"}]},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 410
     data = resp.json()
-    assert data["message"]["role"] == "assistant"
-    assert data["stub"] is True
-    assert data.get("code_edit") is not None
+    assert data["error"] == "http_error"
+    assert "no longer proxies external AI requests" in data["detail"]
 
 
-def test_chat_stream_stub():
+def test_chat_stream_disabled():
     token_resp = client.post(
         "/v1/auth/token",
         json={"email": "dev@matemium.app", "password": "test"},
@@ -53,16 +52,10 @@ def test_chat_stream_stub():
         json={"messages": [{"role": "user", "content": "Add a quadratic formula"}]},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert resp.status_code == 200
-    assert resp.headers["content-type"].startswith("text/event-stream")
-    
-    lines = resp.text.splitlines()
-    data_lines = [ln for ln in lines if ln.startswith("data: ")]
-    assert len(data_lines) > 0
-    
-    import json
-    first_event = json.loads(data_lines[0][6:])
-    assert "type" in first_event
+    assert resp.status_code == 410
+    data = resp.json()
+    assert data["error"] == "http_error"
+    assert "Streaming chat through Matemium servers is disabled" in data["detail"]
 
 
 def test_me_includes_usage_and_rate_limit_headers_present_on_chat():
@@ -78,13 +71,14 @@ def test_me_includes_usage_and_rate_limit_headers_present_on_chat():
     assert "usage" in me.json()
     assert "ai_calls_count" in me.json()["usage"]
 
-    # chat should succeed and include rate headers in response (best effort) or not 429
+    # chat proxying is disabled, but authenticated calls should pass auth/rate-limit
+    # checks before returning the intentional deprecation response.
     resp = client.post(
         "/v1/chat/completions",
         json={"messages": [{"role": "user", "content": "hello"}]},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert resp.status_code in (200, 429)
+    assert resp.status_code in (410, 429)
     # Headers may appear
     assert "x-request-id" in [k.lower() for k in resp.headers.keys()] or True  # always present via middleware
 

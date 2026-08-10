@@ -57,14 +57,14 @@ Or: `uvicorn matemium_server.app:app --reload --port 8080`
 | `GET` | `/v1/admin/stats` | Admin | User counts and operational stats |
 | `GET` | `/v1/admin/users` | Admin | User list |
 | `GET` | `/v1/admin/subscriptions` | Admin | Subscription list |
-| `POST` | `/v1/chat/completions` | Bearer | Chat LLM proxy for desktop |
+| `POST` | `/v1/chat/completions` | Bearer | Historical chat proxy endpoint; returns 410 in current BYO/direct-provider mode |
 | `POST` | `/v1/agent/turn` | Bearer | (planned) Agent tool loop |
 
 **Auth:** Website and desktop send `Authorization: Bearer <supabase_access_token>`. The server verifies via Supabase Auth and reads profile/provider settings from Postgres. Desktop dev can use stub tokens when `MATEMIUM_AUTH_STUB=true`.
 
 **Website SPA:** The marketing/dashboard site is a Vite React app at `http://localhost:5173`. It calls this server from the browser; set `MATEMIUM_SITE_URL` and `MATEMIUM_CORS_ORIGINS` accordingly. OpenAPI at `/openapi.json` includes `BearerAuth` on website routes — regenerate the RTK Query client with `cd website && npm run codegen` (server must be running).
 
-**v1 chat:** desktop calls `/v1/chat/completions` with project context; user applies edits locally.
+**v1 chat:** legacy desktop proxy calls to `/v1/chat/completions` are rejected with `410 Gone`. Current desktop clients connect to the user's provider directly.
 
 Production-grade additions:
 - Abuse/rate protection on Matemium endpoints with `X-RateLimit-*` headers; limits must not imply paid tiers unless the product policy changes.
