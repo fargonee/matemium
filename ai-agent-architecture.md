@@ -1,10 +1,14 @@
 # Matemium AI Agent Architecture
 
-**Status:** Product-boundary reference updated for the target autonomous runtime (2026-07-18). The current XML/regex ReAct loop is a legacy prototype, not the completed architecture.
+**Status:** Product-boundary and design-history reference. Current runtime
+behavior is defined by `matemium/agent/`, `matemium/ipc/`, the desktop agent-run
+commands, and their tests (reviewed 2026-08-09).
 
 **Audience:** Desktop shell, cloud router, sidecar, and AI integration authors.
 
-**PAD Phase 10:** Packaging/CI/docs complete; MCP (phase 9) and RAG (phase 6) integrated into agent tools. See [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md).
+The launch app uses host FFmpeg and LaTeX. Sections below describing an
+automatically downloaded TinyTeX bundle are retained as historical design, not
+as a shipped feature. See [`RELEASING.md`](RELEASING.md).
 
 This document records product placement and trust boundaries: local tool execution, Search/Replace patches, the bounded project workspace, sidecar validation, and context sources. The normative runtime behavior—state, planning, recovery, completion gates, accounting, and evaluation—is defined in [`agentic_ai_goal.md`](agentic_ai_goal.md).
 
@@ -389,9 +393,11 @@ Templates live under [`shared/templates/`](shared/templates/); legacy `brief/tap
 
 Three configurations are required for production reliability.
 
-### 8.A LaTeX — TinyTeX (not full TeX Live)
+### 8.A Historical TinyTeX packaging target
 
-Manim depends on LaTeX for `add_math`. Full MiKTeX/MacTeX installs are multi-gigabyte and unsuitable for bundling.
+Manim depends on LaTeX for `add_math`. The following section records an earlier
+first-run bundle design. It is **not launch behavior**: current installers use a
+host LaTeX toolchain and merely recognize an existing TinyTeX directory.
 
 **Decision:** Bundle a **stripped TinyTeX micro-distribution** (~80–120 MB zipped) — not browser MathJax SVG substitutes. TinyTeX gives vector-precise math identical to standard Manim.
 

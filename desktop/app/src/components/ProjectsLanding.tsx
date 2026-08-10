@@ -29,9 +29,86 @@ interface GalleryItem {
   title: string;
   description?: string;
   youtube_id?: string;
+  video_src?: string;
+  poster_src?: string;
+  orientation?: "portrait" | "landscape";
   tags?: string[];
   author_name?: string;
   status?: string;
+}
+
+const FLAGSHIP_OUTCOMES: GalleryItem[] = [
+  {
+    id: "flagship-orbital-mechanics",
+    title: "Why an Orbit Is a Continuous Fall",
+    description: "Tangent velocity, inward gravity, and three launch speeds inside one persistent 3D world.",
+    video_src: "/showcase/orbital-mechanics.mp4",
+    poster_src: "/showcase/orbital-mechanics.jpg",
+    orientation: "portrait",
+    tags: ["physics", "3D world"],
+    author_name: "Matemium",
+    status: "Flagship outcome",
+  },
+  {
+    id: "flagship-sn2-reaction",
+    title: "Inside an SN2 Reaction",
+    description: "Backside attack, simultaneous bond change, and inversion held in one stable molecular view.",
+    video_src: "/showcase/sn2-reaction.mp4",
+    poster_src: "/showcase/sn2-reaction.jpg",
+    orientation: "portrait",
+    tags: ["chemistry", "3D molecule"],
+    author_name: "Matemium",
+    status: "Flagship outcome",
+  },
+  {
+    id: "flagship-dna-to-protein",
+    title: "From DNA to Protein",
+    description: "A multiscale journey through transcription, RNA processing, export, and translation.",
+    video_src: "/showcase/dna-to-protein.mp4",
+    poster_src: "/showcase/dna-to-protein.jpg",
+    orientation: "landscape",
+    tags: ["biology", "multiscale"],
+    author_name: "Matemium",
+    status: "Flagship outcome",
+  },
+  {
+    id: "flagship-feedback-control",
+    title: "How Feedback Stabilizes a System",
+    description: "Cruise control connects a physical disturbance to measurement, correction, and recovery.",
+    video_src: "/showcase/feedback-control.mp4",
+    poster_src: "/showcase/feedback-control.jpg",
+    orientation: "landscape",
+    tags: ["engineering", "systems"],
+    author_name: "Matemium",
+    status: "Flagship outcome",
+  },
+];
+
+const ENHANCED_EXAMPLE_IDS = new Set([
+  "physics/orbital-mechanics",
+  "chemistry/sn2-reaction",
+  "engineering/feedback-control",
+  "biology/dna-to-protein",
+]);
+
+function matchesGallerySearch(item: GalleryItem, query: string) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    item.title.toLowerCase().includes(normalized) ||
+    (item.description || "").toLowerCase().includes(normalized) ||
+    (item.tags || []).some((tag) => tag.toLowerCase().includes(normalized))
+  );
+}
+
+function isFlagshipCloudDuplicate(item: GalleryItem) {
+  const identity = `${item.id} ${item.title}`.toLowerCase();
+  return (
+    identity.includes("orbital") ||
+    identity.includes("sn2") ||
+    identity.includes("feedback") ||
+    (identity.includes("dna") && identity.includes("protein"))
+  );
 }
 
 interface Collection {
@@ -322,26 +399,18 @@ export function ProjectsLanding({
     return () => clearTimeout(t);
   }, [searchQuery, loadGallery]);
 
-  const filteredGallery = galleryItems.filter((item) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      item.title.toLowerCase().includes(q) ||
-      (item.description || "").toLowerCase().includes(q) ||
-      ((item.tags || []) as string[]).some((t) => t.toLowerCase().includes(q))
-    );
-  });
+  const flagshipItems = FLAGSHIP_OUTCOMES.filter((item) =>
+    matchesGallerySearch(item, searchQuery),
+  );
+  const earlierItems = galleryItems.filter(
+    (item) => !isFlagshipCloudDuplicate(item) && matchesGallerySearch(item, searchQuery),
+  );
 
   // Filter projects list by active collection
   const activeCollection = collections.find((c) => c.id === activeCollectionId);
   const filteredProjects = activeCollection
     ? projects.filter((p) => activeCollection.projectIds.includes(p.id))
     : projects;
-
-  // Editorial Featured vs Trending Split
-  const hasInspiration = filteredGallery.length > 0;
-  const isDefaultView = searchQuery === "";
-  const featuredItem = hasInspiration && isDefaultView ? filteredGallery[0] : null;
-  const listItems = hasInspiration && isDefaultView ? filteredGallery.slice(1) : filteredGallery;
 
   return (
     <div className="projects-landing-page-modern" onClick={() => setManagingProjectId(null)}>
@@ -368,7 +437,7 @@ export function ProjectsLanding({
               {examples.length} subjects · source only
             </span>
             <strong>Explore the Bundled Example Library</strong>
-            <small>Flagship briefs and clean authoring templates, ready to open as editable copies.</small>
+            <small>Project briefs and clean authoring templates, ready to open as editable copies.</small>
           </span>
           <span className="example-library-symbols-modern" aria-hidden>
             {examples.slice(0, 5).map((example) => (
@@ -572,12 +641,12 @@ export function ProjectsLanding({
         <section className="inspiration-pane-modern">
           <div className="pane-header-modern">
             <div className="pane-header-title-container">
-              <h3 className="pane-title-modern">Inspiration Feed</h3>
-              <span className="live-indicator-modern">● LIVE HUB</span>
+              <h3 className="pane-title-modern">Explore</h3>
+              <span className="flagship-count-modern">4 FLAGSHIPS</span>
             </div>
             <input
               type="text"
-              placeholder="Search topics, creators, tags..."
+              placeholder="Search projects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="inspiration-search-input-modern"
@@ -586,132 +655,154 @@ export function ProjectsLanding({
 
           {error && (
             <div style={{ color: "var(--text-muted)", fontSize: "0.74rem", marginBottom: "12px", background: "rgba(255,255,255,0.02)", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border-subtle)" }}>
-              Offline mode. Showing cached featured creations.
+              Community feed unavailable. Flagship outcomes remain available offline.
             </div>
           )}
 
-          {loading ? (
-            <div className="inspiration-loading-modern">
-              <div className="spinner-modern"></div>
-              <span>Connecting to Matemium hub...</span>
-            </div>
-          ) : (
-            <div className="inspiration-content-scroll-modern">
-              {/* editorial featured showcase of the week */}
-              {featuredItem && (
-                <div 
-                  className="inspiration-featured-card-modern"
-                  onClick={() => setSelectedVideo(featuredItem)}
-                  title="Watch Selection of the Week"
-                >
-                  <div className="featured-banner-badge-modern">
-                    <span className="star-icon-modern">★</span> EDITORIAL CHOICE OF THE WEEK
-                  </div>
-                  <div className="featured-thumb-container-modern">
-                    {featuredItem.youtube_id && (
-                      <img
-                        src={`https://img.youtube.com/vi/${featuredItem.youtube_id}/hqdefault.jpg`}
-                        alt={featuredItem.title}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180'%3E%3Crect width='100%25' height='100%25' fill='%2310141e'/%3E%3Ctext x='50%25' y='50%25' fill='%235c6cf0' font-size='14' font-weight='600' font-family='sans-serif' text-anchor='middle'%3EMatemium Featured%3C/text%3E%3C/svg%3E";
-                        }}
-                      />
-                    )}
-                    <div className="inspiration-play-overlay-modern">
-                      <div className="play-button-ring-modern featured-play-ring-modern">
-                        <svg viewBox="0 0 24 24" width="28" height="28" className="svg-play-triangle-modern">
-                          <path fill="currentColor" d="M8 5v14l11-7z" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="featured-body-modern">
-                    <div className="featured-meta-row-modern">
-                      <h4>{featuredItem.title}</h4>
-                      {featuredItem.author_name && (
-                        <div className="author-row-badge-modern">
-                          <span className="avatar-circle-modern">{getAuthorInitials(featuredItem.author_name)}</span>
-                          <span className="author-name-text-modern">{featuredItem.author_name}</span>
-                        </div>
-                      )}
-                    </div>
-                    <p className="featured-desc-modern">{featuredItem.description}</p>
-                    <div className="featured-tags-row-modern">
-                      {featuredItem.tags?.slice(0, 3).map((tag) => (
-                        <span key={tag} className="inspiration-tag-badge-modern">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+          <div className="inspiration-content-scroll-modern">
+              <div className="flagship-section-heading-modern">
+                <div>
+                  <span className="flagship-kicker-modern">Made with Matemium</span>
+                  <h4>Flagship outcomes</h4>
                 </div>
-              )}
+                <p>Our strongest project worlds, rendered from the bundled editable source.</p>
+              </div>
 
-              {/* regular showcase listing */}
-              {featuredItem && <h4 className="trending-header-title-modern">Trending Animations</h4>}
-              
-              <div className="inspiration-grid-modern">
-                {listItems.map((item) => {
-                  const yt = item.youtube_id || (item as any).youtubeId || "";
-                  const tags = item.tags || [];
-                  const author = item.author_name || (item as any).author;
-                  return (
-                    <div
-                      key={item.id}
-                      className="inspiration-card-modern"
-                      onClick={() => setSelectedVideo(item)}
-                      title="Click to watch this community creation"
-                    >
-                      <div className="inspiration-thumb-container-modern">
-                        {yt && (
-                          <img
-                            src={`https://img.youtube.com/vi/${yt}/hqdefault.jpg`}
-                            alt={item.title}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src =
-                                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180'%3E%3Crect width='100%25' height='100%25' fill='%2310141e'/%3E%3Ctext x='50%25' y='50%25' fill='%235c6cf0' font-size='14' font-weight='600' font-family='sans-serif' text-anchor='middle'%3EMatemium Showcase%3C/text%3E%3C/svg%3E";
-                            }}
-                          />
-                        )}
-                        <div className="inspiration-play-overlay-modern">
-                          <div className="play-button-ring-modern">
-                            <svg viewBox="0 0 24 24" width="16" height="16" className="svg-play-triangle-modern">
-                              <path fill="currentColor" d="M8 5v14l11-7z" />
-                            </svg>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="inspiration-card-body-modern">
-                        <h4>{item.title}</h4>
-                        <p className="inspiration-desc-modern">{item.description}</p>
-                        <div className="inspiration-card-footer-modern">
-                          <div className="inspiration-tags-modern">
-                            {tags.slice(0, 2).map((tag) => (
-                              <span key={tag} className="inspiration-tag-badge-modern">
-                                #{tag}
-                              </span>
-                            ))}
-                          </div>
-                          {author && (
-                            <span className="inspiration-author-modern">
-                              <span className="avatar-circle-small-modern">{getAuthorInitials(author)}</span>
-                              {author}
-                            </span>
-                          )}
+              <div className="flagship-grid-modern">
+                {flagshipItems.map((item) => (
+                  <article
+                    key={item.id}
+                    className={`flagship-card-modern flagship-${item.orientation}`}
+                    onClick={() => setSelectedVideo(item)}
+                    onMouseEnter={(event) => {
+                      const video = event.currentTarget.querySelector("video");
+                      if (video) void video.play().catch(() => undefined);
+                    }}
+                    onMouseLeave={(event) => {
+                      const video = event.currentTarget.querySelector("video");
+                      if (video) {
+                        video.pause();
+                        video.currentTime = 0;
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedVideo(item);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    title={`Watch ${item.title}`}
+                  >
+                    <div className="flagship-media-modern">
+                      <video
+                        src={item.video_src}
+                        poster={item.poster_src}
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                        aria-label={`${item.title} outcome preview`}
+                      />
+                      <span className="flagship-badge-modern">FLAGSHIP</span>
+                      <div className="inspiration-play-overlay-modern">
+                        <div className="play-button-ring-modern">
+                          <svg viewBox="0 0 24 24" width="16" height="16" className="svg-play-triangle-modern">
+                            <path fill="currentColor" d="M8 5v14l11-7z" />
+                          </svg>
                         </div>
                       </div>
                     </div>
-                  );
-                })}
-                {filteredGallery.length === 0 && (
-                  <div className="inspiration-empty-modern">
-                    No matches for "{searchQuery}". Try physics, algorithms, biology, history, or algebra.
-                  </div>
-                )}
+                    <div className="flagship-card-body-modern">
+                      <span>{item.tags?.[0]}</span>
+                      <h4>{item.title}</h4>
+                      <p>{item.description}</p>
+                    </div>
+                  </article>
+                ))}
               </div>
-            </div>
-          )}
+
+              {loading ? (
+                <div className="inspiration-loading-modern inspiration-loading-compact-modern">
+                  <div className="spinner-modern"></div>
+                  <span>Loading earlier studies...</span>
+                </div>
+              ) : (
+                <>
+                  {earlierItems.length > 0 && (
+                    <div className="earlier-studies-heading-modern">
+                      <div>
+                        <h4>Earlier studies</h4>
+                        <span>{earlierItems.length} tape-based explorations</span>
+                      </div>
+                      <p>Useful references from the engine’s earlier visual language.</p>
+                    </div>
+                  )}
+
+                  <div className="inspiration-grid-modern earlier-studies-grid-modern">
+                    {earlierItems.map((item) => {
+                      const yt = item.youtube_id || (item as any).youtubeId || "";
+                      const tags = item.tags || [];
+                      const author = item.author_name || (item as any).author;
+                      return (
+                        <div
+                          key={item.id}
+                          className="inspiration-card-modern earlier-study-card-modern"
+                          onClick={() => setSelectedVideo(item)}
+                          title="Watch earlier study"
+                        >
+                          <div className="inspiration-thumb-container-modern">
+                            {yt && (
+                              <img
+                                src={`https://img.youtube.com/vi/${yt}/hqdefault.jpg`}
+                                alt={item.title}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src =
+                                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180'%3E%3Crect width='100%25' height='100%25' fill='%2310141e'/%3E%3Ctext x='50%25' y='50%25' fill='%235c6cf0' font-size='14' font-weight='600' font-family='sans-serif' text-anchor='middle'%3EMatemium Showcase%3C/text%3E%3C/svg%3E";
+                                }}
+                              />
+                            )}
+                            <div className="inspiration-play-overlay-modern">
+                              <div className="play-button-ring-modern">
+                                <svg viewBox="0 0 24 24" width="16" height="16" className="svg-play-triangle-modern">
+                                  <path fill="currentColor" d="M8 5v14l11-7z" />
+                                </svg>
+                              </div>
+                            </div>
+                            <span className="earlier-study-label-modern">STUDY</span>
+                          </div>
+                          <div className="inspiration-card-body-modern">
+                            <h4>{item.title}</h4>
+                            <p className="inspiration-desc-modern">{item.description}</p>
+                            <div className="inspiration-card-footer-modern">
+                              <div className="inspiration-tags-modern">
+                                {tags.slice(0, 2).map((tag) => (
+                                  <span key={tag} className="inspiration-tag-badge-modern">
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+                              {author && (
+                                <span className="inspiration-author-modern">
+                                  <span className="avatar-circle-small-modern">{getAuthorInitials(author)}</span>
+                                  {author}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {flagshipItems.length === 0 && earlierItems.length === 0 && (
+                      <div className="inspiration-empty-modern">
+                        No matches for "{searchQuery}". Try physics, algorithms, biology, history, or algebra.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+          </div>
         </section>
       </div>
 
@@ -739,13 +830,14 @@ export function ProjectsLanding({
             <div className="example-library-header-modern">
               <div>
                 <p className="example-library-kicker-modern">
-                  Eleven flagship projects · complete editable source
+                  Eleven example projects · complete editable source
                 </p>
                 <h3 id="example-library-title">Bundled Example Library</h3>
                 <p>
                   Every project includes authored scenes, reusable helpers, and
                   its complete workflow brief. Inspect the source or open an
-                  independent editable copy.
+                  independent editable copy. The four enhanced flagships match
+                  the polished outcome videos in Explore.
                 </p>
               </div>
               <span className="example-library-count-modern">
@@ -760,18 +852,32 @@ export function ProjectsLanding({
             <div className="example-library-grid-modern">
               {examples.map((example) => (
                 <article
-                  className={`example-card-modern example-${example.subject}`}
+                  className={`example-card-modern example-${example.subject}${ENHANCED_EXAMPLE_IDS.has(example.id) ? " example-card-enhanced-modern" : ""}`}
                   key={example.id}
                 >
+                  {ENHANCED_EXAMPLE_IDS.has(example.id) && (
+                    <div className="example-flagship-seal-modern">
+                      <span className="example-flagship-emblem-modern" aria-hidden>
+                        <span>✦</span>
+                      </span>
+                      <span className="example-flagship-seal-copy-modern">
+                        <strong>Enhanced flagship</strong>
+                        <small>Polished showcase outcome</small>
+                      </span>
+                      <span className="example-flagship-seal-mark-modern" aria-hidden>M</span>
+                    </div>
+                  )}
                   <div className="example-card-top-modern">
                     <span className="example-symbol-modern" aria-hidden>{example.symbol}</span>
                     <div>
                       <span className="example-subject-modern">{example.subjectLabel}</span>
                       <h4>{example.title}</h4>
                     </div>
-                    <span className="example-stage-modern">
-                      {example.stage === "source-ready" ? "Source ready" : example.stage}
-                    </span>
+                    <div className="example-card-badges-modern">
+                      <span className="example-stage-modern">
+                        {example.stage === "source-ready" ? "Source ready" : example.stage}
+                      </span>
+                    </div>
                   </div>
                   <p className="example-question-modern">{example.question}</p>
                   <p className="example-description-modern">{example.description}</p>
@@ -990,17 +1096,29 @@ export function ProjectsLanding({
             <button className="modal-close" onClick={() => setSelectedVideo(null)}>✕</button>
             <h3 className="modal-video-title-modern">{selectedVideo.title}</h3>
             <div className="video-wrapper">
-              <iframe
-                width="100%"
-                height="440"
-                src={`https://www.youtube.com/embed/${
-                  selectedVideo.youtube_id || (selectedVideo as any).youtubeId
-                }?autoplay=1`}
-                title={selectedVideo.title}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
+              {selectedVideo.video_src ? (
+                <video
+                  className={`flagship-modal-video-modern flagship-modal-${selectedVideo.orientation}`}
+                  src={selectedVideo.video_src}
+                  poster={selectedVideo.poster_src}
+                  controls
+                  autoPlay
+                  muted
+                  playsInline
+                />
+              ) : (
+                <iframe
+                  width="100%"
+                  height="440"
+                  src={`https://www.youtube.com/embed/${
+                    selectedVideo.youtube_id || (selectedVideo as any).youtubeId
+                  }?autoplay=1`}
+                  title={selectedVideo.title}
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              )}
             </div>
             <div className="modal-meta-content-modern">
               <p className="modal-desc-modern">{selectedVideo.description}</p>
@@ -1016,7 +1134,11 @@ export function ProjectsLanding({
               )}
             </div>
             <div className="meta-footer" style={{ marginTop: "16px" }}>
-              <span>Public community animation • Powered by YouTube • Works fully before local engines are set up</span>
+              <span>
+                {selectedVideo.video_src
+                  ? "Bundled flagship outcome • Rendered with Matemium • Plays offline"
+                  : "Public community animation • Powered by YouTube"}
+              </span>
             </div>
           </div>
         </div>

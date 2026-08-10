@@ -7,39 +7,42 @@ sidebar:
 
 import { Tabs, TabItem, Steps } from '@astrojs/starlight/components';
 
-Matemium is a desktop application with a bundled local rendering engine. The
-public installer experience is currently in early access.
+Matemium is a desktop application with a bundled local rendering engine. Native
+release automation exists for four launch targets:
 
 <div class="availability-grid">
-	<div><strong>Linux</strong><span>Early-access installer</span></div>
-	<div><strong>Windows</strong><span>Public release in progress</span></div>
-	<div><strong>macOS</strong><span>Public release in progress</span></div>
+	<div><strong>Linux x86_64</strong><span>.deb and .AppImage</span></div>
+	<div><strong>Windows x86_64</strong><span>NSIS .exe and .msi</span></div>
+	<div><strong>macOS Apple Silicon</strong><span>Native .dmg</span></div>
+	<div><strong>macOS Intel</strong><span>Native .dmg</span></div>
 </div>
 
 :::caution[Check release availability]
-Platform build infrastructure may exist before a signed public installer is
-ready. Use the [download page](https://matemium.fargonee.space/download) as the
-authoritative source for currently distributed builds.
+Build support does not mean that every draft has been published or signed. Use
+[GitHub Releases](https://github.com/fargonee/matemium/releases) to see the versions
+and platform artifacts currently distributed.
 :::
 
 ## Install the desktop application
 
 <Steps>
 1. Open the [Matemium download page](https://matemium.fargonee.space/download).
-2. Select an available build for your operating system.
-3. Sign in if the early-access download requires an account.
-4. Install the application using your platform’s normal installer flow.
-5. Start Matemium and allow the first-run assets to finish preparing.
+2. Select an available build for your operating system and processor.
+3. Install the application using your platform’s normal installer flow.
+4. Start Matemium and allow the bundled engine to initialize.
+5. Download a local language model only if you want offline AI assistance.
 </Steps>
 
-The first launch can take longer than later launches because Matemium may prepare
-the bundled engine, TinyTeX, and optional intelligence assets.
+The installer contains the Matemium UI, Rust shell, and native Python sidecar.
+It does not contain FFmpeg, a LaTeX distribution, local language models, or AI
+provider keys.
 
-### Linux requirements
+### Rendering prerequisites
 
-- Ubuntu 22.04 or newer on x86_64
-- FFmpeg available to the application
-- Enough free disk space for the engine, TinyTeX, render caches, and project output
+- **Linux:** Ubuntu 24.04 or compatible on x86_64, FFmpeg, and TeX Live
+- **Windows:** Windows 10/11 on x86_64, FFmpeg, and MiKTeX
+- **macOS:** macOS 12 or newer, FFmpeg, and MacTeX or BasicTeX
+- Enough free disk space for project media, render caches, output, and any optional local model
 
 If a `.deb` reports an unresolved FFmpeg dependency:
 
@@ -73,8 +76,8 @@ installation.
 <Tabs>
 	<TabItem label="Linux / macOS">
 		```bash
-		git clone https://github.com/fargonee/math.git
-		cd math
+		git clone https://github.com/fargonee/matemium.git
+		cd matemium
 		python -m venv .venv
 		source .venv/bin/activate
 		pip install -e ".[dev]"
@@ -83,8 +86,8 @@ installation.
 	</TabItem>
 	<TabItem label="Windows PowerShell">
 		```powershell
-		git clone https://github.com/fargonee/math.git
-		cd math
+		git clone https://github.com/fargonee/matemium.git
+		cd matemium
 		py -m venv .venv
 		.venv\Scripts\Activate.ps1
 		pip install -e ".[dev]"
@@ -93,8 +96,8 @@ installation.
 	</TabItem>
 </Tabs>
 
-Source renders require FFmpeg and a usable LaTeX installation. The packaged
-desktop application prefers its first-run TinyTeX asset.
+Source renders and packaged desktop renders both require FFmpeg and a usable
+LaTeX installation on the host.
 
 ## Verify an engine checkout
 

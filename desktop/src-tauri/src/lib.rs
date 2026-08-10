@@ -94,6 +94,7 @@ pub fn run() {
                 agent_runs,
                 openrouter_oauth_session: Mutex::new(None),
                 openrouter_oauth_active_cancel: Mutex::new(None),
+                auth_browser_cancel: Mutex::new(None),
             });
             Ok(())
         })
@@ -147,6 +148,8 @@ pub fn run() {
             commands::agent_run_provide_input,
             commands::auth_login,
             commands::auth_session,
+            commands::auth_browser_login,
+            commands::auth_browser_login_cancel,
             commands::openrouter_prepare_connect,
             commands::openrouter_complete_connect,
             commands::openrouter_cancel_connect,

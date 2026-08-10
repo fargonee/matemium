@@ -1,0 +1,88 @@
+---
+title: Import, export, and move projects
+description: Export complete Matemium workspaces, import project archives safely, and turn reasoning tapes into PNG or PDF documents.
+---
+
+Matemium has two distinct export paths:
+
+- A **project archive** moves or backs up the complete editable workspace.
+- A **full-tape document** delivers one authored reasoning tape as PNG or PDF.
+
+Neither operation uploads the project. Both run through the desktop application
+and write to locations you control.
+
+## Move a complete project
+
+The project library shows **Import Project** above your local projects. Each
+project card also has an archive export control.
+
+<figure class="docs-screenshot">
+	<img src="/screenshots/project-portability.png" alt="Matemium project library showing Import Project, archive controls on project cards, eleven bundled subjects, and four flagship outcomes" width="1600" height="1000" loading="lazy" />
+	<figcaption>The current project library. Archive controls operate on complete local workspaces.</figcaption>
+</figure>
+
+### Export a project archive
+
+1. Return to **Library**.
+2. Find the project card.
+3. Choose its download-arrow archive control.
+4. Save the suggested `<project-name>.matemium.zip` file.
+
+The archive contains the whole project workspace, including `project.json`,
+`scenes.py`, `helpers.py`, briefs and tape-content files, imported media,
+renders, and output history. Clear disposable render caches first when you want
+a smaller archive.
+
+### Import a project archive
+
+1. Choose **Import Project** in the project library.
+2. Select a `.zip` or `.matemium.zip` archive.
+3. Matemium validates and extracts the archive into its local workspace root.
+4. The imported project opens automatically.
+
+An import requires both `project.json` and `scenes.py`. Matemium rejects unsafe
+archive paths, accepts either a workspace-root archive or one wrapped in a
+single project folder, and assigns a new local project ID plus fresh creation
+timestamps. Importing therefore creates a separate project instead of replacing
+the original.
+
+:::caution[Archives may contain private material]
+A project archive includes its complete workspace. Review references, imported
+media, narration, and output before sharing the file with someone else.
+:::
+
+## Export a full reasoning tape
+
+Open a project and choose **Export tape** in the editor toolbar.
+
+<figure class="docs-screenshot">
+	<img src="/screenshots/tape-export.png" alt="Matemium Export full tape dialog showing a scene, three populated tapes, PNG and PDF formats, and native or fixed resolution controls" width="1600" height="1000" loading="lazy" />
+	<figcaption>The exporter inspects saved scene code and lists every populated tape.</figcaption>
+</figure>
+
+The dialog lets you choose:
+
+- A scene from the saved project source
+- Any populated tape in that scene
+- PNG for a previewable image or PDF for a printable document
+- Native detail, 2160 px height, or 4096 px height
+
+Every output remains upright and uncropped, independent of the video camera.
+Natural tape proportions are preserved. Native detail is the recommended choice
+when text should remain equally sharp on short and long tapes.
+
+The result appears under **Project → Renders**, where you can preview it or show
+it in the operating-system file manager.
+
+## Video is a separate deliverable
+
+Use **Render** for animated portrait or landscape output. A tape document is not
+a captured video frame: it is rendered from the selected tape's complete layout
+bounds. This is why a long explanation can become a readable study sheet even
+when only part of it is visible in any single video frame.
+
+## Related guides
+
+- [Project files](/desktop/project-files/)
+- [Infinite tapes](/authoring/tapes/)
+- [Export and deliver](/production/export-and-deliver/)

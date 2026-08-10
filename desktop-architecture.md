@@ -1,6 +1,8 @@
 # Matemium Desktop — Product Architecture & Goals
 
-**Status:** Core desktop model (2026-06-26). **Latest product decisions** (lazy sidecar, first-run downloads, UX gating, YouTube publishing, vector intelligence) are in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).  
+**Status:** Architecture history with current workspace boundaries reviewed
+2026-08-09. Source, tests, [`AUTHORING_API.md`](AUTHORING_API.md), and
+[`RELEASING.md`](RELEASING.md) control shipped behavior.
 **Audience:** All contributors — engine, desktop shell, cloud middleware, and AI integration authors.
 
 **Phase 10 status:** Packaging/CI/cross-platform + docs refresh implemented. See [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md) §11 and phased roadmap.
@@ -23,7 +25,8 @@ Engine internals remain in [`architecture.md`](architecture.md); feature status 
 The repository layout (`canvas/`, `projects/`, `matemium/`, etc.) **stays intact**:
 
 - **`canvas/`** — frozen into a platform-specific **PyInstaller sidecar**; the render farm on the user's machine.
-- **`projects/`** — dev harness and engine stress tests; mirrors the desktop **single-file project** model.
+- **`projects/`** — dev harness and engine stress tests; mirrors the desktop
+  `scenes.py` entrypoint plus optional helpers and production artifacts.
 - **`matemium/`** — dev/CI CLI today; sidecar IPC for production renders and lint/check.
 
 ---
@@ -34,7 +37,9 @@ These are non-negotiable product rules. All new desktop, cloud, and engine work 
 
 ### 2.1 Code is the authoring surface
 
-- End users work in a **project workspace** with a **single Python file** (`scenes.py`) that defines their animation.
+- End users work in a bounded **project workspace**. `scenes.py` is the required
+  render entrypoint; helpers, briefs, tape documents, media, and renders remain
+  first-class project artifacts.
 - Authoring uses **`CanvasBuilder` + `CanvasScene`** — the same API documented in [`canvas/USAGE.md`](canvas/USAGE.md).
 - Users do **not** write raw Manim. They write Matemium scene code; the engine compiles to an internal `SheetDSL` via `builder.build()`.
 

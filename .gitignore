@@ -107,6 +107,8 @@ screenshots/
 !docs/**/*.jpeg
 !docs/**/*.svg
 !docs/**/*.pdf
+!docs/public/screenshots/
+!docs/public/screenshots/**/*.png
 !desktop/src-tauri/icons/**/*.png
 !desktop/src-tauri/icons/**/*.jpg
 !desktop/src-tauri/icons/**/*.svg
@@ -119,6 +121,10 @@ screenshots/
 !website/public/**/*.icns
 !website/public/media/
 !website/public/media/**/*.mp4
+!desktop/app/public/
+!desktop/app/public/showcase/
+!desktop/app/public/showcase/**/*.jpg
+!desktop/app/public/showcase/**/*.mp4
 !public/**/*.png
 !public/**/*.jpg
 !public/**/*.svg

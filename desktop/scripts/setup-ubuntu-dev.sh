@@ -5,7 +5,7 @@
 # Usage:
 #   ./desktop/scripts/setup-ubuntu-dev.sh              # apt + python venvs only
 #   ./desktop/scripts/setup-ubuntu-dev.sh --with-rust   # also install rustup
-#   ./desktop/scripts/setup-ubuntu-dev.sh --with-node   # also install Node 20 via nodesource
+#   ./desktop/scripts/setup-ubuntu-dev.sh --with-node   # also install Node 22 via NodeSource
 #   ./desktop/scripts/setup-ubuntu-dev.sh --all         # everything above
 set -euo pipefail
 
@@ -73,11 +73,11 @@ if [[ "$WITH_RUST" == true ]]; then
 fi
 
 if [[ "$WITH_NODE" == true ]]; then
-  echo "==> 0.3 Installing Node.js 20"
-  if command -v node >/dev/null 2>&1 && [[ "$(node -p 'process.versions.node.split(".")[0]')" -ge 20 ]]; then
+  echo "==> 0.3 Installing Node.js 22"
+  if command -v node >/dev/null 2>&1 && [[ "$(node -p 'process.versions.node.split(".")[0]')" -eq 22 ]]; then
     echo "    node already installed: $(node --version)"
   else
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
     sudo apt install -y nodejs
     node --version
     npm --version
@@ -89,8 +89,13 @@ if [[ ! -d "$ROOT/.venv" ]]; then
   python3 -m venv "$ROOT/.venv"
 fi
 "$ROOT/.venv/bin/pip" install --upgrade pip -q
-"$ROOT/.venv/bin/pip" install -e "$ROOT/.[dev]" pyinstaller ruff -q
+"$ROOT/.venv/bin/pip" install -e "$ROOT/.[dev,intelligence]" -q
 echo "    matemium: $("$ROOT/.venv/bin/matemium" --version 2>/dev/null || true)"
+
+if [[ "$WITH_NODE" == true ]]; then
+  echo "==> 0.5a Desktop frontend dependencies"
+  npm ci --prefix "$ROOT/desktop/app"
+fi
 
 echo "==> 0.6 Server virtualenv ($ROOT/server/.venv)"
 if [[ ! -d "$ROOT/server/.venv" ]]; then
@@ -110,6 +115,8 @@ echo ""
 echo "Optional next steps:"
 echo "  source $ROOT/.venv/bin/activate && pytest tests/ -q"
 echo "  ./matemium.sh demo -q preview"
+echo "  ./desktop/scripts/build-sidecar.sh"
+echo "  cd desktop && cargo tauri dev"
 if [[ "$WITH_RUST" == false ]]; then
   echo "  Re-run with --with-rust (and --with-node) before Phase 3 Tauri work"
 fi

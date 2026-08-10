@@ -19,4 +19,5 @@ pub struct AppState {
     pub agent_runs: AgentRunStore,
     pub openrouter_oauth_session: Mutex<Option<OpenRouterOAuthSession>>,
     pub openrouter_oauth_active_cancel: Mutex<Option<Arc<AtomicBool>>>,
+    pub auth_browser_cancel: Mutex<Option<Arc<AtomicBool>>>,
 }

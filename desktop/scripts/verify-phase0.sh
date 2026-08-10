@@ -67,16 +67,22 @@ else
 fi
 
 echo ""
-echo "--- 0.3 Node.js 20+ (required before Phase 5 UI) ---"
+echo "--- 0.3 Node.js 22 (required before Phase 5 UI) ---"
 if command -v node >/dev/null 2>&1; then
   major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-  if [[ "$major" -ge 20 ]]; then
+  if [[ "$major" -eq 22 ]]; then
     ok "node $(node --version)"
   else
-    warn "node $(node --version) — need v20+ (setup-ubuntu-dev.sh --with-node)"
+    warn "node $(node --version) — need v22 (setup-ubuntu-dev.sh --with-node)"
   fi
 else
   warn "node not installed — run setup-ubuntu-dev.sh --with-node"
+fi
+
+if [[ -d "$ROOT/desktop/app/node_modules" ]]; then
+  ok "desktop frontend dependencies installed"
+else
+  warn "desktop/app/node_modules missing — run npm ci --prefix desktop/app"
 fi
 
 echo ""

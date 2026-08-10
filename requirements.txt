@@ -1,2 +1,3 @@
-manim>=0.20.1
-pillow>=12.0.0
+# Runtime-only compatibility file. The canonical dependency definitions live in
+# pyproject.toml; uv.lock pins their complete, cross-platform resolution.
+-e .

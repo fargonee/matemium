@@ -4,7 +4,7 @@ A **layout-to-animation compiler and agentic desktop studio** for structured vis
 
 Output targets **9:16 portrait reels** (TikTok / Shorts) by default, with landscape YouTube support. Long-form sheets can be exported as static study materials or auto-chunked into short clips.
 
-**Documentation baseline (2026-07-27):** author-facing claims are aligned to
+**Documentation baseline (2026-08-09):** author-facing claims are aligned to
 the current source and tests. Historical phase plans describe intent and do not
 override the current contract in [`AUTHORING_API.md`](AUTHORING_API.md).
 
@@ -20,6 +20,14 @@ Monorepo for a **free, source-available desktop app** under the Matemium Source-
 
 Overview: [`INTRODUCTION.md`](INTRODUCTION.md). Map: [`STRUCTURE.md`](STRUCTURE.md). Product spec: [`desktop-architecture.md`](desktop-architecture.md). AI agent: [`ai-agent-architecture.md`](ai-agent-architecture.md).
 
+## Follow and contact
+
+- **Build and releases:** [GitHub](https://github.com/fargonee/matemium)
+- **Watch:** [YouTube](https://youtube.com/@matemium) · [Instagram](https://www.instagram.com/matemium)
+- **Updates and conversation:** [Telegram](https://t.me/matemium) · [Reddit](https://www.reddit.com/user/matemium/) · [X](https://x.com/matemium) · [Bluesky](https://bsky.app/profile/matemium.bsky.social)
+- **Launch and engineering:** [Product Hunt](https://www.producthunt.com/@matemium) · [DEV Community](https://dev.to/matemium)
+- **Direct contact:** [matemiumm@gmail.com](mailto:matemiumm@gmail.com)
+
 ```bash
 # Test the desktop sidecar IPC (no Tauri required yet)
 echo '{"type":"request","id":"1","command":"ping","params":{}}' | python -m matemium.sidecar
@@ -27,15 +35,23 @@ echo '{"type":"request","id":"1","command":"ping","params":{}}' | python -m mate
 
 ## Install
 
+**Desktop application:** Download the installer for Linux, Windows, or macOS
+from [GitHub Releases](https://github.com/fargonee/matemium/releases). The launch
+installers bundle Matemium itself; rendering requires FFmpeg and LaTeX. See
+[`RELEASING.md`](RELEASING.md) for the supported targets, prerequisites, and
+current signing limitations.
+
 **From source (recommended for development):**
 
 ```bash
-git clone <repo-url> && cd math
-python -m venv venv && source venv/bin/activate
-pip install -e ".[dev]"
+git clone https://github.com/fargonee/matemium.git && cd matemium
+uv sync --python 3.12 --extra dev --frozen
 ```
 
-**Requirements only (legacy):** `pip install -r requirements.txt`
+For desktop development, native prerequisites, Windows/macOS instructions, and
+all lockfiles, follow [`DEVELOPMENT.md`](DEVELOPMENT.md).
+
+**pip fallback:** `python -m pip install -r requirements-dev.txt`
 
 **System dependencies for video renders:** FFmpeg and LaTeX (see [Manim installation](https://docs.manim.community/en/stable/installation.html)).
 
@@ -110,7 +126,11 @@ Renders are isolated per project under `outputs/<project>/media/` (gitignored).
 
 ### 3. Visual explanation projects (`projects/`)
 
-Each folder is one video. A project has `scenes.py` (required; **the desktop app's single authoring file**) and optional `helpers.py` for topic-specific composition functions in the dev repo. The desktop v1 product uses **one `scenes.py`** with `# ---DIV: ...---` section markers for navigable editing.
+Each folder is one visual-explanation project. `scenes.py` is the required
+render entrypoint and uses `# ---DIV: ...---` section markers for navigable
+editing. A desktop workspace can also contain `helpers.py`, structured `brief/`
+material (including `brief/tapes/`), imported assets, and app-managed renders;
+the complete workspace is portable through `.matemium.zip` archives.
 
 The bundled flagship library currently contains projects across
 eleven subjects: Fourier epicycles, orbital mechanics, an SN2 reaction,
@@ -236,6 +256,7 @@ cutter.cut(input_video=..., output_dir=..., manifest=manifest)
 - Stable semantic-part addressing for paths, axes, series, markers, nodes, edges, and edge labels
 - Synchronized allowlisted state transitions + compiled element morphs
 - Strict pre-render DSL validation and structured project-check diagnostics
+- Registered visual-kind builders, validators, and semantic-part declarations
 - Real 3D surfaces (`z = f(x,y)`)
 - 3D solids (cube/sphere), lift, camera inspect paths
 - Camera focus (isolate / overlay) with viewport-fit zoom capping
@@ -250,9 +271,11 @@ cutter.cut(input_video=..., output_dir=..., manifest=manifest)
 - [x] Sidecar JSON IPC (`matemium-sidecar`, `matemium/ipc/`)
 - [x] Tauri v2 + TypeScript UI (Monaco editor, AI chat, section outline, render preview, project workspaces)
 - [x] Sidecar project commands — `lint_project`, `check_project`, `list_scenes`, `render_project`, `export_sheet`, etc. + progress events
-- [x] PyInstaller Linux binary + full Linux ship (`.deb` / `.AppImage`) via `./desktop/scripts/build-linux.sh`
+- [x] Full-tape PNG/PDF export with scene/tape selection, natural proportions, and output preview
+- [x] Complete `.matemium.zip` project archive import/export with validated paths and new imported identities
+- [x] Eleven bundled editable source examples plus four accepted flagship outcomes in the desktop library
+- [x] Native release pipelines for Linux (`.deb` / `.AppImage`), Windows (`.exe` / `.msi`), and Apple Silicon/Intel macOS (`.dmg`)
 - [x] Cloud auth + chat client (Supabase / Google sign-in; AI uses user-owned provider keys)
-- [ ] Full CI matrix for Windows + macOS desktop builds (Linux complete)
 
 **Server** ([`server/`](server/)):
 - [x] FastAPI — `/health`, auth (Supabase token + Google sign-in session), `/v1/chat/completions`, admin routes
@@ -272,8 +295,7 @@ cutter.cut(input_video=..., output_dir=..., manifest=manifest)
 - Dedicated future work for unfinished world-camera seams and timed media/audio
 - SolutionTape integration as canvas elements
 - Reel cutting polish (audio, titles, padding)
-- Element-type plugin registry to avoid unbounded `if type ==` growth
-- Sidecar progress events for desktop preview matrix
+- Final-quality render, accessibility, and domain review across the source library
 
 ## Project layout
 

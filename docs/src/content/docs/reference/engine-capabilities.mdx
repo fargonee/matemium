@@ -4,7 +4,7 @@ description: See which Matemium authoring and rendering capabilities are mature,
 ---
 
 This page is the public maturity snapshot for the engine revision dated
-2026-07-27. A method existing in source is not, by itself, proof that it is a
+2026-08-09. A method existing in source is not, by itself, proof that it is a
 production authoring contract.
 
 ## Production authoring
@@ -22,6 +22,8 @@ These are the preferred tools for real projects:
 - `StateTransition` for synchronized allowlisted property changes
 - `ElementMorph` for recompiled content or geometry
 - Isolate and overlay camera focus
+- Additional camera-facing tapes with automatic curtain switching
+- Explicit validated tape selection and local movement with `scroll_tape()`
 - Portrait 9:16 and landscape 16:9 settings
 - Strict project/DSL checking before render
 
@@ -36,19 +38,33 @@ These are implemented but need closer visual testing:
 - Tape-local cube/sphere and multipart solids
 - Solid lift, rotation paths, labels, and camera inspection
 - Full-tape PNG/PDF export
+- Complete desktop project archive import/export
 - Reel cutting
 - Legacy grid-board and quadratic helpers
 
 The legacy grid/quadratic methods remain for compatibility. New projects should
 prefer generic visuals and project-local helpers.
 
+## Production spatial composition
+
+These are exercised by the orbital flagship and engine tests:
+
+- Additional camera-facing tapes
+- Automatic world → tape, tape → tape, and tape → world curtain switching
+- Explicit `scroll_tape()` / serialized `TapeScroll`
+- Stable-ID registered world objects through `add_object()`
+- Stable-ID world morphs
+- `add_camera_inspect()` paths
+
+Only one tape—or the free world—is visible at a time. Simultaneously visible
+tapes and arbitrary physical tape transforms are not current contracts.
+
 ## Experimental capabilities
 
 Use these only when a project genuinely needs them and can provide render
 evidence:
 
-- Additional tapes and automatic context switching
-- Free world objects through `add_object()` / `add_world_object()`
+- Low-level free world objects through `add_world_object()`
 - General camera keyframes and `observe_object()`
 - Relative world placement
 
@@ -57,9 +73,8 @@ ergonomics are not yet a flagship-safe default.
 
 ## Not currently available
 
-- `scroll_tape()` / `TapeScroll`: the builder method references a target type
-  that is absent from the current DSL
 - Arbitrary physical transforms for tapes
+- Simultaneously visible tape contexts
 - Generic timed traversal or cursor animation over `DataPath` / `DataPlot`
 - Shared reactive clocks and declarative data bindings
 - Timed audio/media tracks in the canvas timeline
@@ -81,7 +96,17 @@ Persistent relative movement, sampled pose traversal, live anchor bindings,
 surface-relative movement, and geodesics are under discussion. No listed
 approach or illustrative API has been accepted or rejected, and none is a
 launch capability. See the
-[open discussion and evaluation criteria](https://github.com/fargonee/math/blob/main/SPATIAL_AUTHORING_OPEN_QUESTIONS.md).
+[open discussion and evaluation criteria](https://github.com/fargonee/matemium/blob/main/SPATIAL_AUTHORING_OPEN_QUESTIONS.md).
+
+## Desktop delivery capabilities
+
+The current desktop can:
+
+- Inspect saved source and list every populated tape in a scene
+- Export one complete tape as natural-aspect PNG or PDF at native or fixed detail
+- Archive an entire editable project workspace as `.matemium.zip`
+- Validate an imported archive, assign a new project identity, and open it locally
+- Browse imported images, video, audio, and generated output history
 
 ## Evidence levels
 

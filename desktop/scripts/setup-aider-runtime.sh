@@ -21,16 +21,27 @@ mkdir -p "$(dirname "$RUNTIME_DIR")"
 echo "==> Creating Aider runtime at $RUNTIME_DIR with Python $AIDER_PYTHON"
 "$UV_BIN" venv --python "$AIDER_PYTHON" "$RUNTIME_DIR"
 
-echo "==> Installing aider-chat==$AIDER_VERSION"
-"$UV_BIN" pip install --python "$RUNTIME_DIR/bin/python" "aider-chat==$AIDER_VERSION"
+if [[ -x "$RUNTIME_DIR/bin/python" ]]; then
+  RUNTIME_PYTHON="$RUNTIME_DIR/bin/python"
+  AIDER_BIN="$RUNTIME_DIR/bin/aider"
+elif [[ -x "$RUNTIME_DIR/Scripts/python.exe" ]]; then
+  RUNTIME_PYTHON="$RUNTIME_DIR/Scripts/python.exe"
+  AIDER_BIN="$RUNTIME_DIR/Scripts/aider.exe"
+else
+  echo "FAIL: Python executable not found in Aider runtime: $RUNTIME_DIR"
+  exit 1
+fi
 
-if [[ ! -x "$RUNTIME_DIR/bin/aider" ]]; then
-  echo "FAIL: expected Aider executable not found at $RUNTIME_DIR/bin/aider"
+echo "==> Installing aider-chat==$AIDER_VERSION"
+"$UV_BIN" pip install --python "$RUNTIME_PYTHON" "aider-chat==$AIDER_VERSION"
+
+if [[ ! -x "$AIDER_BIN" ]]; then
+  echo "FAIL: expected Aider executable not found at $AIDER_BIN"
   exit 1
 fi
 
 echo "==> Verifying Aider"
-"$RUNTIME_DIR/bin/aider" --version
+"$AIDER_BIN" --version
 
 echo ""
 echo "Aider runtime ready."

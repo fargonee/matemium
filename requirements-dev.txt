@@ -1,0 +1,2 @@
+# Engine tests, linting, and sidecar packaging.
+-e .[dev]

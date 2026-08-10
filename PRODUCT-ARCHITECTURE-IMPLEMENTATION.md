@@ -1,5 +1,9 @@
 # Implementing the Product Architecture Decisions
 
+> Historical implementation guide. For the 0.3.0 launch contract, rendering
+> tools are host prerequisites and TinyTeX is not downloaded automatically.
+> See `RELEASING.md` and `desktop/packaging/README.md`.
+
 **Date:** 2026-07-02  
 **Status:** Implementation guide (authoritative steps)  
 **Related (read first):**  

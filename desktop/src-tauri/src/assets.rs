@@ -1,5 +1,5 @@
 //! PAD Phase 3: Rust-owned first-run asset download manager.
-//! Handles TinyTeX and local GGUF offline intelligence models with Range resumable downloads.
+//! Handles optional local GGUF models with Range-resumable downloads.
 //!
 //! Responsibilities:
 //! - Load asset specs dynamically from shared/assets/manifest.json (with static fallbacks)
@@ -325,19 +325,8 @@ impl AssetManager {
 
         // Static production-grade fallback manifest if local file resolution fails
         Manifest {
-            version: "2026-07-12".to_string(),
+            version: "2026-08-09".to_string(),
             assets: vec![
-                ManifestAsset {
-                    id: "tinytex-linux".to_string(),
-                    name: "TinyTeX (Linux x86_64)".to_string(),
-                    url: "https://github.com/yihui/tinytex-releases/releases/download/v2024.11/TinyTeX-1-v2024.11.tar.gz".to_string(),
-                    sha256: "PLACEHOLDER_REPLACE_WITH_REAL".to_string(),
-                    size: 120000000,
-                    extract: true,
-                    extract_format: "tar.gz".to_string(),
-                    install_path: "bin/tinytex".to_string(),
-                    platforms: vec!["linux".to_string()],
-                },
                 ManifestAsset {
                     id: "llm-qwen-coder-3b-q4".to_string(),
                     name: "Qwen-2.5-Coder-3B-Instruct (Q4_K_M GGUF)".to_string(),

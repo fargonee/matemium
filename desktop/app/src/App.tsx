@@ -24,6 +24,7 @@ import { ChatPanel } from "./components/ChatPanel";
 import { CodeEditor, type CodeEditorHandle } from "./components/Editor";
 import { ProjectsLanding } from "./components/ProjectsLanding";
 import { CommunityGallery } from "./components/CommunityGallery";
+import { AuthGate } from "./components/AuthGate";
 import { ObsidianLoadingScreen } from "./components/ObsidianLoadingScreen";
 import { ProjectSidebar, type WorkspaceItem } from "./components/ProjectSidebar";
 import { BriefJsonEditor, STRUCTURED_BRIEF_FILES } from "./components/BriefJsonEditor";
@@ -345,6 +346,9 @@ export default function App() {
     llmProvider: "openrouter",
     useAutonomousAgent: true,
   });
+  const [authStatus, setAuthStatus] = useState<"checking" | "signed-out" | "signed-in">("checking");
+  const [accountProfile, setAccountProfile] = useState<Record<string, unknown> | null>(null);
+  const [authenticatedBootstrapped, setAuthenticatedBootstrapped] = useState(false);
   const [llmProfile, setLlmProfile] = useState<LLMConfig | null>(null);
   const [pipeline, setPipeline] = useState<RenderPipelineState>(INITIAL_PIPELINE_STATE);
   const { tab: bottomDockTab, selectTab: selectBottomDockTab, focusProgress } =
@@ -634,15 +638,39 @@ export default function App() {
     }
   }, [inTauri]);
 
+  const endAuthenticatedSession = useCallback(async () => {
+    const loadedSettings = await api.settingsGet().catch(() => settings);
+    const clearedSettings = { ...loadedSettings, apiToken: null };
+    await api.settingsSet(clearedSettings).catch(() => undefined);
+    setSettings(clearedSettings);
+    setAuthStatus("signed-out");
+    setAccountProfile(null);
+    setAuthenticatedBootstrapped(false);
+    setProject(null);
+    setProjects([]);
+    setExamples([]);
+    setLlmProfile(null);
+  }, [settings]);
+
+  const handleAuthenticated = useCallback(async (profile: Record<string, unknown>) => {
+    const loadedSettings = await api.settingsGet();
+    setSettings(loadedSettings);
+    setAccountProfile(profile);
+    setAuthenticatedBootstrapped(false);
+    setAuthStatus("signed-in");
+  }, []);
+
   useEffect(() => {
+    if (authStatus !== "signed-in") return;
     // initial check
     void refreshReadiness();
     const id = setInterval(() => { void refreshReadiness(); }, 2000);
     return () => clearInterval(id);
-  }, [refreshReadiness]);
+  }, [authStatus, refreshReadiness]);
 
   // Listen to asset progress and loading to refresh readiness faster
   useEffect(() => {
+    if (authStatus !== "signed-in") return;
     // we can also listen for asset-progress
     let unlistenAsset: (() => void) | undefined;
     let unlistenSidecar: (() => void) | undefined;
@@ -658,7 +686,7 @@ export default function App() {
       unlistenAsset?.();
       unlistenSidecar?.();
     };
-  }, [refreshReadiness]);
+  }, [authStatus, refreshReadiness]);
 
   const coreReady = Boolean(
     readiness?.fullyReady
@@ -671,14 +699,6 @@ export default function App() {
   const readinessMessage = settings.useLocalLlm && !localModelReady
     ? (localModelStatusMsg || "Waiting for offline model...") 
     : (readiness?.message || "Checking readiness...");
-
-  // Auto trigger asset download on start if not ready (demo for phase 4)
-  useEffect(() => {
-    if (readiness && !readiness.assetsReady) {
-      // fire and forget; UI will show via polling
-      void api.startAssetDownload("tinytex-linux").catch(() => {});
-    }
-  }, [readiness?.assetsReady]);
 
   // Auto-trigger intelligence/RAG load in background once engine is ready
   // (retrieve handler calls ensure_intelligence_loaded; keyword fallback if no vector deps)
@@ -884,13 +904,36 @@ export default function App() {
 
     void (async () => {
       try {
-        setBusy(true);
-        await Promise.all([refreshProjects(), refreshExamples()]);
         const loadedSettings = await api.settingsGet();
         setSettings(loadedSettings);
-        if (loadedSettings.apiToken) {
-          void refreshLlmProfile();
+        if (!loadedSettings.apiToken) {
+          setAuthStatus("signed-out");
+          return;
         }
+        const profile = await api.cloudGetProfile();
+        setAccountProfile(profile as Record<string, unknown>);
+        setAuthStatus("signed-in");
+      } catch (error) {
+        const loadedSettings = await api.settingsGet().catch(() => null);
+        if (loadedSettings?.apiToken) {
+          const clearedSettings = { ...loadedSettings, apiToken: null };
+          await api.settingsSet(clearedSettings).catch(() => undefined);
+          setSettings(clearedSettings);
+        }
+        setAccountProfile(null);
+        setAuthStatus("signed-out");
+      }
+    })();
+  }, [inTauri]);
+
+  useEffect(() => {
+    if (authStatus !== "signed-in" || authenticatedBootstrapped) return;
+
+    void (async () => {
+      try {
+        setBusy(true);
+        await Promise.all([refreshProjects(), refreshExamples()]);
+        void refreshLlmProfile();
         const ping = await api.sidecarPing();
         appendLog(`[ping] ${JSON.stringify(ping)}`);
         if (
@@ -906,10 +949,43 @@ export default function App() {
         setStatusMessage(formatError(error), "error");
         appendLog(`[error] ${formatError(error)}`);
       } finally {
+        setAuthenticatedBootstrapped(true);
         setBusy(false);
       }
     })();
-  }, [appendLog, inTauri, refreshExamples, refreshProjects]);
+  }, [
+    appendLog,
+    authenticatedBootstrapped,
+    authStatus,
+    refreshExamples,
+    refreshLlmProfile,
+    refreshProjects,
+  ]);
+
+  useEffect(() => {
+    if (authStatus !== "signed-in") return;
+    let verifying = false;
+
+    const verifySession = async () => {
+      if (verifying) return;
+      verifying = true;
+      try {
+        const profile = await api.cloudGetProfile();
+        setAccountProfile(profile as Record<string, unknown>);
+      } catch {
+        await endAuthenticatedSession();
+      } finally {
+        verifying = false;
+      }
+    };
+    const onFocus = () => { void verifySession(); };
+    const interval = window.setInterval(() => { void verifySession(); }, 5 * 60 * 1000);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [authStatus, endAuthenticatedSession]);
 
   useEffect(() => {
     if (!project) return;
@@ -1951,6 +2027,14 @@ export default function App() {
       await api.settingsSet(nextSettings);
       setSettings(nextSettings);
       setSettingsOpen(false);
+      if (!nextSettings.apiToken) {
+        setAuthStatus("signed-out");
+        setAccountProfile(null);
+        setAuthenticatedBootstrapped(false);
+        setProject(null);
+        setProjects([]);
+        setExamples([]);
+      }
       setStatusMessage("Settings saved", "ok");
       // Refresh provider profile when token or prefs are saved.
       if (nextSettings.apiToken) {
@@ -1979,6 +2063,10 @@ export default function App() {
   const phasePulse = roadmapPulse(fileContents.roadmap);
   const selectedProductionPath = passportProductionPath(fileContents.passport);
   const renderAllowed = !phasePulse || ["authoring", "render_repair", "timing_regulation"].includes(phasePulse.id);
+  const accountDetails = accountProfile?.profile && typeof accountProfile.profile === "object"
+    ? accountProfile.profile as Record<string, unknown>
+    : null;
+  const accountEmail = typeof accountDetails?.email === "string" ? accountDetails.email : "";
 
   const handleCreateTape = async () => {
     if (!project) return;
@@ -2021,6 +2109,14 @@ export default function App() {
   const [publishTags, setPublishTags] = useState("");
   const [publishing, setPublishing] = useState(false);
 
+  if (authStatus === "checking") {
+    return <AuthGate checking />;
+  }
+
+  if (authStatus === "signed-out") {
+    return <AuthGate onAuthenticated={(profile) => void handleAuthenticated(profile)} />;
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -2058,6 +2154,17 @@ export default function App() {
           }}
         >
           Settings
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost auth-header-account-modern"
+          title={accountEmail ? `Signed in as ${accountEmail}` : "Signed in to Matemium"}
+          onClick={() => void endAuthenticatedSession()}
+        >
+          <span className="auth-header-avatar-modern" aria-hidden>
+            {(accountEmail.charAt(0) || "M").toUpperCase()}
+          </span>
+          Sign out
         </button>
         <span className={`status-pill ${statusKind}`}>{busy ? "Working…" : status}</span>
       </header>

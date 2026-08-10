@@ -1,0 +1,2 @@
+# Full local desktop/sidecar development environment, including local AI.
+-e .[dev,intelligence]

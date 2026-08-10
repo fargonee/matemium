@@ -109,13 +109,33 @@ pub struct ProviderModel {
     pub badges: Vec<String>,
 }
 
-fn default_server_url() -> String {
+pub fn configured_server_url() -> String {
     let json_str = include_str!("../../app/src/config.json");
     let v: serde_json::Value = serde_json::from_str(json_str).expect("invalid config.json");
     v["serverUrl"]
         .as_str()
         .expect("missing serverUrl in config.json")
         .to_string()
+}
+
+fn default_server_url() -> String {
+    configured_server_url()
+}
+
+fn migrate_legacy_server_url(settings: &mut Settings) -> bool {
+    let current = settings.server_url.trim().trim_end_matches('/');
+    let configured = configured_server_url();
+    if current == configured.trim_end_matches('/') {
+        return false;
+    }
+    if matches!(
+        current,
+        "http://127.0.0.1:8080" | "http://localhost:8080"
+    ) {
+        settings.server_url = configured;
+        return true;
+    }
+    false
 }
 
 fn default_bottom_dock_default() -> String {
@@ -260,7 +280,12 @@ impl AppPaths {
         }
         let raw =
             fs::read_to_string(&self.settings_path).map_err(|e| format!("read settings: {e}"))?;
-        serde_json::from_str(&raw).map_err(|e| format!("parse settings: {e}"))
+        let mut settings: Settings =
+            serde_json::from_str(&raw).map_err(|e| format!("parse settings: {e}"))?;
+        if migrate_legacy_server_url(&mut settings) {
+            self.save_settings(&settings)?;
+        }
+        Ok(settings)
     }
 
     pub fn save_settings(&self, settings: &Settings) -> Result<(), String> {
@@ -291,5 +316,25 @@ mod tests {
         assert!(paths.data_root.ends_with("matemium"));
         assert!(paths.workspaces_root.ends_with("workspaces"));
         assert!(paths.settings_path.ends_with("matemium/settings.json"));
+    }
+
+    #[test]
+    fn migrates_legacy_local_auth_server_to_configured_cloud() {
+        let mut settings = Settings {
+            server_url: "http://127.0.0.1:8080".to_string(),
+            ..Settings::default()
+        };
+        assert!(migrate_legacy_server_url(&mut settings));
+        assert_eq!(settings.server_url, configured_server_url());
+    }
+
+    #[test]
+    fn preserves_non_legacy_custom_server() {
+        let mut settings = Settings {
+            server_url: "http://127.0.0.1:9080".to_string(),
+            ..Settings::default()
+        };
+        assert!(!migrate_legacy_server_url(&mut settings));
+        assert_eq!(settings.server_url, "http://127.0.0.1:9080");
     }
 }

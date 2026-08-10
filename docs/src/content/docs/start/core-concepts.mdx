@@ -80,15 +80,17 @@ an infinite document: content flows vertically, reveals lazily, and remains
 addressable after appearing.
 
 Projects can use additional tapes for comparisons or parallel explanations,
-but current multi-tape switching is an advanced feature that needs preview
-evidence.
+with automatic world-to-tape, tape-to-tape, and tape-to-world curtain
+transitions. `scroll_tape()` explicitly selects a tape and moves within its
+local layout. Only one tape—or the free world—is visible at a time.
 
 ## World object
 
-Anything positioned in Matemium’s experimental 3D world path, such as a
-registered solid or other free object. Tape-local solids and inspection are the
-more mature production method. Arbitrary physical tape placement remains an
-unfinished architecture seam.
+Anything positioned in Matemium’s free 3D world, such as a registered solid or
+project-local visual kind. Stable-ID world objects, morphs, and inspection paths
+can be production composition tools; lower-level camera keyframes and relative
+world placement remain experimental. Tapes themselves stay camera-facing and
+cannot be given arbitrary physical transforms.
 
 ## Render
 
@@ -104,6 +106,12 @@ project, and rendering again.
 
 Generated videos, images, full-sheet exports, and related delivery artifacts.
 Output remains local unless you explicitly publish or move it.
+
+## Project archive
+
+A `.matemium.zip` copy of a complete project workspace. It preserves editable
+source, briefs, tapes, imported media, renders, and output history. Importing an
+archive creates a new local project identity instead of replacing the original.
 
 ## Continue learning
 

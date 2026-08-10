@@ -15,10 +15,10 @@ export default defineConfig({
 			favicon: '/favicon.png',
 			customCss: ['./src/styles/custom.css'],
 			social: [
-				{ icon: 'github', label: 'Matemium on GitHub', href: 'https://github.com/fargonee/math' },
+				{ icon: 'github', label: 'Matemium on GitHub', href: 'https://github.com/fargonee/matemium' },
 			],
 			editLink: {
-				baseUrl: 'https://github.com/fargonee/math/edit/main/docs/',
+				baseUrl: 'https://github.com/fargonee/matemium/edit/main/docs/',
 			},
 			sidebar: [
 				{
@@ -36,6 +36,7 @@ export default defineConfig({
 						{ slug: 'desktop/project-lifecycle' },
 						{ slug: 'desktop/working-with-the-agent' },
 						{ slug: 'desktop/project-files' },
+						{ slug: 'desktop/import-export' },
 					],
 				},
 				{
@@ -75,7 +76,10 @@ export default defineConfig({
 				},
 				{
 					label: 'Help',
-					items: [{ slug: 'help/troubleshooting' }],
+					items: [
+						{ slug: 'help/troubleshooting' },
+						{ slug: 'help/community-and-contact' },
+					],
 				},
 				{
 					label: 'Develop and contribute',

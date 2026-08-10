@@ -12,11 +12,13 @@ Thank you for helping improve Matemium.
 
 ## Development setup
 
+The complete clean-machine instructions and dependency-lock inventory are in
+[`DEVELOPMENT.md`](DEVELOPMENT.md). For engine-only work:
+
 ```bash
-git clone <your-fork-url>
+git clone https://github.com/<your-username>/math.git
 cd math
-python -m venv venv && source venv/bin/activate
-pip install -e ".[dev]"
+uv sync --python 3.12 --extra dev --frozen
 ```
 
 System dependencies for Manim renders:

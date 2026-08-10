@@ -10,7 +10,7 @@ This page documents implemented methods. Persistent parent-relative movement,
 generic traversal, surface-relative positioning, and arbitrary-surface
 geodesics are not current API promises. Matemium is evaluating those questions
 through real projects, and no candidate design has been accepted or rejected.
-See the [open spatial-authoring discussion](https://github.com/fargonee/math/blob/main/SPATIAL_AUTHORING_OPEN_QUESTIONS.md).
+See the [open spatial-authoring discussion](https://github.com/fargonee/matemium/blob/main/SPATIAL_AUTHORING_OPEN_QUESTIONS.md).
 
 ```python
 builder = CanvasBuilder(title="My Explanation")
@@ -186,8 +186,11 @@ compatibility. A warning is not evidence that the kind can render.
   semantic diagrams, state transitions, morphs, focus, and both orientations.
 - Specialized: equation surfaces and solid inspection; always preview them in
   the delivery orientation.
-- Experimental: multiple-tape choreography and the free-world object/camera
-  APIs.
+- Production spatial composition: additional camera-facing tapes, curtain
+  switching, `scroll_tape()`, stable-ID `add_object()` world objects and morphs,
+  and `add_camera_inspect()` paths.
+- Experimental: `add_world_object()`, low-level camera keyframes,
+  `observe_object()`, and relative world placement.
 - Not yet generic: timed traversal of sampled paths/plots, reactive shared
   clocks, arbitrary physical tape transforms, and timed audio/media.
 
@@ -198,6 +201,6 @@ debugging, and specialized escape hatches. New product authoring should remain
 reachable through `CanvasBuilder`.
 
 For exact signatures in the current source, see
-[`canvas/builder.py`](https://github.com/fargonee/math/blob/main/canvas/builder.py).
+[`canvas/builder.py`](https://github.com/fargonee/matemium/blob/main/canvas/builder.py).
 The repository also maintains a source-aligned
-[`AUTHORING_API.md`](https://github.com/fargonee/math/blob/main/AUTHORING_API.md).
+[`AUTHORING_API.md`](https://github.com/fargonee/matemium/blob/main/AUTHORING_API.md).

@@ -115,7 +115,7 @@ Tauri fulfills the cross-platform product goal with **one shared frontend + shel
 | Tool | Windows | macOS | Linux |
 |------|---------|-------|-------|
 | Rust | rustup | rustup | rustup |
-| Node.js | 20+ | 20+ | 20+ |
+| Node.js | 22 | 22 | 22 |
 | Tauri CLI | `cargo install tauri-cli` | same | same |
 | Engine sidecar | PyInstaller build → `src-tauri/binaries/` | same | same |
 

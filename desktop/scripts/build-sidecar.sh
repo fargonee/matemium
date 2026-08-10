@@ -63,7 +63,7 @@ chmod +x "$BIN_DIR/$TAURI_NAME" 2>/dev/null || true
 echo "==> Installed Tauri externalBin: $BIN_DIR/$TAURI_NAME"
 
 echo "==> Smoke test"
-BIN="$BIN_DIR/$TAURI_NAME" "$ROOT/desktop/scripts/verify-sidecar-binary.sh" || true
+BIN="$BIN_DIR/$TAURI_NAME" "$ROOT/desktop/scripts/verify-sidecar-binary.sh"
 
 # Phase 10: Copy asset manifest for runtime reference (if needed by sidecar)
 MANIFEST_SRC="$ROOT/shared/assets/manifest.json"

@@ -1,5 +1,5 @@
 use std::io::{Read, Write};
-use std::net::TcpListener;
+use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{
@@ -552,11 +552,10 @@ pub struct Readiness {
 
 #[tauri::command]
 pub async fn get_readiness(state: State<'_, AppState>) -> Result<Readiness, String> {
-    let asset_statuses = state.assets.get_status(None);
-    let tinytex_ready = asset_statuses
-        .iter()
-        .any(|a| a.id == "tinytex-linux" && a.downloaded && a.verified)
-        || state.assets.tinytex_bin_dir().is_some();
+    // Rendering tools are host prerequisites for the launch release. They must
+    // not block editing, project management, or first launch. Linux packages
+    // declare them as dependencies; Windows/macOS setup is documented.
+    let core_assets_ready = true;
 
     let engine_status = state
         .sidecar
@@ -575,14 +574,9 @@ pub async fn get_readiness(state: State<'_, AppState>) -> Result<Readiness, Stri
         .unwrap_or(false)
         || engine_phase.contains("INTELLIGENCE_READY");
 
-    let fully_ready = tinytex_ready && engine_ready;
+    let fully_ready = core_assets_ready && engine_ready;
 
-    let (phase, message) = if !tinytex_ready {
-        (
-            "assets".to_string(),
-            "Downloading Local Code Intelligence assets (TinyTeX)...".to_string(),
-        )
-    } else if !engine_ready {
+    let (phase, message) = if !engine_ready {
         (
             "engine".to_string(),
             "Loading Manim / canvas engine...".to_string(),
@@ -593,7 +587,7 @@ pub async fn get_readiness(state: State<'_, AppState>) -> Result<Readiness, Stri
 
     Ok(Readiness {
         phase,
-        assets_ready: tinytex_ready,
+        assets_ready: core_assets_ready,
         engine_ready,
         intelligence_ready,
         fully_ready,
@@ -1080,6 +1074,117 @@ pub async fn auth_session(
 }
 
 #[tauri::command]
+pub async fn auth_browser_login(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .map_err(|e| format!("start desktop sign-in listener: {e}"))?;
+    let port = listener
+        .local_addr()
+        .map_err(|e| format!("read desktop sign-in address: {e}"))?
+        .port();
+    let csrf_state = uuid::Uuid::new_v4().to_string();
+    let cancel = Arc::new(AtomicBool::new(false));
+    {
+        let mut active = state
+            .auth_browser_cancel
+            .lock()
+            .map_err(|_| "Desktop sign-in state poisoned".to_string())?;
+        if let Some(previous) = active.replace(cancel.clone()) {
+            previous.store(true, Ordering::Relaxed);
+        }
+    }
+    let auth_url = format!(
+        "https://matemium.fargonee.space/desktop-auth?port={port}&state={}",
+        urlencoding::encode(&csrf_state),
+    );
+
+    if let Err(error) = app.opener().open_url(auth_url, None::<&str>) {
+        let mut active = state
+            .auth_browser_cancel
+            .lock()
+            .map_err(|_| "Desktop sign-in state poisoned".to_string())?;
+        if active
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, &cancel))
+        {
+            active.take();
+        }
+        return Err(format!("open Matemium sign-in: {error}"));
+    }
+
+    let expected_state = csrf_state.clone();
+    let wait_cancel = cancel.clone();
+    let callback_result = tauri::async_runtime::spawn_blocking(move || {
+        wait_for_desktop_auth_callback(listener, expected_state, wait_cancel)
+    })
+    .await
+    .map_err(|e| format!("desktop sign-in task failed: {e}"))?;
+
+    let (supabase_token, mut callback_stream) = match callback_result {
+        Ok(callback) => callback,
+        Err(error) => {
+            let mut active = state
+                .auth_browser_cancel
+                .lock()
+                .map_err(|_| "Desktop sign-in state poisoned".to_string())?;
+            if active
+                .as_ref()
+                .is_some_and(|current| Arc::ptr_eq(current, &cancel))
+            {
+                active.take();
+            }
+            return Err(error);
+        }
+    };
+    let result = async {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("Matemium sign-in cancelled.".to_string());
+        }
+        let mut settings = state.paths.load_settings()?;
+        let token = crate::cloud::login_with_session(&settings, &supabase_token).await?;
+        if cancel.load(Ordering::Relaxed) {
+            return Err("Matemium sign-in cancelled.".to_string());
+        }
+        settings.api_token = Some(token);
+        let profile = crate::cloud::get_profile(&settings).await?;
+        if cancel.load(Ordering::Relaxed) {
+            return Err("Matemium sign-in cancelled.".to_string());
+        }
+        state.paths.save_settings(&settings)?;
+        Ok(profile)
+    }
+    .await;
+    {
+        let mut active = state
+            .auth_browser_cancel
+            .lock()
+            .map_err(|_| "Desktop sign-in state poisoned".to_string())?;
+        if active
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, &cancel))
+        {
+            active.take();
+        }
+    }
+    write_desktop_auth_response(&mut callback_stream, result.is_ok());
+    result
+}
+
+#[tauri::command]
+pub async fn auth_browser_login_cancel(state: State<'_, AppState>) -> Result<(), String> {
+    let mut active = state
+        .auth_browser_cancel
+        .lock()
+        .map_err(|_| "Desktop sign-in state poisoned".to_string())?;
+    if let Some(cancel) = active.take() {
+        cancel.store(true, Ordering::Relaxed);
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn cloud_chat(
     state: State<'_, AppState>,
     params: CloudChatParams,
@@ -1279,6 +1384,125 @@ fn query_param(query: &str, name: &str) -> Option<String> {
         );
     }
     None
+}
+
+fn read_http_form(stream: &mut TcpStream) -> Result<(String, String), String> {
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .map_err(|e| format!("configure sign-in callback: {e}"))?;
+    let mut request = Vec::with_capacity(4096);
+    let mut chunk = [0_u8; 4096];
+
+    loop {
+        let count = stream
+            .read(&mut chunk)
+            .map_err(|e| format!("read sign-in callback: {e}"))?;
+        if count == 0 {
+            break;
+        }
+        request.extend_from_slice(&chunk[..count]);
+        if request.len() > 32 * 1024 {
+            return Err("Desktop sign-in callback was too large.".to_string());
+        }
+
+        let Some(header_end) = request.windows(4).position(|part| part == b"\r\n\r\n") else {
+            continue;
+        };
+        let headers = String::from_utf8_lossy(&request[..header_end]);
+        let content_length = headers
+            .lines()
+            .find_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                name.eq_ignore_ascii_case("content-length")
+                    .then(|| value.trim().parse::<usize>().ok())
+                    .flatten()
+            })
+            .unwrap_or(0);
+        if request.len() >= header_end + 4 + content_length {
+            let first_line = headers.lines().next().unwrap_or_default().to_string();
+            let body_start = header_end + 4;
+            let body_end = body_start + content_length;
+            let body = String::from_utf8_lossy(&request[body_start..body_end]).into_owned();
+            return Ok((first_line, body));
+        }
+    }
+
+    Err("Desktop sign-in callback was incomplete.".to_string())
+}
+
+fn write_desktop_auth_response(stream: &mut TcpStream, success: bool) {
+    let (title, message, color) = if success {
+        (
+            "Desktop sign-in complete",
+            "Matemium accepted your account. You can close this tab and return to the desktop app.",
+            "#61ddb0",
+        )
+    } else {
+        (
+            "Sign-in could not be completed",
+            "Return to Matemium and try signing in again.",
+            "#ff8a8a",
+        )
+    };
+    let body = format!(
+        "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>{title}</title></head><body style=\"margin:0;min-height:100vh;display:grid;place-items:center;background:#0a0c11;color:#f2f1f5;font-family:system-ui,sans-serif\"><main style=\"max-width:34rem;padding:3rem;text-align:center\"><div style=\"width:3rem;height:3rem;margin:0 auto 1.25rem;display:grid;place-items:center;border:1px solid {color};border-radius:1rem;color:{color};font-size:1.4rem\">✦</div><h1 style=\"margin:0;font-size:2rem\">{title}</h1><p style=\"color:#a5a9b4;line-height:1.7\">{message}</p></main></body></html>"
+    );
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    let _ = stream.write_all(response.as_bytes());
+}
+
+fn wait_for_desktop_auth_callback(
+    listener: TcpListener,
+    expected_state: String,
+    cancel: Arc<AtomicBool>,
+) -> Result<(String, TcpStream), String> {
+    listener
+        .set_nonblocking(true)
+        .map_err(|e| format!("configure desktop sign-in listener: {e}"))?;
+    let started = std::time::Instant::now();
+
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("Matemium sign-in cancelled.".to_string());
+        }
+        if started.elapsed() > Duration::from_secs(180) {
+            return Err("Matemium sign-in timed out. Please try again.".to_string());
+        }
+        match listener.accept() {
+            Ok((mut stream, _)) => {
+                let result = read_http_form(&mut stream).and_then(|(first_line, body)| {
+                    let mut parts = first_line.split_whitespace();
+                    let method = parts.next().unwrap_or_default();
+                    let path = parts.next().unwrap_or_default();
+                    if method != "POST" || path != "/matemium/auth/callback" {
+                        return Err("Invalid desktop sign-in callback.".to_string());
+                    }
+                    let returned_state = query_param(&body, "state").unwrap_or_default();
+                    if returned_state != expected_state {
+                        return Err("Desktop sign-in state did not match.".to_string());
+                    }
+                    query_param(&body, "access_token")
+                        .filter(|token| token.len() >= 10)
+                        .ok_or_else(|| "Desktop sign-in did not return a session.".to_string())
+                });
+                match result {
+                    Ok(token) => return Ok((token, stream)),
+                    Err(error) => {
+                        write_desktop_auth_response(&mut stream, false);
+                        return Err(error);
+                    }
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            Err(error) => return Err(format!("accept desktop sign-in callback: {error}")),
+        }
+    }
 }
 
 fn wait_for_openrouter_callback(
@@ -2431,6 +2655,52 @@ pub async fn conversation_delete(
         .map_err(|e| format!("Failed to serialize conversations: {}", e))?;
     std::fs::write(&path, data).map_err(|e| format!("Failed to write conversations: {}", e))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod desktop_auth_callback_tests {
+    use super::*;
+    use std::net::{Shutdown, TcpStream};
+
+    #[test]
+    fn desktop_auth_wait_can_be_cancelled() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("listener");
+        let cancel = Arc::new(AtomicBool::new(true));
+        let error = wait_for_desktop_auth_callback(listener, "expected".into(), cancel)
+            .expect_err("cancelled callback");
+        assert!(error.to_lowercase().contains("cancelled"));
+    }
+
+    #[test]
+    fn desktop_auth_success_response_is_deferred_until_verification() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("listener");
+        let address = listener.local_addr().expect("address");
+        let body = "state=expected-state&access_token=verified-browser-token";
+        let request = format!(
+            "POST /matemium/auth/callback HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {}\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let client = std::thread::spawn(move || {
+            let mut stream = TcpStream::connect(address).expect("connect");
+            stream.write_all(request.as_bytes()).expect("request");
+            stream.shutdown(Shutdown::Write).expect("finish request");
+            let mut response = String::new();
+            stream.read_to_string(&mut response).expect("response");
+            response
+        });
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let (token, mut callback_stream) =
+            wait_for_desktop_auth_callback(listener, "expected-state".into(), cancel)
+                .expect("callback");
+        assert_eq!(token, "verified-browser-token");
+        write_desktop_auth_response(&mut callback_stream, true);
+        drop(callback_stream);
+
+        let response = client.join().expect("client thread");
+        assert!(response.contains("Desktop sign-in complete"));
+    }
 }
 
 #[cfg(test)]

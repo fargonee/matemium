@@ -1,6 +1,6 @@
 # Matemium — Project Spec & Status
 
-## Product direction (updated 2026-07-26)
+## Product direction (updated 2026-08-09)
 
 **We are building a free, source-available desktop application** under the Matemium Source-Available License. Matemium is completely free to use. The source code is publicly available for inspection, personal use, education, internal use, and contribution to the official project.
 
@@ -193,7 +193,7 @@ cutter.cut(
 )
 ```
 
-## Current engine status (2026-07-27)
+## Current engine status (2026-08-09)
 
 - [x] DSL (JSON + Python builder)
 - [x] Registry + persistent elements
@@ -281,7 +281,8 @@ Audit after test-scene iteration (`quadratic_graphs`, `em_waves`, `demo/tictacto
 
 ## Desktop build phases
 
-See [`desktop-architecture.md`](desktop-architecture.md) §6 for full detail. (Linux desktop MVP shipping.)
+See [`desktop-architecture.md`](desktop-architecture.md) §6 for the architecture
+history and [`RELEASING.md`](RELEASING.md) for the current native targets.
 
 | Phase | Status | Deliverable |
 |-------|--------|-------------|
@@ -290,10 +291,11 @@ See [`desktop-architecture.md`](desktop-architecture.md) §6 for full detail. (L
 | P2 — PyInstaller | **done** | `dist/matemium-sidecar`, Tauri `binaries/` copy, `verify-sidecar-binary.sh` |
 | P3 — Tauri scaffold | **done** | `src-tauri/`, sidecar spawn, `invoke` bridge |
 | P4 — Rust shell | **done** | sidecar IPC, project CRUD, `cloud_chat` |
-| P5 — UI shell | **done** | Vite + React + Monaco (editor, chat, preview, sections; project-structure sidebar/brief UI is the next layout target) |
+| P5 — Studio UI | **done** | Vite + React + Monaco, project structure, brief/tape editors, AI chat, preview, progress, and render history |
 | P6 — Cloud client + auth | **done** | `auth_login`, Supabase/Google, `cloud_chat` → [`server/`](server/) |
 | P7 — Linux ship | **done** | `build-linux.sh` → `.deb` / `.AppImage`; CI in [`.github/workflows/build-linux.yml`](.github/workflows/build-linux.yml) |
-| P8 — CI matrix (Win/Mac) | pending | Windows + macOS GitHub Actions workflows (Linux done) |
+| P8 — Native CI matrix | **done** | Linux `.deb`/`.AppImage`, Windows `.exe`/`.msi`, and Apple Silicon/Intel macOS `.dmg` workflows |
+| P9 — Project delivery | **done** | Full-tape PNG/PDF export and safe complete-workspace `.matemium.zip` import/export |
 
 **Cross-platform rule:** PyInstaller sidecars cannot be cross-compiled — one native binary per OS triple, built on matching CI runners. See [`desktop/targets/README.md`](desktop/targets/README.md).
 
@@ -310,7 +312,7 @@ Product constraints on when the agent and render become available (strict gating
 | A3 — Tool loop orchestrator | partial | `compile_manim` via sidecar + render pipeline; full view/edit/compile agent loop |
 | A4 — Async render bridge | **done** | Non-blocking render + streamed `render_progress` events |
 | A5 — Bounded project workspace | target update | Migrate helper code from `assets.py` to `helpers.py`; add `brief/`, source asset folders, and sidebar navigation for Script/Helpers/Brief/Assets/Renders |
-| A6 — TinyTeX bootstrap | partial (PAD-2) | Python injection + paths implemented; Rust asset unpacker in PAD-3 |
+| A6 — Rendering prerequisites | launch policy | FFmpeg and LaTeX are host prerequisites; an existing TinyTeX path is recognized but no TeX bundle is downloaded |
 | A7 — Agent system prompt | **done** | [`shared/prompts/agent-system.txt`](shared/prompts/agent-system.txt) |
 | A8 — AI project manager | **implemented** | Shared manager policy, Passport-readiness interview, structured chat polls, delegated decisions, and AI-owned Roadmap; see [`project-manager-architecture.md`](project-manager-architecture.md) |
 
@@ -321,5 +323,8 @@ Product constraints on when the agent and render become available (strict gating
 3. Embed `SolutionTape` as a canvas element.
 4. Dry-run time simulator for cutter duration estimates.
 5. Optional YAML support.
-6. Element-type plugin registry in `measure.py` / `scene.py` to avoid unbounded `if type ==` growth.
-7. Sidecar progress events from `CanvasScene` / `render_sheet()` for desktop preview matrix.
+6. Extend the registered-kind pipeline only when a new generic primitive has
+   cross-subject evidence; builders, validators, and semantic-part declarations
+   are already registry-backed.
+7. Continue refining the existing streamed render progress and live-preview
+   evidence as production scenes become more complex.

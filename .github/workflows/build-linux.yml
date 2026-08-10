@@ -6,7 +6,7 @@ name: Build Linux Desktop
 #   that touch relevant paths.
 # - Full matrix: Linux + Windows + macOS (see build-windows.yml and build-macos.yml).
 # - Path filters avoid wasting minutes when only website/ or unrelated server code changes.
-# - On tags we publish a GitHub Release and attach the built bundles from all platforms.
+# - Tag builds upload workflow artifacts; publish-release.yml assembles one draft release.
 #
 # This aligns with the project documentation: release pipeline uses tags.
 
@@ -39,7 +39,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # Allow creating GitHub Releases when building from tags
+  contents: read
 
 jobs:
   # Fast, cheap verification job.
@@ -73,7 +73,10 @@ jobs:
           pip install -e .
 
       - name: Verify engine imports + CLI smoke
-        run: python -c "import canvas, matemium; from matemium import __version__; print('✅ Engine imports OK - version:', __version__)" && (matemium --version || true); echo 'matemium list (head):'; (matemium list 2>/dev/null | head -3 || true)
+        run: |
+          python -c "import canvas, matemium; from matemium import __version__; print('Engine imports OK - version:', __version__)"
+          matemium --version
+          matemium list
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -119,6 +122,10 @@ jobs:
             echo "is_release=false" >> $GITHUB_OUTPUT
             echo "Dispatch/manual build (no version override)"
           fi
+
+      - name: Validate tagged release metadata
+        if: steps.ver.outputs.is_release == 'true'
+        run: python scripts/check_release.py "${{ github.ref_name }}"
 
       - name: Install apt dependencies
         run: |
@@ -176,11 +183,12 @@ jobs:
         run: ./desktop/scripts/build-linux.sh
 
       - name: Phase 10 - PAD readiness smoke (verify new commands, phases, manifest)
-        run: |
-          ./desktop/scripts/verify-pad-readiness.sh || echo "PAD readiness script warnings (non-fatal in CI for now)"
+        run: ./desktop/scripts/verify-pad-readiness.sh
 
       - name: Phase 10 - Quick asset manifest presence check
-        run: test -f shared/assets/manifest.json && echo "✅ Asset manifest present" || (echo "FAIL: manifest missing" && exit 1)
+        run: |
+          test -f shared/assets/manifest.json
+          echo "Asset manifest present"
 
       - name: Upload desktop bundles (as artifact)
         uses: actions/upload-artifact@v4
@@ -191,29 +199,8 @@ jobs:
             desktop/src-tauri/target/release/bundle/appimage/*.AppImage
           if-no-files-found: error
 
-      - name: Create GitHub Release and attach bundles (tags only)
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "==> Creating GitHub Release for ${{ github.ref_name }}"
-          # Try create (normal case). Fall back to upload if the release already exists.
-          gh release create "${{ github.ref_name }}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Matemium ${{ github.ref_name }}" \
-            --generate-notes \
-            desktop/src-tauri/target/release/bundle/deb/*.deb \
-            desktop/src-tauri/target/release/bundle/appimage/*.AppImage || \
-          gh release upload "${{ github.ref_name }}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber \
-            desktop/src-tauri/target/release/bundle/deb/*.deb \
-            desktop/src-tauri/target/release/bundle/appimage/*.AppImage
-
       - name: Summary
         run: |
           echo "✅ Linux desktop build finished."
           echo "Version used: ${{ steps.ver.outputs.version }}"
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
-          fi
+          echo "Artifact is ready for the Publish Desktop Release workflow."

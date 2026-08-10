@@ -442,6 +442,14 @@ export async function authSession(accessToken: string): Promise<TokenResponse> {
   return invoke<TokenResponse>("auth_session", { params: { accessToken } });
 }
 
+export async function authBrowserLogin(): Promise<Record<string, unknown>> {
+  return invoke<Record<string, unknown>>("auth_browser_login");
+}
+
+export async function authBrowserLoginCancel(): Promise<void> {
+  return invoke("auth_browser_login_cancel");
+}
+
 export async function settingsGet(): Promise<Settings> {
   return invoke<Settings>("settings_get");
 }

@@ -30,11 +30,13 @@ Focus modes:
 ## Explicit tape movement
 
 ```python
-builder.add_camera_move(dy=3.5)
+builder.scroll_tape(tape_id="analysis", local_y=3.5)
 ```
 
-Prefer automatic reveal and focus when they already express the intended motion.
-Use explicit camera movement when the transition itself carries meaning.
+`scroll_tape()` selects an explicit camera-facing tape and moves within that
+tape's local layout. Prefer automatic reveal and focus when they already express
+the intended motion. `add_camera_move(dy=...)` remains the legacy explicit path
+for root-tape movement.
 
 ## Add a mathematical surface
 
@@ -86,13 +88,15 @@ Matemium’s world uses:
 | Y | Tape scroll direction |
 | Z | Depth above or below a tape |
 
-The current high-level tape API provides isolated 2D layout contexts and
-tape-scroll observation. Arbitrary physical tape transforms remain an
-unfinished world-camera seam; do not author against old `set_tape_pose` examples.
-Free world objects use `add_object()` and explicit observation, but that
-world-camera path is experimental. Prefer tape-local solids and
-`add_camera_inspect()` for production work unless a free-world composition has
-been preview-rendered and accepted.
+The high-level tape API provides isolated 2D layout contexts and tape-scroll
+observation. Arbitrary physical tape transforms remain outside the current
+contract; do not author against old `set_tape_pose` examples.
+
+Stable-ID free-world objects created through `add_object()`, world morphs, and
+`add_camera_inspect()` form the production spatial-composition path exercised by
+the orbital flagship. Lower-level `add_world_object()`, general camera
+keyframes, `observe_object()`, and relative world placement remain experimental.
+Every 3D composition still needs a real target-orientation render.
 
 ## Camera guidelines
 
@@ -106,4 +110,4 @@ been preview-rendered and accepted.
 ## Related recipes
 
 - [Inscribed-sphere source and showcase](https://matemium.fargonee.space/showcase/inscribed-sphere)
-- [Electromagnetic waves](/recipes/physics/electromagnetic-waves/)
+- [Infinite tapes](/authoring/tapes/)

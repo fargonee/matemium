@@ -1,0 +1,146 @@
+name: Publish Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, for example v0.3.0
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: publish-desktop-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish-draft:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag input
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Tag must be strict SemVer such as v0.3.0."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Validate release metadata
+        run: python scripts/check_release.py "${{ inputs.tag }}"
+
+      - name: Verify configured production service
+        run: |
+          SERVER_URL=$(python -c 'import json; print(json.load(open("desktop/app/src/config.json"))["serverUrl"].rstrip("/"))')
+          curl --fail --show-error --silent \
+            --retry 3 --connect-timeout 10 --max-time 30 \
+            "$SERVER_URL/health" \
+            | python -c 'import json, sys; data=json.load(sys.stdin); assert data.get("status") == "ok", data; print(data)'
+
+      - name: Download successful native build artifacts for tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          SHA=$(git rev-parse HEAD)
+          mkdir -p incoming
+
+          download_workflow_artifacts() {
+            local workflow="$1"
+            local run_id
+            run_id=$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "$workflow" \
+              --commit "$SHA" \
+              --event push \
+              --status success \
+              --limit 20 \
+              --json databaseId,headSha \
+              --jq 'map(select(.headSha == "'"$SHA"'")) | first | .databaseId')
+            if [[ -z "$run_id" || "$run_id" == "null" ]]; then
+              echo "No successful $workflow tag run found for $RELEASE_TAG ($SHA)."
+              exit 1
+            fi
+            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --dir incoming
+          }
+
+          download_workflow_artifacts build-linux.yml
+          download_workflow_artifacts build-windows.yml
+          download_workflow_artifacts build-macos.yml
+
+      - name: Stage and verify release files
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          while IFS= read -r -d '' file; do
+            cp "$file" release-assets/
+          done < <(find incoming -type f \( \
+            -name '*.deb' -o -name '*.AppImage' -o -name '*.exe' -o \
+            -name '*.msi' -o -name '*.dmg' \) -print0)
+
+          require_count() {
+            local pattern="$1"
+            local expected="$2"
+            local actual
+            actual=$(find release-assets -maxdepth 1 -type f -name "$pattern" | wc -l)
+            if [[ "$actual" -ne "$expected" ]]; then
+              echo "Expected $expected $pattern artifact(s), found $actual."
+              find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
+              exit 1
+            fi
+          }
+
+          require_count '*.deb' 1
+          require_count '*.AppImage' 1
+          require_count '*.exe' 1
+          require_count '*.msi' 1
+          require_count '*.dmg' 2
+
+          cd release-assets
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%f\0' \
+            | sort -z \
+            | xargs -0 sha256sum > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A GitHub release already exists for $RELEASE_TAG; refusing to replace it."
+            exit 1
+          fi
+
+          cat > release-notes.md <<'EOF'
+          Cross-platform Matemium desktop release.
+
+          Before publishing this draft, complete the clean-machine smoke tests in
+          `RELEASING.md` and replace this paragraph with the final test results.
+
+          Known distribution limitations:
+          - Windows installers may trigger SmartScreen until Windows signing is configured.
+          - macOS builds require Privacy & Security approval unless Developer ID signing and notarization were configured for this run.
+          - FFmpeg and LaTeX are host prerequisites outside the Debian package.
+          - Automatic application updates are not enabled in this release.
+          EOF
+
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --draft \
+            --title "Matemium $RELEASE_TAG" \
+            --generate-notes \
+            --notes-file release-notes.md \
+            release-assets/*
+
+          echo "Draft created: https://github.com/$GITHUB_REPOSITORY/releases"

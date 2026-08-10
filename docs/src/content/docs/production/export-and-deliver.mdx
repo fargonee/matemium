@@ -41,6 +41,13 @@ Export the entire reasoning tape as PNG or PDF when viewers need:
 The full sheet uses its natural length rather than forcing the content into a
 video frame.
 
+In the desktop, choose **Export tape**, select a saved scene and any populated
+tape, then choose PNG or PDF plus native, 2160 px, or 4096 px detail. The result
+is saved under **Project → Renders** and can be previewed or revealed in the file
+manager.
+
+![Matemium full-tape export dialog](/screenshots/tape-export.png)
+
 From an engine checkout:
 
 ```python
@@ -51,6 +58,18 @@ scene.export_full_sheet(
     format="png",
 )
 ```
+
+## Complete project archive
+
+Use the archive control on a project card when the editable workspace must move
+with the output. Matemium writes a `.matemium.zip` containing the project source,
+briefs, all tape-content files, imported media, and render history. **Import
+Project** validates the archive and opens it as a new local project.
+
+This is different from a tape document: a project archive is for backup,
+handoff, and continued editing, not for direct viewing or printing.
+
+[See the complete import/export workflow →](/desktop/import-export/)
 
 ## Reel cutting
 

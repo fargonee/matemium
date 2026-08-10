@@ -15,11 +15,12 @@ def test_load_real_manifest() -> None:
     """Verify that the real manifest.json parses perfectly and includes our GGUF models."""
     manifest = load_manifest(REAL_MANIFEST_PATH)
 
-    assert manifest.version == "2026-07-12"
-    assert len(manifest.assets) >= 4  # TinyTex + 3 LLM models
+    assert manifest.version == "2026-08-09"
+    assert len(manifest.assets) == 3
 
     # Verify model details
     assets_by_id = {a.id: a for a in manifest.assets}
+    assert all("PLACEHOLDER" not in asset.sha256 for asset in manifest.assets)
 
     # 1. Qwen 3B
     assert "llm-qwen-coder-3b-q4" in assets_by_id

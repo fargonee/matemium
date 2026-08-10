@@ -1,11 +1,16 @@
 # Matemium Product Architecture Decisions
 
 **Date:** 2026-07-02  
-**Status:** Authoritative – captures all key decisions from agentic AI through desktop productization.  
+**Status:** Historical decision record (2026-07-02). Current shipped behavior is
+defined by source, tests, [`AUTHORING_API.md`](AUTHORING_API.md), and
+[`RELEASING.md`](RELEASING.md).
 **Audience:** Engineers, product, and anyone implementing the transition from prototype to consumer-grade desktop app.  
 **Related:** `ai-agent-architecture.md`, `desktop-architecture.md`, `architecture.md`, `INTRODUCTION.md`, `project-spec.md`, `STRUCTURE.md`
 
-This document is now the single source of truth for product-level architecture. The older docs have been updated with references to prevent inconsistency.
+This document preserves the decisions that guided productization. It is not the
+current release checklist. In the 0.3.0 launch source, FFmpeg and LaTeX are host
+prerequisites, local GGUF models are optional, creation is not gated on a
+TinyTeX download, and native delivery follows `RELEASING.md`.
 
 This document records the shift from a lightweight research-oriented agent system to a production desktop application that must feel instant on first launch while delivering powerful AI-assisted authoring through user-owned external providers and optional local models.
 

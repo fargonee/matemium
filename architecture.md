@@ -352,7 +352,10 @@ Visual **section fences** (`# ---DIV: Title---` before top-level `def`/`class`) 
 
 The `brief/` files are product memory for the user, UI, and AI. They do not replace `SheetDSL`, and the engine should not treat Markdown/JSON brief files as animation IR.
 
-**Latest product decisions** (free/source-available distribution, OpenRouter-first BYO AI providers, local vector DB/RAG in sidecar, lazy loading, first-run downloads of Jina embeddings + TinyTeX, YouTube-based thin publishing, strict user gating until fully ready, local + hosted MCP) are in [`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
+Historical productization decisions are preserved in
+[`PRODUCT-ARCHITECTURE-DECISIONS.md`](PRODUCT-ARCHITECTURE-DECISIONS.md).
+For current release behavior—including optional local models and host FFmpeg /
+LaTeX prerequisites—use source, tests, and [`RELEASING.md`](RELEASING.md).
 
 **PAD-10 complete:** Cross-platform packaging, CI updates, docs refresh. Full implementation details in [`PRODUCT-ARCHITECTURE-IMPLEMENTATION.md`](PRODUCT-ARCHITECTURE-IMPLEMENTATION.md).
 

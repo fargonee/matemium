@@ -49,7 +49,7 @@ The exact branch and gate ordering are normative in [the AI-led production lifec
 First install dependencies (once):
 
 ```bash
-cd desktop/app && npm install
+npm ci --prefix desktop/app
 ```
 
 Then either:

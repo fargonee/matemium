@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "matemium"
-version = "0.1.0"
+version = "0.3.0"
 description = "Layout-to-animation compiler for math education videos on Manim"
 readme = "README.md"
 license = "LicenseRef-Matemium-Source-Available"
@@ -41,15 +41,17 @@ intelligence = [
     "llama-cpp-python>=0.2.75",
 ]
 dev = [
+    "pyinstaller>=6.11,<7",
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "ruff>=0.9",
 ]
 
 [project.urls]
-Homepage = "https://github.com/matemium/matemium"
-Documentation = "https://github.com/matemium/matemium#readme"
-Repository = "https://github.com/matemium/matemium"
-Issues = "https://github.com/matemium/matemium/issues"
+Homepage = "https://github.com/fargonee/matemium"
+Documentation = "https://github.com/fargonee/matemium#readme"
+Repository = "https://github.com/fargonee/matemium"
+Issues = "https://github.com/fargonee/matemium/issues"
 
 [project.scripts]
 matemium = "matemium.cli:main"

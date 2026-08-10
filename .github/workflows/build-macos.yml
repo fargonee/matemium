@@ -4,7 +4,7 @@ name: Build macOS Desktop
 # - Verify job for fast PR feedback (dummy sidecar).
 # - Full builds on v* tags and workflow_dispatch only.
 # - Produces native .dmg / .app for each architecture.
-# - Signing + notarization is scaffolded (enabled when secrets are present).
+# - Signing happens before bundling; Tauri notarizes when Apple secrets are present.
 
 on:
   push:
@@ -34,7 +34,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   desktop-verify:
@@ -83,7 +83,7 @@ jobs:
 
       - name: Cargo check
         working-directory: desktop/src-tauri
-        run: cargo check --target ${{ matrix.triple }} || cargo check
+        run: cargo check --target ${{ matrix.triple }}
 
   build-macos:
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
@@ -115,6 +115,10 @@ jobs:
             echo "version=0.0.0-dev" >> $GITHUB_OUTPUT
             echo "is_release=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Validate tagged release metadata
+        if: steps.ver.outputs.is_release == 'true'
+        run: python scripts/check_release.py "${{ github.ref_name }}"
 
       - name: Install system dependencies (ffmpeg + MacTeX)
         run: |
@@ -162,69 +166,68 @@ jobs:
         working-directory: desktop/src-tauri
         run: cargo tauri set-version "${{ steps.ver.outputs.version }}"
 
-      - name: Build macOS desktop (native for ${{ matrix.triple }})
-        env:
-          MATEMIUM_TARGET_TRIPLE: ${{ matrix.triple }}
-        run: ./desktop/scripts/build-macos.sh
-
-      - name: Code sign + notarize (only if secrets configured)
-        # This block is a no-op unless you store the following secrets.
-        # Recommended for distribution to avoid "app is damaged" and Gatekeeper blocks.
-        # See: https://tauri.app/v1/guides/distribution/macos
+      - name: Configure macOS signing
         if: steps.ver.outputs.is_release == 'true'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}   # app-specific password
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          if [ -z "$APPLE_CERTIFICATE" ]; then
-            echo "No Apple certificate secret found — skipping signing and notarization."
-            echo "   Unsigned .dmg / .app will be produced. Add secrets to enable professional distribution."
+          if [[ -z "$APPLE_CERTIFICATE" ]]; then
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            echo "MACOS_NOTARIZE=false" >> "$GITHUB_ENV"
+            echo "Apple credentials are absent; using an ad-hoc signature."
             exit 0
           fi
 
-          echo "==> Setting up code signing certificate"
-          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
-          KEYCHAIN="build.keychain"
-          security create-keychain -p "" "$KEYCHAIN" || true
-          security default-keychain -s "$KEYCHAIN"
-          security unlock-keychain -p "" "$KEYCHAIN"
-          security import certificate.p12 -k "$KEYCHAIN" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$KEYCHAIN" || true
-
-          # Find the actual signing identity name
-          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}' || echo "Developer ID Application")
-          echo "Using identity: $IDENTITY"
-
-          APP_PATH=$(find desktop/src-tauri/target -name "*.app" -type d | head -1 || true)
-          if [ -n "$APP_PATH" ]; then
-            echo "Signing app: $APP_PATH"
-            codesign --force --deep --sign "$IDENTITY" --options runtime --timestamp "$APP_PATH" || true
+          if [[ -z "$APPLE_CERTIFICATE_PASSWORD" || -z "$APPLE_ID" || -z "$APPLE_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+            echo "Apple signing is partially configured. Set all five Apple secrets."
+            exit 1
           fi
 
-          DMG_PATH=$(find desktop/src-tauri/target -name "*.dmg" -type f | head -1 || true)
-          if [ -n "$DMG_PATH" ]; then
-            echo "Signing DMG: $DMG_PATH"
-            codesign --force --sign "$IDENTITY" --timestamp "$DMG_PATH" || true
+          KEYCHAIN_PATH="$RUNNER_TEMP/matemium-build.keychain-db"
+          KEYCHAIN_PASSWORD="matemium-ci-keychain"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | awk -F'"' '/Developer ID Application/ {print $2; exit}')
+          if [[ -z "$IDENTITY" ]]; then
+            echo "No Developer ID Application identity found in certificate."
+            exit 1
+          fi
+          echo "APPLE_SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          echo "MACOS_NOTARIZE=true" >> "$GITHUB_ENV"
+          echo "MATEMIUM_KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Build macOS desktop (native for ${{ matrix.triple }})
+        env:
+          MATEMIUM_TARGET_TRIPLE: ${{ matrix.triple }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: ./desktop/scripts/build-macos.sh
+
+      - name: Verify macOS bundle signature and notarization
+        if: steps.ver.outputs.is_release == 'true'
+        run: |
+          APP_PATH=$(find desktop/src-tauri/target -name "*.app" -type d -print -quit)
+          DMG_PATH=$(find desktop/src-tauri/target -name "*.dmg" -type f -print -quit)
+          test -n "$APP_PATH"
+          test -n "$DMG_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          if [[ "$MACOS_NOTARIZE" == "true" ]]; then
+            xcrun stapler validate "$DMG_PATH"
           fi
 
-          # Notarization (requires Apple ID + app password + team id)
-          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ] && [ -n "$DMG_PATH" ]; then
-            echo "==> Submitting for notarization (can take 5-15+ minutes)..."
-            xcrun notarytool submit "$DMG_PATH" \
-              --apple-id "$APPLE_ID" \
-              --password "$APPLE_PASSWORD" \
-              --team-id "$APPLE_TEAM_ID" \
-              --wait || true
-            xcrun stapler staple "$DMG_PATH" || true
-          else
-            echo "Skipping notarization (missing credentials or no DMG found)."
-          fi
-
-          security delete-keychain "$KEYCHAIN" || true
-          echo "✅ macOS signing/notarization step completed (or skipped)."
+      - name: Remove temporary signing keychain
+        if: always() && env.MATEMIUM_KEYCHAIN_PATH != ''
+        run: security delete-keychain "$MATEMIUM_KEYCHAIN_PATH"
 
       - name: Upload macOS bundles
         uses: actions/upload-artifact@v4
@@ -235,31 +238,10 @@ jobs:
             desktop/src-tauri/target/${{ matrix.triple }}/release/bundle/macos/*.app
             desktop/src-tauri/target/release/bundle/dmg/*.dmg
             desktop/src-tauri/target/release/bundle/macos/*.app
-          if-no-files-found: warn
-
-      - name: Attach to GitHub Release (create if needed)
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "==> Uploading macOS ${{ matrix.arch_name }} artifacts"
-          gh release create "${{ github.ref_name }}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Matemium ${{ github.ref_name }}" \
-            --generate-notes \
-            desktop/src-tauri/target/${{ matrix.triple }}/release/bundle/dmg/*.dmg \
-            desktop/src-tauri/target/${{ matrix.triple }}/release/bundle/macos/*.app \
-            desktop/src-tauri/target/release/bundle/dmg/*.dmg \
-            desktop/src-tauri/target/release/bundle/macos/*.app 2>/dev/null || \
-          gh release upload "${{ github.ref_name }}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber \
-            desktop/src-tauri/target/${{ matrix.triple }}/release/bundle/dmg/*.dmg \
-            desktop/src-tauri/target/${{ matrix.triple }}/release/bundle/macos/*.app \
-            desktop/src-tauri/target/release/bundle/dmg/*.dmg \
-            desktop/src-tauri/target/release/bundle/macos/*.app || true
+          if-no-files-found: error
 
       - name: Summary
         run: |
           echo "✅ macOS (${{ matrix.arch_name }}) desktop build finished."
           echo "Version: ${{ steps.ver.outputs.version }}"
+          echo "Artifact is ready for the Publish Desktop Release workflow."

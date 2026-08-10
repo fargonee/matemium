@@ -1,7 +1,7 @@
 # Matemium Sidecar IPC Protocol
 
 **Version:** 1.0
-**Last updated:** 2026-07-27 (reflects current sidecar commands + engine actions)
+**Last updated:** 2026-08-09 (reflects current sidecar commands + engine actions)
 **Transport:** newline-delimited JSON on stdin (requests) and stdout (responses + events)
 
 The Tauri Rust shell spawns `matemium-sidecar` as a child process. All engine work flows through this protocol — the TypeScript UI never talks to Python directly.
@@ -160,7 +160,10 @@ echo '{"type":"request","id":"1","command":"ping","params":{}}' | python -m mate
 - Read stdout in a dedicated thread; parse lines by `type` field.
 - Write requests to stdin with trailing newline; flush after each line.
 - Engine logs may use stderr — do not parse stderr as protocol traffic.
-- **LaTeX:** inject local TinyTeX `bin` into `PATH` at sidecar startup before Manim renders (see [`ai-agent-architecture.md`](../../ai-agent-architecture.md) §8.A).
+- **LaTeX:** use a host-installed compatible LaTeX toolchain. The sidecar may
+  prepend an already-present TinyTeX `bin` directory, but the launch app does
+  not download TinyTeX automatically (see
+  [`desktop/packaging/README.md`](../../desktop/packaging/README.md)).
 
 ## Agent tool mapping
 

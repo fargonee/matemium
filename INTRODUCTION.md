@@ -9,7 +9,7 @@ biology, history, philosophy, language learning, and other structured topics.
 
 ---
 
-## Product direction (updated 2026-07-27)
+## Product direction (updated 2026-08-09)
 
 We are building a **free, source-available desktop application** under the Matemium Source-Available License. Matemium is completely free to use and its source code is publicly available for inspection, personal use, education, internal use, and contribution to the official project.
 
@@ -26,14 +26,16 @@ Private modifications are permitted. Redistribution, publication of derivative b
 The builder creates a root tape automatically. Root-tape text/math, style,
 flex, generic sampled visuals, semantic transitions, morphs, focus, and
 portrait/landscape settings are the current production authoring surface.
-Additional tapes and free-world camera composition remain experimental.
+Additional camera-facing tapes, explicit `scroll_tape()` navigation, automatic
+tape/world curtain switching, stable-ID world objects, solid lifts, and camera
+inspect paths are also part of the current production spatial-composition path.
 
 **AI integration tiers:**
 
 | Tier | Mode | Project shape |
 |------|------|---------------|
-| **v1 — Chat** | Completions + Search/Replace diffs | Single `scenes.py` |
-| **v2 — Agent** | Tool loop (`view_file`, `edit_file`, `compile_manim`) + self-correction | `scenes.py` + `assets.py` only |
+| **Chat** | Completions + normalized edits | Current project workspace |
+| **Agent** | Project-aware inspect/edit/compile loop, self-correction, durable run history, and approvals | Current project workspace |
 
 Visual section fences (`# ---DIV: Title---`) make one file feel like multiple collapsible cards in the editor without splitting the project.
 
@@ -150,12 +152,19 @@ scrolls over.
 
 There is **no `canvas/extensions/`** tier. Topic code stays next to the lesson so authors memorize one API ([`canvas/USAGE.md`](canvas/USAGE.md)), not a growing jungle of `add_quadratic_*` methods.
 
-**Desktop agent workspaces** use a strict two-file model instead of open-ended multi-file repos:
+**Desktop projects** are portable workspaces rather than a fixed two-file pair:
 
-| File | Role |
+| Path | Role |
 |------|------|
-| `scenes.py` | Visual timeline — `# ---DIV:` markers, `part_*` functions, `CanvasScene` |
-| `assets.py` | Engine room — computations, coordinate arrays, LaTeX strings, mesh data |
+| `project.json` | Project identity and metadata |
+| `scenes.py` | Required visual timeline — `# ---DIV:` markers, scene classes, and composition |
+| `helpers.py` | Optional calculations, structured data, and topic-specific helpers |
+| `brief/` (including `brief/tapes/`) | Optional planning artifacts and authored tape documents |
+| `assets/` and `renders/` | Optional project media and local outputs |
+
+The desktop library can export the complete workspace as `.matemium.zip` and
+import it as a new project identity. Archive import requires `project.json` and
+`scenes.py`, rejects unsafe paths, and accepts a common wrapper directory.
 
 Composition uses **CSS-like `style={}`** dicts and flex rows/columns rather than endlessly growing `CanvasBuilder` with domain methods.
 
@@ -206,9 +215,12 @@ The agent upgrades chat from "copy markdown code blocks" to an **autonomous codi
 Full spec: [ai-agent-architecture.md](ai-agent-architecture.md).  
 Latest product decisions on the agent, sidecar, and intelligence engine: [PRODUCT-ARCHITECTURE-DECISIONS.md](PRODUCT-ARCHITECTURE-DECISIONS.md).
 
-### LaTeX (TinyTeX)
+### Rendering prerequisites
 
-Manim needs LaTeX for math. Full TeX Live installs are too large to bundle. Production ships a **TinyTeX micro-distribution** (~80–120 MB), installed on first run, with PATH injection at sidecar startup. Pre-install required packages (`amsmath`, `amssymb`, etc.) in CI when building the master bundle.
+Launch installers bundle Matemium and its sidecar, but not FFmpeg or a LaTeX
+distribution. Video rendering requires host-installed FFmpeg; mathematical
+typesetting requires a compatible host LaTeX toolchain. The sidecar can use an
+existing TinyTeX installation, but the desktop app does not bootstrap one.
 
 ---
 
@@ -360,19 +372,20 @@ World camera actions open that tape and restore the free 3D world.
 - CLI with project scaffolding
 - Eleven cross-subject flagship first passes + development demos
 
-### Desktop (Linux MVP shipping)
+### Desktop (current application)
 
 | Phase | Status | Deliverable |
 |-------|--------|-------------|
 | Sidecar IPC | **done** | `lint/check/list/render_project` + progress, export, cut etc. |
-| PyInstaller (Linux) | **done** | `matemium-sidecar` binary + Tauri `binaries/` |
+| Native sidecars | **done** | Per-target `matemium-sidecar` binaries + Tauri `binaries/` |
 | Tauri scaffold + Rust shell | **done** | `src-tauri/`, sidecar spawn, invoke bridge, project CRUD |
-| UI shell (MVP) | **done** | Editor (Monaco + sections), AI chat, preview, two-file support |
+| Studio UI | **done** | Editor, project-aware AI, live preview, render progress, and project workspaces |
 | Cloud client + auth | **done** | Auth (Supabase/Google) + chat API |
-| Linux ship | **done** | `.deb` / `.AppImage` + CI workflow |
-| CI matrix (Win/Mac) | pending | Windows + macOS GitHub Actions |
-| Agent mode (v2) | partial | Two-file + chat/patch foundation; full tool loop + self-correction |
-| TinyTeX bootstrap | pending | First-run install + PATH injection |
+| Full-tape delivery | **done** | Scene/tape selection, PNG/PDF, native/2160/4096 heights, natural aspect |
+| Project portability | **done** | Safe `.matemium.zip` archive import/export with new imported identities |
+| Example library | **done** | Eleven editable source examples and four accepted flagship outcomes |
+| Native release pipelines | **done** | Linux `.deb`/`.AppImage`, Windows `.exe`/`.msi`, Apple Silicon/Intel macOS `.dmg` |
+| Signing/notarization | in progress | Production trust and clean-machine hardening before every build is broadly distributed |
 
 ### Engine (planned)
 
@@ -381,7 +394,7 @@ World camera actions open that tape and restore the free 3D world.
 - Generic timed traversal for `DataPath` / `DataPlot` (replace quadratic-only `PlotTrace`)
 - SolutionTape integration as canvas elements
 - Broader production-quality registered builders for currently placeholder-only primitives
-- Sidecar progress events for desktop preview matrix
+- Final-quality render, accessibility, and domain review across the source library
 
 ---
 
@@ -393,9 +406,14 @@ World camera actions open that tape and restore the free 3D world.
 | Fixed frame, elements come and go | Infinite vertical tape, persistent anchors |
 | Manual layout positioning | CSS-like `style={}` + flex layout engine |
 | Rebuild mobjects to revisit them | Registry-backed re-animation by ID |
-| One video = one scene script | One compiler + many projects / lessons |
-| Landscape-first thinking | Portrait reels-first, with landscape and static export |
-| Developer installs Python + Manim | Desktop app bundles engine; zero cloud rendering |
-| Copy-paste AI code blocks | v2 agent: inspect, patch, compile, self-correct |
+| One video = one scene script | One portable project workspace with scenes, helpers, briefs, tapes, assets, and renders |
+| Landscape-first thinking | Portrait reels-first, with landscape, full-tape PNG/PDF, and reel cuts |
+| Developer installs Python + Manim | Desktop app bundles Matemium; rendering uses host FFmpeg and LaTeX |
+| Copy-paste AI code blocks | Project-aware agent: inspect, edit, compile, self-correct, and record activity |
 
-Matemium is a **document compiler for animated math** — you write what should appear on the learning sheet and when the camera should move; the engine turns that into Manim animations, study-material exports, and social-ready reel segments. The long-term bet is a clean, generic compiler that scales to hundreds of lessons without the engine becoming a pile of topic-specific hacks.
+Matemium is a **document compiler and desktop studio for animated visual
+explanations** — you write what should appear on tapes or in the spatial world
+and when the camera should move; the engine turns that into Manim animations,
+full-tape study materials, and social-ready reel segments. The long-term bet is
+a clean, generic compiler that scales across subjects without the engine
+becoming a pile of topic-specific hacks.

@@ -1,13 +1,19 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Matemium",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "identifier": "app.matemium.canvas",
   "build": {
-    "beforeDevCommand": "npm run dev --prefix app 2>/dev/null || npm run dev --prefix ../app 2>/dev/null || npm run dev --prefix ../../app 2>/dev/null || npm run dev --prefix app",
-    "beforeBuildCommand": "npm run build --prefix app 2>/dev/null || npm run build --prefix ../app 2>/dev/null || npm run build --prefix ../../app 2>/dev/null || npm run build --prefix app",
+    "beforeDevCommand": {
+      "script": "npm run dev",
+      "cwd": "../app"
+    },
+    "beforeBuildCommand": {
+      "script": "npm run build",
+      "cwd": "../app"
+    },
     "frontendDist": "../app/dist",
-    "devUrl": "http://localhost:5173"
+    "devUrl": "http://localhost:1420"
   },
   "app": {
     "windows": [
@@ -38,6 +44,10 @@
     "active": true,
     "targets": ["deb", "appimage", "nsis", "msi", "dmg", "app"],
     "externalBin": ["binaries/matemium-sidecar"],
+    "resources": {
+      "../../LICENSE": "LICENSE.txt",
+      "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.txt"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/64x64.png",

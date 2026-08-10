@@ -1,17 +1,6 @@
 {
-  "version": "2026-07-12",
+  "version": "2026-08-09",
   "assets": [
-    {
-      "id": "tinytex-linux",
-      "name": "TinyTeX (Linux x86_64)",
-      "url": "https://github.com/yihui/tinytex-releases/releases/download/v2024.11/TinyTeX-1-v2024.11.tar.gz",
-      "sha256": "PLACEHOLDER_REPLACE_WITH_REAL",
-      "size": 120000000,
-      "extract": true,
-      "extract_format": "tar.gz",
-      "install_path": "bin/tinytex",
-      "platforms": ["linux"]
-    },
     {
       "id": "llm-qwen-coder-3b-q4",
       "name": "Qwen-2.5-Coder-3B-Instruct (Q4_K_M GGUF)",
@@ -46,5 +35,5 @@
       "platforms": ["linux", "darwin", "windows"]
     }
   ],
-  "notes": "This manifest configures the local dependencies and offline GGUF models. It is parsed by Tauri's download manager and the Python sidecar."
+  "notes": "This manifest configures optional offline GGUF models. Rendering tools are host prerequisites for the launch release."
 }

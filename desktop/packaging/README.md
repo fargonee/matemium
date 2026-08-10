@@ -59,13 +59,11 @@ Verify:
 
 **FFmpeg** is still required from the host (for final video encoding).
 
-**LaTeX**: Starting with the product architecture (PAD Phase 2), the sidecar prefers a **bundled TinyTeX** distribution unpacked on first run by the desktop app into the user data directory (see `matemium/paths.py:get_tinytex_bin_dir` + lazy injection). 
-
-The PATH is automatically prepended with TinyTeX's bin dir before the first Manim import (triggered lazily on engine load). 
-
-If no TinyTeX is present the sidecar will fall back to whatever `pdflatex` / `dvisvgm` is on the system PATH (for dev convenience).
-
-In final desktop installers the `.deb`/`.AppImage`/etc. should **not** declare heavy texlive as a hard dependency anymore (TinyTeX is delivered as a first-run asset).
+**LaTeX** is a host prerequisite for the launch release. The Debian package
+declares the needed TeX Live packages; AppImage, Windows, and macOS users install
+TeX separately as documented in [`../../RELEASING.md`](../../RELEASING.md).
+The sidecar still recognizes a TinyTeX installation in the Matemium data
+directory, but the app does not automatically download one in this release.
 
 | Tool | Used for |
 |------|----------|

@@ -25,8 +25,12 @@ desktop/
 
 - **One `scenes.py` per project** (v1) — `CanvasBuilder` + `CanvasScene`
 - **Code editor** with Python syntax highlighting and linters
-- **AI chat** — mini-Cursor; patches `scenes.py` via cloud chat API
+- **Project-aware agent** — works across durable briefs, roadmap phases, visible source, validation, and render repair
 - **Local render only** — sidecar imports project code and runs Manim
+- **Multiple tape-content artifacts** — `brief/tapes/*.md` plus camera-facing tape choreography in authored scenes
+- **Full-tape documents** — choose a populated tape and export natural-aspect PNG or PDF
+- **Portable projects** — archive and import the complete workspace as `.matemium.zip`
+- **Bundled library** — eleven editable cross-subject source examples and four accepted flagship outcomes
 
 See [`desktop-architecture.md`](../desktop-architecture.md).
 
@@ -53,6 +57,8 @@ See [`desktop-architecture.md`](../desktop-architecture.md).
 ```
 
 See [`COMPLETE_LINUX_UBUNTU_APP_TODO.md`](../COMPLETE_LINUX_UBUNTU_APP_TODO.md) Phase 0.
+For clean-machine setup on Windows and macOS, and the complete dependency-lock
+inventory, see [`DEVELOPMENT.md`](../DEVELOPMENT.md).
 
 ## Quick test — sidecar (from repo root)
 
@@ -82,7 +88,7 @@ cargo tauri dev --manifest-path desktop/src-tauri/Cargo.toml
 ```bash
 ./desktop/scripts/build-linux.sh
 sudo dpkg -i desktop/src-tauri/target/release/bundle/deb/Matemium_*.deb
-sudo apt -f install -y   # ffmpeg (+ TinyTeX delivered as first-run asset by the app)
+sudo apt -f install -y   # installs declared FFmpeg + TeX Live dependencies
 ```
 
 **Full checklist:** [`COMPLETE_LINUX_UBUNTU_APP_TODO.md`](../COMPLETE_LINUX_UBUNTU_APP_TODO.md) — Phases 0–7 and 9 complete; Phase 8 (clean VM validation) deferred until a fresh Ubuntu 24.04 image is available.

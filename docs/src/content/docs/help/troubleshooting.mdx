@@ -37,17 +37,28 @@ Restart Matemium after installing a system dependency.
 
 ## LaTeX fails
 
-Matemium uses LaTeX for mathematical notation. Packaged releases prefer the
-TinyTeX asset prepared by the application.
+Matemium uses LaTeX for mathematical notation. Launch installers do not bundle
+a LaTeX distribution, so the host must provide TeX Live on Linux, MiKTeX on
+Windows, or MacTeX/BasicTeX on macOS.
 
 Check:
 
-- First-run assets completed
+- The host LaTeX executable is installed and available to Matemium
 - The equation contains valid LaTeX
 - Required commands belong to an available package
-- A system LaTeX installation is not unexpectedly shadowing TinyTeX
+- The expected distribution is not shadowed by another stale installation
 
 Reduce the problem to one equation before changing the entire scene.
+
+## A project archive will not import
+
+Matemium requires `project.json` and `scenes.py` in the archive root or beneath
+one common wrapper folder. It rejects unsafe paths and archives with multiple
+conflicting project roots.
+
+If the archive was created manually, compare it with an archive exported from
+the project library. Do not work around a path-safety rejection by extracting
+untrusted content into the Matemium workspace yourself.
 
 ## Python syntax or import error
 
@@ -151,4 +162,4 @@ When reporting a problem, include:
 - Screenshot or short recording for visual defects
 
 Open an issue in the
-[Matemium repository](https://github.com/fargonee/math/issues).
+[Matemium repository](https://github.com/fargonee/matemium/issues).

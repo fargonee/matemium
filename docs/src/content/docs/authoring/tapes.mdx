@@ -1,6 +1,6 @@
 ---
 title: Infinite tapes
-description: Use the automatic root tape and understand the maturity of additional tape contexts.
+description: Author the automatic root tape, switch between isolated camera-facing tapes, and export complete tape documents.
 ---
 
 A tape is a structured 2D layout context in Matemium’s scene model. In
@@ -47,10 +47,23 @@ right.add_heading("Objection")
 right.add_body("Fallible beliefs can still be justified.")
 ```
 
-The renderer contains automatic context-switch behavior when timeline content
-moves between additional tapes. Treat this as an advanced feature and verify
-every switch in a real preview; root-tape authoring is the production-safe
-default.
+The renderer automatically switches context when timeline content moves between
+tapes. The transition fades out the previous context, cuts to the destination
+camera pose, and fades in the selected tape. World-to-tape, tape-to-tape, and
+tape-to-world switches are implemented and exercised by the orbital flagship.
+
+The root tape remains the simplest default. Use additional tapes deliberately
+and verify the choreography in a real preview.
+
+Select and scroll a tape explicitly when its local position matters:
+
+```python
+builder.scroll_tape(
+    tape_id="objection",
+    local_y=4.5,
+    run_time=1.0,
+)
+```
 
 ## Tape view and world view
 
@@ -58,8 +71,8 @@ A tape currently provides:
 
 - **Root-tape view** — document layout, automatic local scrolling, lazy reveal,
   and focus.
-- **Additional tape contexts** — separate layouts with automatic switching that
-  still require project-level preview evidence.
+- **Additional tape contexts** — separate camera-facing layouts with automatic
+  curtain switching and explicit local scrolling.
 
 Free 3D objects do not inherit tape layout behavior. Only tape content flows
 through the tape’s internal layout system.
@@ -69,9 +82,13 @@ observed as transformed world planes. Arbitrary physical tape placement is not
 a current high-level authoring contract: `add_tape()` intentionally rejects
 `position`, `rotation`, and `scale`.
 
-The source-level `scroll_tape()` sugar is also unavailable in the current DSL
-because `TapeScroll` is not implemented. Normal root-tape reveal does not need
-it.
+`scroll_tape()` serializes a `TapeScroll` target, validates the tape ID, selects
+that tape as the foreground context, and moves within its local layout. Normal
+root-tape reveal still does not require it.
+
+Only one managed context is visible at a time. A selected tape hides the free
+world and every other tape; a world observation closes the tape and restores
+the free-world objects. Simultaneously visible tapes are not a current contract.
 
 ## After a 3D moment
 
@@ -96,3 +113,13 @@ builder.add_body(
 
 Use a new tape for a meaningful spatial context, not merely because the source
 file has another paragraph.
+
+## Export a complete tape
+
+The desktop can inspect saved scene code, list every populated tape, and export
+the selected layout as an upright, uncropped PNG or PDF. Natural proportions do
+not depend on the video camera.
+
+![Matemium Export full tape dialog with three populated tapes](/screenshots/tape-export.png)
+
+[Follow the full export workflow →](/desktop/import-export/)

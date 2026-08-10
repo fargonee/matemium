@@ -16,14 +16,21 @@ project/
 │   ├── description.md
 │   ├── passport.json
 │   ├── roadmap.json
-│   ├── tape.md
-│   ├── narration.md
+│   ├── tapes/
+│   │   ├── main.md
+│   │   └── <additional-tape>.md
+│   ├── orchestration.md
+│   ├── tts-narration.md
+│   ├── tts-narration-style.md
+│   ├── audio-description.md
+│   ├── custom-narration.md
+│   ├── transcript.md
 │   └── timestamps.json
 ├── assets/
 │   ├── images/
 │   ├── video/
 │   └── audio/
-└── output/
+└── renders/
 ```
 
 Not every production path uses every artifact.
@@ -62,9 +69,15 @@ Rare-changing production identity and selected production path.
 
 Current phase, progress, blockers, branch, and phase notes.
 
-### `tape.md`
+### `tapes/*.md`
 
-Approved or provisional content intended to appear on the visual reasoning tape.
+Approved or provisional content intended to appear on each visual reasoning
+tape. Every project starts with `brief/tapes/main.md`; the desktop can add more
+tape-content files with validated lowercase slugs.
+
+### `orchestration.md`
+
+The intended world, tapes, camera, reveals, transitions, and pacing.
 
 ### Narration and timing files
 
@@ -83,6 +96,13 @@ the workspace.
 
 Rendered videos and exports belong in output history. They are generated
 artifacts and should not be manually edited as if they were authoring source.
+
+## Project archives
+
+The desktop archive exporter includes the entire workspace. That makes a
+`.matemium.zip` file appropriate for complete backup and transfer, but it may
+also include large renders, caches, or private media. Review and clear anything
+unnecessary before sharing it.
 
 ## Section markers
 
@@ -106,3 +126,6 @@ the project into many source files.
 Project workspaces are ordinary local data. Back up important projects and use
 version control when appropriate. Generated media can be large, so decide
 separately whether output belongs in your repository.
+
+The desktop's project archive is the quickest whole-workspace backup. See
+[Import, export, and move projects](/desktop/import-export/).
