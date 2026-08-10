@@ -1,26 +1,24 @@
-import { Link } from "react-router-dom";
-
 const PLATFORMS = [
   {
     platform: "Linux",
-    detail: "Ubuntu 22.04+ · x86_64",
-    status: "Early access",
+    detail: "Ubuntu 24.04+ · x86_64",
+    status: "Launch platform",
     statusClass: "available",
-    body: "The complete desktop studio and bundled local rendering engine.",
+    body: "At launch: .deb and .AppImage installers with the Matemium UI, Rust shell, and native sidecar.",
   },
   {
     platform: "Windows",
     detail: "Windows 10/11 · x86_64",
-    status: "In progress",
-    statusClass: "progress",
-    body: "Native installer work is underway. Follow the roadmap for release progress.",
+    status: "Launch platform",
+    statusClass: "available",
+    body: "At launch: native NSIS .exe and .msi installers. Unsigned builds may show a SmartScreen warning.",
   },
   {
     platform: "macOS",
-    detail: "Apple Silicon & Intel",
-    status: "In progress",
-    statusClass: "progress",
-    body: "Universal desktop packaging is planned after the Windows release path.",
+    detail: "macOS 12+ · Apple Silicon & Intel",
+    status: "Launch platform",
+    statusClass: "available",
+    body: "At launch: separate .dmg installers for Apple Silicon and Intel. Notarization depends on release credentials.",
   },
 ];
 
@@ -47,16 +45,22 @@ export function DownloadPage() {
                 <span className={`release-status ${item.statusClass}`}>{item.status}</span>
               </div>
               <p className="mt-8 min-h-20 leading-7 text-text-muted">{item.body}</p>
-              {item.platform === "Linux" ? (
-                <Link to="/login?next=/dashboard/downloads" className="button-primary mt-8 w-full">
-                  Sign in for installer <span aria-hidden>→</span>
-                </Link>
-              ) : (
-                <Link to="/roadmap" className="button-secondary mt-8 w-full">Follow progress</Link>
-              )}
+              <a
+                href="https://github.com/fargonee/math/releases"
+                target="_blank"
+                rel="noreferrer"
+                className="button-primary mt-8 w-full"
+              >
+                Check GitHub releases <span aria-hidden>↗</span>
+              </a>
             </article>
           ))}
         </div>
+        <p className="mx-auto mt-6 max-w-3xl text-center text-xs leading-5 text-text-subtle">
+          All four native targets are included in the launch release. Before launch,
+          GitHub Releases may be empty or contain drafts while every installer completes
+          clean-machine validation, signing where credentials are available, and smoke testing.
+        </p>
         <div className="mt-12 grid gap-8 border-t border-border pt-12 md:grid-cols-3">
           {[
             ["Everything local", "Project files, Manim rendering, LaTeX, and video encoding remain on your machine."],

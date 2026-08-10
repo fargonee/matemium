@@ -8,6 +8,20 @@ import {
 } from "@/content/showcase";
 
 describe("showcase catalog", () => {
+  it("uses the launch showcase selection", () => {
+    expect(SHOWCASE_PROJECTS.map((project) => project.slug)).toEqual(
+      expect.arrayContaining([
+        "inscribed-sphere",
+        "orbital-mechanics",
+        "dna-to-protein",
+        "feedback-control",
+        "sn2-reaction",
+      ]),
+    );
+    expect(SHOWCASE_PROJECTS).toHaveLength(5);
+    expect(SHOWCASE_PROJECTS.every((project) => project.featured)).toBe(true);
+  });
+
   it("uses unique project slugs", () => {
     const slugs = SHOWCASE_PROJECTS.map((project) => project.slug);
     expect(new Set(slugs).size).toBe(slugs.length);

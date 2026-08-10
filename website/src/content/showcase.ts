@@ -66,7 +66,7 @@ export const SUBJECT_AREAS: SubjectArea[] = [
     shortName: "Chemistry",
     scope: "Molecules, reactions, orbitals, laboratory processes",
     symbol: "H₂O",
-    status: "in-production",
+    status: "published",
   },
   {
     id: "computer-science",
@@ -82,7 +82,7 @@ export const SUBJECT_AREAS: SubjectArea[] = [
     shortName: "Engineering",
     scope: "Systems, circuits, mechanisms, control flows",
     symbol: "⌁",
-    status: "in-production",
+    status: "published",
   },
   {
     id: "economics",
@@ -98,7 +98,7 @@ export const SUBJECT_AREAS: SubjectArea[] = [
     shortName: "Biology",
     scope: "Cells, anatomy, cycles, systems, inheritance",
     symbol: "◌",
-    status: "in-production",
+    status: "published",
   },
   {
     id: "history",
@@ -136,99 +136,37 @@ export const SUBJECT_AREAS: SubjectArea[] = [
 
 export const SHOWCASE_PROJECTS: ShowcaseProject[] = [
   {
-    slug: "quadratic-graphs",
-    title: "Quadratic graphs",
-    subject: "mathematics",
-    question: "How does each coefficient reshape a parabola?",
-    description:
-      "Compare parabolas side by side and watch each coefficient change the graph in a predictable way.",
-    video: "/media/quadratic-graphs.mp4",
-    poster: "/media/quadratic-graphs.jpg",
-    accent: "violet",
-    duration: "28 sec",
-    orientation: "Portrait",
-    productionPath: "Visual-first",
-    capabilities: ["Plot comparison", "Trace animation", "Camera focus", "Multiple tapes"],
-    sourcePath: "projects/quadratic_graphs/scenes.py",
-    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/quadratic_graphs/scenes.py",
-    docsUrl: "https://docs.matemium.fargonee.space/recipes/mathematics/quadratic-graphs/",
-    sourceExcerpt: `builder = CanvasBuilder(title="Quadratic Graphs")
-tape = builder.add_tape("main")
-
-tape.add_heading("Graphs of quadratics")
-tape.add_math(r"ax^2 + bx + c = 0")
-
-positive, negative = add_compare_row(
-    tape,
-    builder,
-    (1, -2, 1),
-    (-1, 2, 1),
-)
-
-add_plot_trace(builder, positive, x_from=-0.5, x_to=2.5)
-builder.add_camera_focus(positive, zoom=2.1)`,
-    featured: true,
-  },
-  {
-    slug: "quadratic-factoring",
-    title: "Quadratic factoring",
-    subject: "mathematics",
-    question: "How does a trinomial reveal its roots?",
-    description:
-      "A continuous derivation that keeps earlier reasoning visible as the camera moves through the solution.",
-    video: "/media/quadratic-factoring.mp4",
-    poster: "/media/quadratic-factoring.jpg",
-    accent: "cyan",
-    duration: "62 sec",
-    orientation: "Portrait",
-    productionPath: "Visual-first",
-    capabilities: ["Typeset equations", "Flex layout", "Continuous tape", "Structured reveal"],
-    sourcePath: "projects/quadratic_factoring/scenes.py",
-    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/quadratic_factoring/scenes.py",
-    sourceExcerpt: `builder = CanvasBuilder(title="Quadratic Factoring")
-tape = builder.add_tape("main")
-
-tape.add_heading("Factor a quadratic")
-tape.add_math(r"x^2 - 5x + 6 = 0")
-
-tape.add_flex_row([
-    tape.text_spec("multiply to"),
-    tape.math_spec(r"+6"),
-    tape.text_spec("and add to"),
-    tape.math_spec(r"-5"),
-])
-
-tape.add_math(r"x^2 - 5x + 6 = (x - 2)(x - 3)")`,
-  },
-  {
-    slug: "electromagnetic-waves",
-    title: "Electromagnetic waves",
+    slug: "orbital-mechanics",
+    title: "Orbital mechanics",
     subject: "physics",
-    question: "How do changing fields sustain a wave?",
+    question: "Why does a satellite keep falling without hitting Earth?",
     description:
-      "A multi-section physics lesson combining notation, explanation, spatial motion, and a mathematical surface.",
-    video: "/media/em-waves.mp4",
-    poster: "/media/em-waves.jpg",
+      "Follow one persistent 3D world from tangent velocity and inward gravity to re-entry, circular orbit, and escape.",
+    video: "/media/orbital-mechanics.mp4",
+    poster: "/media/orbital-mechanics.jpg",
     accent: "cyan",
-    duration: "87 sec",
+    duration: "64 sec",
     orientation: "Portrait",
     productionPath: "Visual-first",
-    capabilities: ["Physics notation", "3D surface", "Sectioned lesson", "Spatial camera"],
-    sourcePath: "projects/em_waves/scenes.py",
-    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/em_waves/scenes.py",
-    docsUrl: "https://docs.matemium.fargonee.space/recipes/physics/electromagnetic-waves/",
-    sourceExcerpt: `builder = CanvasBuilder(title="Electromagnetic Waves")
-tape = builder.add_tape("main")
-
-tape.add_heading("Maxwell's equations (vacuum)")
-tape.add_math(r"\\nabla \\cdot \\vec{E} = 0")
-tape.add_math(r"\\nabla \\cdot \\vec{B} = 0")
-tape.add_math(
-    r"\\nabla \\times \\vec{E}"
-    r" = -\\frac{\\partial \\vec{B}}{\\partial t}"
+    capabilities: ["Persistent 3D world", "Vector animation", "Camera choreography", "Parameter sweep"],
+    sourcePath: "projects/orbital_mechanics/scenes.py",
+    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/orbital_mechanics/scenes.py",
+    sourceExcerpt: `b.add_object(
+    "OrbitalWorld",
+    id=WORLD_ID,
+    content=orbital_world_state("circular", vectors=False),
 )
-
-builder.add_3d(r"z = \\sin(x)\\cos(y)", pitch=50)`,
+b.add_camera_inspect(
+    WORLD_ID,
+    path=[
+        b.inspect_shot(
+            phi=68,
+            theta=-90,
+            zoom=1.15,
+            hold=1.8,
+        ),
+    ],
+)`,
     featured: true,
   },
   {
@@ -261,6 +199,100 @@ builder.add_solid_lift(solid, lift=1.8)
 builder.add_camera_inspect(
     solid,
     path=inscribed_tangency_study_path(builder),
+)`,
+    featured: true,
+  },
+  {
+    slug: "dna-to-protein",
+    title: "From DNA to protein",
+    subject: "biology",
+    question: "How does stored information become a protein?",
+    description:
+      "Move across cellular scales as one sequence is transcribed, processed, exported, translated, and folded into a teaching model.",
+    video: "/media/dna-to-protein.mp4",
+    poster: "/media/dna-to-protein.jpg",
+    accent: "violet",
+    duration: "73 sec",
+    orientation: "Landscape",
+    productionPath: "Visual-first",
+    capabilities: ["Multiscale 3D world", "Sequence transforms", "Molecular states", "Spatial transport"],
+    sourcePath: "projects/dna_to_protein/scenes.py",
+    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/dna_to_protein/scenes.py",
+    sourceExcerpt: `b.add_element_morph(
+    WORLD_ID,
+    world_target("dna_open"),
+    run_time=1.4,
+)
+for index in range(5):
+    b.add_element_morph(
+        WORLD_ID,
+        world_target("transcription", sequence_index=index),
+        run_time=1.05,
+    )
+
+author_sequence_tape(b, sequence)`,
+    featured: true,
+  },
+  {
+    slug: "feedback-control",
+    title: "Feedback control",
+    subject: "engineering",
+    question: "How does a system detect a disturbance and correct itself?",
+    description:
+      "Cruise control connects a moving vehicle, a closed-loop diagram, live values, and comparable response histories.",
+    video: "/media/feedback-control.mp4",
+    poster: "/media/feedback-control.jpg",
+    accent: "amber",
+    duration: "57 sec",
+    orientation: "Landscape",
+    productionPath: "Visual-first",
+    capabilities: ["System diagrams", "Signal flow", "Time-series plots", "Physical simulation"],
+    sourcePath: "projects/feedback_control/scenes.py",
+    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/feedback_control/scenes.py",
+    sourceExcerpt: `open_time = 6.0
+b.add_element_morph(
+    WORLD_ID,
+    world_target(
+        open_time,
+        feedback=False,
+        stage="disturbance",
+    ),
+    run_time=1.7,
+)
+
+author_dashboard(b, open_dashboard, time=open_time, feedback=False)
+author_loop(b, loop)`,
+    featured: true,
+  },
+  {
+    slug: "sn2-reaction",
+    title: "Inside an SN2 reaction",
+    subject: "chemistry",
+    question: "How can bond formation, bond breaking, and inversion be one event?",
+    description:
+      "A locked camera makes backside attack, the transition state, and stereochemical inversion readable as one molecular motion.",
+    video: "/media/sn2-reaction.mp4",
+    poster: "/media/sn2-reaction.jpg",
+    accent: "violet",
+    duration: "30 sec",
+    orientation: "Portrait",
+    productionPath: "Visual-first",
+    capabilities: ["3D molecular world", "Identity-preserving morphs", "Synchronized energy", "Fixed reference view"],
+    sourcePath: "projects/sn2_reaction/scenes.py",
+    sourceUrl: "https://github.com/fargonee/math/blob/main/projects/sn2_reaction/scenes.py",
+    sourceExcerpt: `b.add_element_morph(
+    WORLD_ID,
+    world_target(
+        0.22,
+        cue="concerted",
+        show_reference_plane=True,
+    ),
+    run_time=1.25,
+)
+b.add_element_morph(
+    WORLD_ID,
+    world_target(0.50, cue="concerted", show_reference_plane=True),
+    run_time=1.65,
 )`,
     featured: true,
   },

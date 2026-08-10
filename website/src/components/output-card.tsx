@@ -12,6 +12,7 @@ interface OutputCardProps {
   poster: string;
   accent: Accent;
   duration: string;
+  orientation: "Portrait" | "Landscape";
   capabilities?: string[];
   eager?: boolean;
 }
@@ -26,12 +27,13 @@ export function OutputCard({
   poster,
   accent,
   duration,
+  orientation,
   capabilities = [],
   eager = false,
 }: OutputCardProps) {
   return (
-    <article className={`output-card output-card-${accent}`}>
-      <div className="output-media">
+    <article className={`output-card output-card-${accent} output-card-${orientation.toLowerCase()}`}>
+      <div className={`output-media output-media-${orientation.toLowerCase()}`}>
         <video
           muted
           loop
@@ -49,7 +51,7 @@ export function OutputCard({
         >
           <source src={video} type="video/mp4" />
         </video>
-        <span className="output-format">9:16 · {duration}</span>
+        <span className="output-format">{orientation === "Portrait" ? "9:16" : "16:9"} · {duration}</span>
       </div>
       <div className="p-6">
         <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-text-subtle">{subjectLabel}</span>

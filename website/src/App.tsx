@@ -19,6 +19,7 @@ import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { PricingPage } from "@/pages/PricingPage";
 import { DownloadPage } from "@/pages/DownloadPage";
+import { DesktopAuthPage } from "@/pages/DesktopAuthPage";
 import { RoadmapPage } from "@/pages/RoadmapPage";
 import { ShowcasePage } from "@/pages/ShowcasePage";
 import { ShowcaseProjectPage } from "@/pages/ShowcaseProjectPage";
@@ -46,6 +47,7 @@ export function App() {
             <Route path="pricing" element={<PricingPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="auth/callback" element={<AuthCallbackPage />} />
+            <Route path="desktop-auth" element={<DesktopAuthPage />} />
 
             {/* Legal / Policy pages */}
             <Route path="privacy" element={<PrivacyPolicyPage />} />

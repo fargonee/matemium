@@ -4,23 +4,23 @@ const PLATFORMS = [
   {
     id: "linux",
     name: "Linux",
-    meta: "Ubuntu 22.04+ · x86_64",
-    status: "Early access",
-    note: "Native installer with bundled rendering engine.",
+    meta: "Ubuntu 24.04+ · x86_64",
+    status: "At launch",
+    note: ".deb and .AppImage installers with the native sidecar.",
   },
   {
     id: "windows",
     name: "Windows",
     meta: "Windows 10/11 · x86_64",
-    status: "Coming soon",
-    note: "Signed MSI/EXE installer with bundled engine.",
+    status: "At launch",
+    note: "Native NSIS .exe and .msi installers; unsigned builds may trigger SmartScreen.",
   },
   {
     id: "macos",
     name: "macOS",
-    meta: "Apple Silicon & Intel",
-    status: "Coming soon",
-    note: "Universal DMG with native engine binaries.",
+    meta: "macOS 12+ · Apple Silicon & Intel",
+    status: "At launch",
+    note: "Separate Apple Silicon and Intel .dmg installers.",
   },
 ];
 
@@ -30,8 +30,9 @@ export function DashboardDownloadsPage() {
       <Card>
         <h2 className="text-lg font-semibold">Installers</h2>
         <p className="mt-2 text-sm text-text-muted">
-          Matemium is free to use. Installers are distributed to signed-in accounts while
-          builds are staged for each platform.
+          Matemium is free to use. Linux, Windows, Apple Silicon macOS, and Intel
+          macOS installers all publish with the launch release. GitHub Releases is
+          authoritative for artifacts currently available to download.
         </p>
       </Card>
 
@@ -43,18 +44,19 @@ export function DashboardDownloadsPage() {
                 <h3 className="font-semibold">{platform.name}</h3>
                 <p className="text-xs text-text-subtle">{platform.meta}</p>
               </div>
-              <span className="rounded-full bg-warning/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-warning">
+              <span className="rounded-full bg-success/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-success">
                 {platform.status}
               </span>
             </div>
             <p className="mt-3 text-sm text-text-muted">{platform.note}</p>
-            <button
-              type="button"
-              disabled
-              className="mt-5 w-full rounded-[10px] border border-border-strong px-4 py-2.5 text-sm font-semibold text-text-muted opacity-60"
+            <a
+              href="https://github.com/fargonee/math/releases"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-5 block w-full rounded-[10px] border border-border-strong px-4 py-2.5 text-center text-sm font-semibold text-text-muted hover:border-accent hover:text-text"
             >
-              Notify when ready
-            </button>
+              Check releases ↗
+            </a>
           </Card>
         ))}
       </div>

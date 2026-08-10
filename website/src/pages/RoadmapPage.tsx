@@ -2,14 +2,16 @@ import { Link } from "react-router-dom";
 
 const COMPLETE = [
   "Infinite-sheet layout and animation engine",
-  "2D and real 3D composition",
-  "Desktop editor, project workspaces, and live preview",
-  "Local rendering, static export, and reel cutting",
-  "Agent chat, project roadmap, and decision workflow",
-  "Linux packaging and bundled rendering engine",
+  "2D, data visuals, multiple tapes, and persistent 3D worlds",
+  "Desktop editor, durable project workspaces, media, and output history",
+  "Local portrait/landscape rendering and live replay preview",
+  "Full-tape PNG/PDF export and portable project archives",
+  "Agent chat, project roadmap, and three production paths",
+  "Launch installers for Linux, Windows, Apple Silicon, and Intel macOS",
 ];
 
 const NOW = [
+  "Cross-platform launch validation, signing, notarization, and coordinated publishing",
   "Strengthen autonomous project planning",
   "Render evidence inspection and visual repair",
   "Production-path orchestration",
@@ -18,7 +20,6 @@ const NOW = [
 ];
 
 const NEXT = [
-  "Windows and macOS release paths",
   "Deeper narration and custom-audio production",
   "Community project publishing",
   "More polished example projects and learning material",
@@ -42,7 +43,7 @@ export function RoadmapPage() {
         <div className="roadmap-public">
           {[
             ["01", "Built", "The working foundation", COMPLETE, "complete"],
-            ["02", "Now", "Agentic production", NOW, "now"],
+            ["02", "Now", "Launch readiness and agentic production", NOW, "now"],
             ["03", "Next", "Reach and refinement", NEXT, "next"],
           ].map(([number, label, title, items, state]) => (
             <article key={label as string} className={`roadmap-column roadmap-${state}`}>
@@ -55,6 +56,15 @@ export function RoadmapPage() {
               </ul>
             </article>
           ))}
+        </div>
+        <div className="mt-8 rounded-2xl border border-success/30 bg-success/8 p-6">
+          <p className="text-sm leading-6 text-text-muted">
+            <strong className="text-text">Cross-platform launch commitment:</strong>{" "}
+            the launch release includes Linux <code>.deb</code> and <code>.AppImage</code>,
+            Windows <code>.exe</code> and <code>.msi</code>, and separate Apple Silicon
+            and Intel macOS <code>.dmg</code> installers. Windows and macOS are launch
+            platforms—not post-launch roadmap items.
+          </p>
         </div>
         <div className="mt-12 flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-accent/30 bg-accent/8 p-6">
           <p className="max-w-2xl text-sm leading-6 text-text-muted">

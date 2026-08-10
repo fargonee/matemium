@@ -17,6 +17,17 @@ const VALUES = [
   ["Your work is yours", "Keep and publish the lessons, videos, images, and scripts you create, including commercially."],
 ];
 
+const SHIPPED_FEATURES = [
+  "Portrait + landscape rendering",
+  "Multiple camera-facing tapes",
+  "2D, data visuals, and 3D worlds",
+  "Live replay preview",
+  "Full-tape PNG/PDF export",
+  "Portable project archives",
+  "11 editable subject examples",
+  "BYO-provider or local AI",
+];
+
 function ArrowIcon() {
   return (
     <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="none">
@@ -132,8 +143,8 @@ export function HomePage() {
           {[
             ["Infinite sheet", "Document-like composition"],
             ["2D + 3D", "One continuous visual world"],
-            ["Agent-assisted", "Decisions before generation"],
-            ["Portrait + landscape", "Built for every destination"],
+            ["Project-aware agent", "Durable briefs, decisions, and repair"],
+            ["Portable projects", "Archive, move, and reopen whole workspaces"],
           ].map(([title, body]) => (
             <div key={title} className="px-0 py-5 first:pl-0 md:px-7">
               <strong className="block text-sm text-text">{title}</strong>
@@ -157,14 +168,17 @@ export function HomePage() {
             <Link to="/showcase" className="text-link mt-5">Explore the showcase <ArrowIcon /></Link>
           </div>
         </div>
-        <div className="mt-12 grid gap-5 md:grid-cols-3">
-          {SHOWCASE_PROJECTS.filter((project) => project.featured).map((project) => (
-            <OutputCard
-              key={project.slug}
-              {...project}
-              subjectLabel={subjectById(project.subject).name}
-            />
-          ))}
+        <div className="showcase-grid mt-12">
+          {SHOWCASE_PROJECTS
+            .filter((project) => project.featured)
+            .sort((left, right) => Number(left.orientation === "Landscape") - Number(right.orientation === "Landscape"))
+            .map((project) => (
+              <OutputCard
+                key={project.slug}
+                {...project}
+                subjectLabel={subjectById(project.subject).name}
+              />
+            ))}
         </div>
       </section>
 
@@ -234,6 +248,80 @@ export function HomePage() {
                 <p>{description}</p>
               </article>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="feature-evidence-section border-y border-border px-5 py-24 md:py-32" id="features">
+        <div className="mx-auto max-w-7xl">
+          <div className="section-heading">
+            <div>
+              <p className="section-kicker">In the studio now</p>
+              <h2>From working source<br /><span className="text-text-muted">to durable deliverables.</span></h2>
+            </div>
+            <div className="max-w-md">
+              <p>
+                Matemium keeps the explanation, production decisions, media, and
+                output together. These are current desktop controls captured from
+                the same code that ships in the app.
+              </p>
+              <a href="https://docs.matemium.fargonee.space/desktop/import-export/" className="text-link mt-5">
+                Read the import and export guide <ArrowIcon />
+              </a>
+            </div>
+          </div>
+
+          <div className="feature-proof-grid mt-12">
+            <article className="feature-proof-card feature-proof-tape">
+              <div className="feature-proof-copy">
+                <span className="feature-proof-number">01</span>
+                <div>
+                  <p className="section-kicker">Full-tape documents</p>
+                  <h3>Keep the whole line of reasoning.</h3>
+                  <p>
+                    Inspect the saved scene, choose any populated tape, then export
+                    its natural uncropped proportions as PNG or PDF at native or fixed detail.
+                  </p>
+                </div>
+              </div>
+              <div className="feature-proof-shot">
+                <img
+                  src="/media/features/tape-export.png"
+                  alt="Matemium Export full tape dialog showing three tapes, PNG and PDF formats, and resolution controls"
+                  width="1600"
+                  height="1000"
+                  loading="lazy"
+                />
+              </div>
+            </article>
+
+            <article className="feature-proof-card feature-proof-projects">
+              <div className="feature-proof-copy">
+                <span className="feature-proof-number">02</span>
+                <div>
+                  <p className="section-kicker">Project portability</p>
+                  <h3>Move the workspace, not just the movie.</h3>
+                  <p>
+                    Export a complete <code>.matemium.zip</code> archive, including
+                    source, briefs, media, and output history. Importing creates a new
+                    local project and opens it ready to continue.
+                  </p>
+                </div>
+              </div>
+              <div className="feature-proof-shot">
+                <img
+                  src="/media/features/project-portability.png"
+                  alt="Matemium project library with Import Project, project archive controls, 11 bundled subjects, and four flagship outcomes"
+                  width="1600"
+                  height="1000"
+                  loading="lazy"
+                />
+              </div>
+            </article>
+          </div>
+
+          <div className="shipped-feature-list mt-8" aria-label="Current Matemium features">
+            {SHIPPED_FEATURES.map((feature) => <span key={feature}>{feature}</span>)}
           </div>
         </div>
       </section>

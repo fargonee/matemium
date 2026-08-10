@@ -25,10 +25,15 @@ export function ShowcasePage() {
     setSearchParams(nextFilter === "all" ? {} : { subject: nextFilter }, { replace: true });
   };
   const visibleProjects = useMemo(
-    () =>
-      filter === "all"
+    () => {
+      const projects = filter === "all"
         ? SHOWCASE_PROJECTS
-        : SHOWCASE_PROJECTS.filter((project) => project.subject === filter),
+        : SHOWCASE_PROJECTS.filter((project) => project.subject === filter);
+
+      return [...projects].sort(
+        (left, right) => Number(left.orientation === "Landscape") - Number(right.orientation === "Landscape"),
+      );
+    },
     [filter],
   );
 
@@ -61,7 +66,7 @@ export function ShowcasePage() {
           ))}
         </div>
 
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="showcase-grid mt-10">
           {visibleProjects.map((project, index) => (
             <OutputCard
               key={project.slug}

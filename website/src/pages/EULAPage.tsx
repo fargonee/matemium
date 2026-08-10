@@ -37,7 +37,8 @@ export function EULAPage() {
         <p>
           Matemium includes third-party software and libraries, including Manim
           Community Edition, Tauri components, Python runtime elements, and
-          TinyTeX. Those components are governed by their own license terms.
+          host-provided FFmpeg and LaTeX distributions. Those components are
+          governed by their own license terms.
         </p>
 
         <h2>4. Disclaimer</h2>
