@@ -132,10 +132,10 @@ jobs:
           python -m venv .venv
           if [ -f .venv/bin/python ]; then
             .venv/bin/python -m pip install --upgrade pip
-            .venv/bin/python -m pip install -e ".[dev,intelligence]" pyinstaller
+            .venv/bin/python -m pip install -e ".[dev]" pyinstaller
           else
             .venv/Scripts/python.exe -m pip install --upgrade pip
-            .venv/Scripts/python.exe -m pip install -e ".[dev,intelligence]" pyinstaller
+            .venv/Scripts/python.exe -m pip install -e ".[dev]" pyinstaller
           fi
           echo "Venv ready"
 

@@ -27,7 +27,7 @@ move independently of Aider's Python support window.
 
 ```bash
 python -m venv .venv
-.venv/bin/pip install -e '.[dev,intelligence]' pyinstaller
+.venv/bin/pip install -e '.[dev]' pyinstaller
 ./desktop/scripts/setup-aider-runtime.sh
 ```
 
