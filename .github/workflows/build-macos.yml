@@ -206,7 +206,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: ./desktop/scripts/build-macos.sh
+        run: bash ./desktop/scripts/build-macos.sh
 
       - name: Verify macOS bundle signature and notarization
         if: steps.ver.outputs.is_release == 'true'

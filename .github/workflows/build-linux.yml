@@ -177,7 +177,7 @@ jobs:
         run: ./desktop/scripts/build-linux.sh
 
       - name: Phase 10 - PAD readiness smoke (verify new commands, phases, manifest)
-        run: ./desktop/scripts/verify-pad-readiness.sh
+        run: bash ./desktop/scripts/verify-pad-readiness.sh
 
       - name: Phase 10 - Quick asset manifest presence check
         run: |
