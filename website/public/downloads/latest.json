@@ -1,0 +1,38 @@
+{
+  "tagName": "v0.3.0",
+  "name": "Matemium v0.3.0",
+  "htmlUrl": "https://github.com/fargonee/matemium/releases/tag/v0.3.0",
+  "publishedAt": "2026-08-10T00:00:00Z",
+  "assets": [
+    {
+      "id": 0,
+      "name": "Matemium_0.3.0_aarch64.dmg",
+      "size": 96573850,
+      "browser_download_url": "https://github.com/fargonee/matemium/releases/download/v0.3.0/Matemium_0.3.0_aarch64.dmg"
+    },
+    {
+      "id": 0,
+      "name": "Matemium_0.3.0_amd64.AppImage",
+      "size": 236978176,
+      "browser_download_url": "https://github.com/fargonee/matemium/releases/download/v0.3.0/Matemium_0.3.0_amd64.AppImage"
+    },
+    {
+      "id": 0,
+      "name": "Matemium_0.3.0_amd64.deb",
+      "size": 162529280,
+      "browser_download_url": "https://github.com/fargonee/matemium/releases/download/v0.3.0/Matemium_0.3.0_amd64.deb"
+    },
+    {
+      "id": 0,
+      "name": "Matemium_0.3.0_x64-setup.exe",
+      "size": 121634816,
+      "browser_download_url": "https://github.com/fargonee/matemium/releases/download/v0.3.0/Matemium_0.3.0_x64-setup.exe"
+    },
+    {
+      "id": 0,
+      "name": "Matemium_0.3.0_x64_en-US.msi",
+      "size": 122683392,
+      "browser_download_url": "https://github.com/fargonee/matemium/releases/download/v0.3.0/Matemium_0.3.0_x64_en-US.msi"
+    }
+  ]
+}

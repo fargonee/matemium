@@ -1,6 +1,7 @@
 const REPO = "fargonee/matemium";
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 const LATEST_RELEASE_API = `https://api.github.com/repos/${REPO}/releases/latest`;
+const LOCAL_RELEASE_MANIFEST = `${import.meta.env.BASE_URL}downloads/latest.json`;
 
 export type DownloadPlatform = "linux" | "windows" | "macos";
 
@@ -40,7 +41,29 @@ export function getReleasesUrl(): string {
 }
 
 export function loadLatestRelease(): Promise<LatestRelease | null> {
-  latestReleasePromise ??= fetch(LATEST_RELEASE_API, {
+  latestReleasePromise ??= loadLocalReleaseManifest().then((localRelease) => {
+    if (localRelease?.assets.length) return localRelease;
+    return loadGitHubLatestRelease();
+  });
+
+  return latestReleasePromise;
+}
+
+function loadLocalReleaseManifest(): Promise<LatestRelease | null> {
+  return fetch(LOCAL_RELEASE_MANIFEST, { cache: "no-cache" })
+    .then((response) => {
+      if (!response.ok) return null;
+      return response.json() as Promise<LatestRelease>;
+    })
+    .then((release) => {
+      if (!release?.tagName || !Array.isArray(release.assets)) return null;
+      return release;
+    })
+    .catch(() => null);
+}
+
+function loadGitHubLatestRelease(): Promise<LatestRelease | null> {
+  return fetch(LATEST_RELEASE_API, {
     headers: { Accept: "application/vnd.github+json" },
   })
     .then((response) => {
@@ -58,8 +81,6 @@ export function loadLatestRelease(): Promise<LatestRelease | null> {
       };
     })
     .catch(() => null);
-
-  return latestReleasePromise;
 }
 
 export function getPlatformLinks(
