@@ -4,7 +4,7 @@
 
 I’m releasing Matemium: a local-first, source-available desktop compiler for visual explanations, built on Manim. It is early on purpose—I want real projects to expose the weak parts and people who care about the problem to shape what comes next.
 
-[WEBSITE_URL]/articles/introducing-matemium
+https://matemium.fargonee.space/articles/introducing-matemium
 
 ## Thread
 
@@ -28,4 +28,4 @@ The code is available to inspect and contribute to under Matemium’s source-ava
 
 I’m opening the door before every edge is sanded down: setup prerequisites, signing, rough workflows, and all. If you like developer tools, visual explanations, local software, or testing ambitious abstractions, I’d value your feedback.
 
-[WEBSITE_URL]/articles/introducing-matemium
+https://matemium.fargonee.space/articles/introducing-matemium

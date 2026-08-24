@@ -9,7 +9,7 @@ tags:
   - ai
 ---
 
-> This is a developer-focused adaptation. The canonical launch article lives at [WEBSITE_URL]/articles/introducing-matemium.
+> This is a developer-focused adaptation. The canonical launch article lives at https://matemium.fargonee.space/articles/introducing-matemium.
 
 I have spent enough time writing technical animations to recognize a recurring failure mode: the code starts with an idea and ends as choreography.
 
@@ -184,16 +184,16 @@ Areas where contribution and outside use can help immediately include:
 
 ## Getting started
 
-1. Read the launch article and current documentation: [WEBSITE_URL]/articles/introducing-matemium and [DOCS_URL].
-2. Download the installer for your platform from [DOWNLOAD_URL].
+1. Read the launch article and current documentation: https://matemium.fargonee.space/articles/introducing-matemium and [DOCS_URL].
+2. Download the installer for your platform from https://matemium.fargonee.space/download.
 3. Install the platform's FFmpeg and LaTeX prerequisites described in the release notes.
 4. Open an example or create a project, run a preview-quality render, and inspect the output.
-5. Report installation failures, visual defects, or API friction at [GITHUB_URL].
+5. Report installation failures, visual defects, or API friction at https://github.com/fargonee/matemium.
 
 For engine development from source:
 
 ```bash
-git clone [GITHUB_URL]
+git clone https://github.com/fargonee/matemium
 cd matemium
 uv sync --python 3.12 --extra dev --frozen
 pytest
@@ -203,4 +203,4 @@ You can see current visual evidence at [DEMO_URL].
 
 I am releasing Matemium now because private polishing has reached diminishing returns. The next useful evidence will come from machines, subjects, and contributors I do not control. If the compiler model interests you, I would rather hear a precise objection or receive a reproducible failure than collect another vague launch compliment.
 
-Canonical article: [WEBSITE_URL]/articles/introducing-matemium
+Canonical article: https://matemium.fargonee.space/articles/introducing-matemium

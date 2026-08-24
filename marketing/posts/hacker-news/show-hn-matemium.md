@@ -18,4 +18,4 @@ The rough parts are real: FFmpeg and LaTeX remain host prerequisites, signing/no
 
 I could keep testing only the paths I already understand, but that is a poor way to discover whether the abstraction holds up. I would value code review, architectural criticism, installation reports, strange use cases, and ugly render bugs.
 
-Canonical explanation and links: [WEBSITE_URL]/articles/introducing-matemium
+Canonical explanation and links: https://matemium.fargonee.space/articles/introducing-matemium

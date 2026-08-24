@@ -14,4 +14,4 @@ What is usable today is the underlying compiler and desktop project path: infini
 
 I’m releasing it because building the agent against only my own projects would optimize for a very narrow distribution. I would like feedback from people working on coding agents, local-first tools, structured creative systems, or verification: which boundaries are useful, and which are ceremony without enough payoff?
 
-I’m the creator. Canonical launch article: [WEBSITE_URL]/articles/introducing-matemium
+I’m the creator. Canonical launch article: https://matemium.fargonee.space/articles/introducing-matemium

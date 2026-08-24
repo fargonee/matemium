@@ -23,7 +23,7 @@ The example library contains authoring proofs at different review stages, not el
 
 Matemium is source-available, not open-source. Review the Matemium Source-Available License before use or modification.
 
-- Downloads and checksums: [DOWNLOAD_URL]
-- Canonical launch article: [WEBSITE_URL]/articles/introducing-matemium
+- Downloads and checksums: https://matemium.fargonee.space/download
+- Canonical launch article: https://matemium.fargonee.space/articles/introducing-matemium
 - Documentation: [DOCS_URL]
-- Source and issues: [GITHUB_URL]
+- Source and issues: https://github.com/fargonee/matemium

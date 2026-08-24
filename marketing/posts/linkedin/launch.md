@@ -28,4 +28,4 @@ I hope Matemium reaches educators, Manim authors, Python developers, technical a
 
 The full launch article explains the architecture, what works today, and what remains rough:
 
-[WEBSITE_URL]/articles/introducing-matemium
+https://matemium.fargonee.space/articles/introducing-matemium

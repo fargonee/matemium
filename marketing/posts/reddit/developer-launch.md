@@ -23,4 +23,4 @@ The launch is early. Host FFmpeg/LaTeX setup still creates friction, signing is 
 
 I would genuinely like feedback on the compiler boundaries, API shape, packaging, and contribution model—even if your conclusion is that one of them is wrong.
 
-Main link: [GITHUB_URL]
+Main link: https://github.com/fargonee/matemium

@@ -17,8 +17,8 @@ If you try Matemium, please share any of the following:
 
 Please distinguish compile success from visual or domain correctness. A minimal repro and actual render evidence are especially useful.
 
-Start here: [WEBSITE_URL]/articles/introducing-matemium
+Start here: https://matemium.fargonee.space/articles/introducing-matemium
 
-Downloads: [DOWNLOAD_URL]
+Downloads: https://matemium.fargonee.space/download
 
-Contribution guide: [GITHUB_URL]/blob/main/CONTRIBUTING.md
+Contribution guide: https://github.com/fargonee/matemium/blob/main/CONTRIBUTING.md

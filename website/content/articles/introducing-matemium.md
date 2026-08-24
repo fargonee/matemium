@@ -151,7 +151,7 @@ That model is meant to make serious collaboration possible while keeping officia
 
 If Matemium interests you, try it on something I did not design for. Tell me where the model breaks. Open an issue with an ugly render. Question the tape/world boundary. Improve a validator, a platform build, a guide, or an example. The useful version of this project will be built from evidence, and I do not want all of that evidence to come from me.
 
-- GitHub and issues: [GITHUB_URL]
-- Download: [DOWNLOAD_URL]
+- GitHub and issues: https://github.com/fargonee/matemium
+- Download: https://matemium.fargonee.space/download
 - Demo: [DEMO_URL]
 - Documentation: [DOCS_URL]

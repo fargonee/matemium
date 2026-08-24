@@ -16,4 +16,4 @@ The application is free and source-available, not open-source. Rendering stays o
 
 If you teach, make educational videos, or have fought with visualizing a proof or derivation, I would value feedback on what this approach still fails to express. I’m the creator, and criticism is the point of releasing it now.
 
-Full explanation: [WEBSITE_URL]/articles/introducing-matemium
+Full explanation: https://matemium.fargonee.space/articles/introducing-matemium

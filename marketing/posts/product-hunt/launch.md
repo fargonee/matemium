@@ -48,7 +48,6 @@ If you make visual explanations, teach, work with Manim, or build local creative
 
 ## Links
 
-- Suggested primary link: [WEBSITE_URL]/articles/introducing-matemium
-- Suggested secondary link: [DOWNLOAD_URL]
-- Suggested secondary link: [GITHUB_URL]
-- Suggested secondary link: [DEMO_URL]
+- Suggested primary link: https://matemium.fargonee.space/articles/introducing-matemium
+- Suggested secondary link: https://matemium.fargonee.space/download
+- Suggested secondary link: https://github.com/fargonee/matemium

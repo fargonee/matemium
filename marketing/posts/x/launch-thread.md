@@ -6,7 +6,7 @@
 
 Matemium is live: a free, source-available desktop studio and layout-to-animation compiler for structured visual explanations. It uses Manim, renders locally, and is ready for honest early feedback.
 
-[WEBSITE_URL]/articles/introducing-matemium
+https://matemium.fargonee.space/articles/introducing-matemium
 
 ### 2/9
 
@@ -40,10 +40,10 @@ It is early. FFmpeg and LaTeX are still host prerequisites, signing needs work o
 
 I could keep tuning Matemium against my own examples, or let real use expose the weak assumptions. I chose the second. Try it, break it, question the architecture, and tell me what should improve first.
 
-[WEBSITE_URL]/articles/introducing-matemium
+https://matemium.fargonee.space/articles/introducing-matemium
 
 ## Standalone ultra-short post
 
 Matemium is live: an early, local-first, source-available compiler for animated visual explanations. Built on Manim, shaped in public from here.
 
-[WEBSITE_URL]/articles/introducing-matemium
+https://matemium.fargonee.space/articles/introducing-matemium
